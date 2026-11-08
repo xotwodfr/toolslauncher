@@ -10,8 +10,8 @@
   "scripts": {
     "start": "node ../../node_modules/electron/cli.js .",
     "test": "node test/tags.test.js",
-    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip",
-    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip"
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
   },
   "dependencies": {
     "node-taglib-sharp": "^6.0.3"

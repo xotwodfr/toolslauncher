@@ -12,8 +12,8 @@
     "test": "node scripts/selftest.js",
     "icon": "node scripts/make-icon.js",
     "pack": "electron-builder --dir",
-    "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux"
+    "dist:win": "electron-builder --win --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "author": {
     "name": "xotwodfr",
