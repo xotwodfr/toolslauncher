@@ -43,33 +43,35 @@ jobs:
             exit 1
           fi
 
+      # scripts/ci-step.sh runs a command normally, but if it fails it also publishes the last lines of its output as an
+      # error annotation, so a failed run explains itself (annotations are readable without signing in).
       - name: Launcher - install, test, package
         run: |
-          npm ci
-          npm test
-          npm run ${{ matrix.script }}
+          bash scripts/ci-step.sh "Launcher: npm ci" npm ci
+          bash scripts/ci-step.sh "Launcher: npm test" npm test
+          bash scripts/ci-step.sh "Launcher: package" npm run ${{ matrix.script }}
 
       - name: Picture Converter
         working-directory: tools/picture-converter
         run: |
-          npm ci
-          npm test
-          npm run ${{ matrix.script }}
+          bash ../../scripts/ci-step.sh "Picture Converter: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Picture Converter: npm test" npm test
+          bash ../../scripts/ci-step.sh "Picture Converter: package" npm run ${{ matrix.script }}
 
       - name: Audio Tagger
         working-directory: tools/audio-tagger
         run: |
-          npm ci
-          npm test
-          npm run ${{ matrix.script }}
+          bash ../../scripts/ci-step.sh "Audio Tagger: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Audio Tagger: npm test" npm test
+          bash ../../scripts/ci-step.sh "Audio Tagger: package" npm run ${{ matrix.script }}
 
       - name: Audio Converter
         working-directory: tools/audio-converter
         run: |
-          npm ci
-          npm run setup   # downloads the bundled ffmpeg binary (ffmpeg-static)
-          npm test
-          npm run ${{ matrix.script }}
+          bash ../../scripts/ci-step.sh "Audio Converter: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Audio Converter: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
+          bash ../../scripts/ci-step.sh "Audio Converter: npm test" npm test
+          bash ../../scripts/ci-step.sh "Audio Converter: package" npm run ${{ matrix.script }}
 
       - name: Collect release files into one flat folder
         run: |
