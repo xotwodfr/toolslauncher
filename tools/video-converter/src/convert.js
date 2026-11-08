@@ -211,8 +211,10 @@ function runFfmpeg(args, span, hooks, onFraction) {
     const p = spawn(ffmpegPath(), args, { windowsHide: true });
     let err = '', buf = '', speed = 0;
     p.stdout.setEncoding('utf8'); p.stderr.setEncoding('utf8');
-    const onAbort = () => { p.kill(); };
-    if (hooks.signal) { if (hooks.signal.aborted) p.kill(); else hooks.signal.addEventListener('abort', onAbort, { once: true }); }
+    // SIGKILL, not the polite SIGTERM: on a slow machine ffmpeg would first finish encoding its queued frames (many
+    // seconds), and the half-written file is thrown away anyway. (On Windows kill() always ends the process at once.)
+    const onAbort = () => { p.kill('SIGKILL'); };
+    if (hooks.signal) { if (hooks.signal.aborted) onAbort(); else hooks.signal.addEventListener('abort', onAbort, { once: true }); }
     p.stdout.on('data', (d) => {
       buf += d;
       let i;
