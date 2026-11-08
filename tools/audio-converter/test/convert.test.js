@@ -13,7 +13,9 @@ const ok = (m) => { n++; console.log('  ok  ' + m); };
 const run = (args) => { const r = spawnSync(ff, ['-y', '-hide_banner', '-loglevel', 'error', ...args]); assert.strictEqual(r.status, 0, 'ffmpeg: ' + r.stderr); };
 
 (async () => {
-  assert.strictEqual(spawnSync(ff, ['-version']).status, 0, 'ffmpeg must be available (run `npm run setup`)');
+  const ver = spawnSync(ff, ['-version']);
+  assert.strictEqual(ver.status, 0, 'ffmpeg must be available (run `npm run setup`)');
+  console.log('  using ' + String(ver.stdout).split('\n')[0]);
 
   // fixtures: 2s stereo 44.1k sine as WAV, and a FLAC with title/artist tags + embedded cover
   const wav = path.join(tmp, 'tone.wav');
@@ -44,13 +46,19 @@ const run = (args) => { const r = spawnSync(ff, ['-y', '-hide_banner', '-logleve
   ok('wav -> mp3/m4a/ogg/opus/flac/wav (codec + duration)');
 
   // ---- tags and cover survive (where the format can carry them)
+  // Check every format before failing, and on a problem show ffmpeg's own report: different ffmpeg builds
+  // (Windows vs Linux) can lay tags out differently, and a CI log is all we get to see.
+  const problems = [];
   for (const fmt of ['mp3', 'flac', 'm4a', 'ogg', 'opus']) {
     const r = await C.convertOne(tagged, { format: fmt, outDir: path.join(tmp, 'tags') });
     const p = await C.probe(r.output);
-    assert.strictEqual(p.tags.title, 'Café ♪', `${fmt} title`);
-    assert.strictEqual(p.tags.artist, 'The Band', `${fmt} artist`);
-    assert.strictEqual(p.coverStream != null, C.FORMATS[fmt].cover, `${fmt} cover expected=${C.FORMATS[fmt].cover}`);
+    const bad = [];
+    if (p.tags.title !== 'Café ♪') bad.push(`title=${JSON.stringify(p.tags.title)}`);
+    if (p.tags.artist !== 'The Band') bad.push(`artist=${JSON.stringify(p.tags.artist)}`);
+    if ((p.coverStream != null) !== C.FORMATS[fmt].cover) bad.push(`cover=${p.coverStream != null} (expected ${C.FORMATS[fmt].cover})`);
+    if (bad.length) problems.push(`[${fmt}] ${bad.join(', ')}\n--- ffmpeg report for the ${fmt} output:\n${p.raw.split('\n').slice(0, 16).join('\n')}`);
   }
+  assert.strictEqual(problems.length, 0, '\n' + problems.join('\n'));
   ok('tags preserved; cover kept for mp3/flac/m4a');
   const stripped = await C.convertOne(tagged, { format: 'mp3', keepTags: false, outDir: path.join(tmp, 'strip') });
   const sp = await C.probe(stripped.output);

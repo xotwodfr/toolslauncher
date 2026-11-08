@@ -104,6 +104,7 @@ function probe(input) {
         durationSec: Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]),
         codec: audio[2].trim(), sampleRate: hz ? Number(hz[1]) : 0, bitrate: kbps ? Number(kbps[1]) : 0,
         coverStream: cover ? Number(cover[1]) : null, tags: meta,
+        raw: err, // ffmpeg's own report, kept for diagnostics (tests print it when something looks wrong)
       });
     });
   });
