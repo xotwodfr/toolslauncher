@@ -1,7 +1,7 @@
 {
   "name": "tools-launcher",
   "productName": "Tools Launcher",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cross-platform launcher to install, update and run small creative tools (audio tagger, audio converter, picture converter).",
   "main": "src/main/main.js",
   "license": "MIT",

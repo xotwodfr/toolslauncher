@@ -2,7 +2,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { convertOne, isSupportedInput, INPUT_EXTS } = require('./convert');
+const { convertOne, normalizeOptions, isSupportedInput, INPUT_EXTS } = require('./convert');
+const { describe } = require('./formats');
 
 let win = null;
 let cancelled = false;
@@ -58,9 +59,12 @@ ipcMain.handle('dir:pick', async () => {
   return r.canceled ? null : r.filePaths[0];
 });
 
+ipcMain.handle('formats:describe', () => describe());
+
 ipcMain.handle('convert:start', async (_e, files, opts) => {
   if (running) throw new Error('A conversion is already running');
   if (!Array.isArray(files) || files.length === 0) throw new Error('No files to convert');
+  normalizeOptions(opts); // reject bad options once, up front, instead of failing every file
   running = true;
   cancelled = false;
   let done = 0, failed = 0, inBytes = 0, outBytes = 0;
@@ -88,8 +92,24 @@ ipcMain.handle('reveal', (_e, file) => {
   if (producedFiles.has(file)) shell.showItemInFolder(file);
 });
 
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) app.quit();
+// `--self-test=<result.json>`: convert to every format and write the results to a file, then exit. Used to prove
+// that a PACKAGED build (encoders, WebAssembly loader, native sharp) works. No window, no single-instance lock.
+const selfTestArg = process.argv.find((a) => a.startsWith('--self-test='));
+const gotLock = selfTestArg ? true : app.requestSingleInstanceLock();
+if (selfTestArg) {
+  app.whenReady().then(async () => {
+    const out = selfTestArg.slice('--self-test='.length);
+    let code = 1;
+    try {
+      const results = await require('./selftest').run();
+      fs.writeFileSync(out, JSON.stringify({ ok: results.every((r) => r.ok), results }, null, 2));
+      code = results.every((r) => r.ok) ? 0 : 1;
+    } catch (e) {
+      fs.writeFileSync(out, JSON.stringify({ ok: false, error: String(e && e.stack || e) }, null, 2));
+    }
+    app.exit(code);
+  });
+} else if (!gotLock) app.quit();
 else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.whenReady().then(createWindow);

@@ -142,6 +142,50 @@ function makeTool(version, { badHash = false, evil = false } = {}) {
   assert.strictEqual((await store.getSettings({ checkUpdatesOnStart: true })).checkUpdatesOnStart, true);
   ok('settings persist + defaults');
 
+  // ---- updating while the old version is RUNNING ----------------------------------------------------
+  // On Windows a running .exe cannot be deleted. Updating must still succeed (new version in, old one left for
+  // later cleanup) instead of failing and throwing the new, working version away.
+  {
+    const { spawn } = require('child_process');
+    const exeTool = (version) => {
+      const zip = new AdmZip();
+      const body = process.platform === 'win32'
+        ? fs.readFileSync(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'PING.EXE'))
+        : fs.readFileSync('/bin/sleep');
+      zip.addFile('tool.bin', body, '', 0o755);
+      const file = path.join(tmp, `exe-${version}.zip`); zip.writeZip(file);
+      return { id: 'busy', name: 'Busy', version, platforms: { [key]: { url: pathToFileURL(file).href, sha256: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'), exec: 'tool.bin', kind: 'zip' } } };
+    };
+    const st = new core.Store(path.join(tmp, 'busy-data'));
+    await st.install(exeTool('1.0.0'), undefined, L);
+    const run = await st.resolveLaunch('busy');
+    const child = spawn(run.file, process.platform === 'win32' ? ['-n', '300', '127.0.0.1'] : ['300'], { stdio: 'ignore' });
+    await new Promise((r) => child.once('spawn', r));
+    await new Promise((r) => setTimeout(r, 300));
+    try {
+      await st.install(exeTool('2.0.0'), undefined, L); // must not throw even if 1.0.0 is locked
+      assert.strictEqual((await st.getInstalled()).busy.version, '2.0.0');
+      const now = await st.resolveLaunch('busy');
+      assert(fs.existsSync(now.file) && now.file.includes('2.0.0'), 'the new version is installed and launchable');
+      if (process.platform === 'win32') assert(fs.existsSync(path.join(st.toolsDir, 'busy', '1.0.0')), 'locked old version is left in place (cleaned up later)');
+    } finally {
+      child.kill();
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    await st.pruneOldVersions();
+    assert(!fs.existsSync(path.join(st.toolsDir, 'busy', '1.0.0')), 'old version is removed once it is no longer running');
+    assert(fs.existsSync(path.join(st.toolsDir, 'busy', '2.0.0')), 'pruning never touches the installed version');
+    // uninstalling a tool that is running removes it from the list, and the leftovers are pruned later
+    const child2 = spawn((await st.resolveLaunch('busy')).file, process.platform === 'win32' ? ['-n', '300', '127.0.0.1'] : ['300'], { stdio: 'ignore' });
+    await new Promise((r) => child2.once('spawn', r)); await new Promise((r) => setTimeout(r, 300));
+    try { await st.uninstall('busy'); } catch (e) { assert(/still running|in use/i.test(e.message), 'friendly uninstall error: ' + e.message); }
+    assert.deepStrictEqual(await st.getInstalled(), {}, 'it is off the installed list either way');
+    child2.kill(); await new Promise((r) => setTimeout(r, 500));
+    await st.pruneOldVersions();
+    assert(!fs.existsSync(path.join(st.toolsDir, 'busy')), 'leftover files of an uninstalled tool are pruned');
+    ok('update/uninstall while the old version is running: new version survives, leftovers pruned later');
+  }
+
   // ---- catalog parsing: a hosted catalog is untrusted input ----------------------------------------
   const goodSha = 'AB'.repeat(32);
   const parsed = core.parseCatalog(JSON.stringify({

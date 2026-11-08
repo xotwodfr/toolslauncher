@@ -2,6 +2,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('pc', {
+  describeFormats: () => ipcRenderer.invoke('formats:describe'),
   pickFiles: () => ipcRenderer.invoke('files:pick'),
   pickFolder: () => ipcRenderer.invoke('files:pick-folder'),
   pickOutputDir: () => ipcRenderer.invoke('dir:pick'),

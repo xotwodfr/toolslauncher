@@ -12,7 +12,7 @@
     <section class="left">
       <div id="drop" class="drop" tabindex="0" role="button" aria-label="Add images">
         <strong>Drop images or folders here</strong>
-        <span class="muted">JPG, PNG, WebP, AVIF, GIF, TIFF, SVG</span>
+        <span class="muted small">Reads JPG, PNG, WebP, AVIF, GIF, TIFF, SVG, BMP, ICO, TGA, QOI, PPM/PGM and JPEG XL</span>
         <div class="row center">
           <button id="addFiles" class="btn">Add files…</button>
           <button id="addFolder" class="btn">Add folder…</button>
@@ -26,39 +26,39 @@
     </section>
 
     <aside class="right">
-      <h2>Output</h2>
-      <label>Format
-        <select id="format">
-          <option value="webp">WebP</option>
-          <option value="jpeg">JPG</option>
-          <option value="png">PNG</option>
-          <option value="avif">AVIF</option>
-        </select>
-      </label>
-      <label id="qualityRow"><span>Quality <output id="qualityOut" class="muted">85</output></span>
-        <input id="quality" type="range" min="1" max="100" value="85">
-      </label>
-      <label class="check"><input id="resizeOn" type="checkbox"> Limit size (fit inside)</label>
-      <div id="resizeRow" class="row" hidden>
-        <input id="rw" type="number" min="1" max="20000" placeholder="Width px">
-        <span class="muted">×</span>
-        <input id="rh" type="number" min="1" max="20000" placeholder="Height px">
-      </div>
-      <label class="check"><input id="keepMeta" type="checkbox"> Keep metadata (EXIF)</label>
+      <div class="scroll">
+        <h2>Convert to</h2>
+        <label class="sr-label">Format
+          <select id="format" aria-label="Output format"></select>
+        </label>
+        <p id="fmtHint" class="muted small hint"></p>
 
-      <label>Save to
-        <div class="row">
-          <input id="outDir" type="text" readonly value="Same folder as each image">
-          <button id="pickOut" class="btn small">Browse</button>
-          <button id="resetOut" class="btn ghost small" title="Use the source folder" hidden>Reset</button>
+        <div id="fmtOptions" class="opts"></div>
+
+        <div class="sep"></div>
+        <label class="check"><input id="resizeOn" type="checkbox"> Limit size (fit inside)</label>
+        <div id="resizeRow" class="row" hidden>
+          <input id="rw" type="number" min="1" max="20000" placeholder="Width px">
+          <span class="muted">×</span>
+          <input id="rh" type="number" min="1" max="20000" placeholder="Height px">
         </div>
-      </label>
-      <p class="muted small">Originals are never changed or overwritten.</p>
+        <label class="check" id="metaRow"><input id="keepMeta" type="checkbox"> Keep metadata (EXIF)</label>
 
-      <div class="grow"></div>
-      <div id="summary" class="summary" hidden></div>
-      <button id="go" class="btn primary big" disabled>Convert</button>
-      <button id="cancel" class="btn big" hidden>Cancel</button>
+        <label>Save to
+          <div class="row">
+            <input id="outDir" type="text" readonly value="Same folder as each image">
+            <button id="pickOut" class="btn small">Browse</button>
+            <button id="resetOut" class="btn ghost small" title="Use the source folder" hidden>Reset</button>
+          </div>
+        </label>
+        <p class="muted small">Originals are never changed or overwritten.</p>
+      </div>
+
+      <div class="foot">
+        <div id="summary" class="summary" hidden></div>
+        <button id="go" class="btn primary big" disabled>Convert</button>
+        <button id="cancel" class="btn big" hidden>Cancel</button>
+      </div>
     </aside>
   </div>
   <script src="app.js"></script>

@@ -24,7 +24,7 @@
     {
       "id": "picture-converter",
       "name": "Picture Converter",
-      "description": "Convert and resize PNG, JPG, WebP and AVIF images in bulk.",
+      "description": "Convert and resize images between 14 formats: JPEG, PNG, WebP, GIF, AVIF, JPEG XL, TIFF, PDF, BMP, ICO, TGA and more.",
       "category": "Images",
       "glyph": "▣",
       "accent": "#7c5cff",

@@ -307,10 +307,9 @@ class Store {
       };
       await writeJsonAtomic(this.installedFile, installed);
 
-      // Remove older version folders
-      if (previous && previous.version !== String(tool.version)) {
-        await fsp.rm(path.join(this.toolsDir, id, previous.version), { recursive: true, force: true });
-      }
+      // Remove older version folders. Best effort: on Windows a RUNNING tool's files cannot be deleted, and that must
+      // never undo an otherwise successful update. Leftovers are removed on the next prune (next update / app start).
+      if (previous && previous.version !== String(tool.version)) await this.pruneOldVersions(id);
       onProgress({ phase: 'done' });
       return installed[id];
     } catch (err) {
@@ -325,8 +324,35 @@ class Store {
     const id = safeId(idRaw);
     const installed = await this.getInstalled();
     delete installed[id];
-    await writeJsonAtomic(this.installedFile, installed);
-    await fsp.rm(path.join(this.toolsDir, id), { recursive: true, force: true });
+    await writeJsonAtomic(this.installedFile, installed); // off the list first: this part always succeeds
+    try {
+      await fsp.rm(path.join(this.toolsDir, id), { recursive: true, force: true });
+    } catch {
+      throw new Error('Removed from your list, but some files are still in use (is the tool still running?). They will be cleaned up automatically later.');
+    }
+  }
+
+  /**
+   * Delete versions that are no longer the installed one (and whole folders of tools that are not installed).
+   * Never throws: anything still in use (a running tool on Windows) is simply tried again next time.
+   * @param {string} [onlyId] limit to one tool
+   */
+  async pruneOldVersions(onlyId) {
+    let ids = [];
+    try { ids = await fsp.readdir(this.toolsDir); } catch { return; }
+    const installed = await this.getInstalled();
+    for (const id of ids) {
+      if (onlyId && id !== onlyId) continue;
+      if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(id)) continue; // never touch anything we did not create
+      const dir = path.join(this.toolsDir, id);
+      const keep = installed[id] && String(installed[id].version);
+      try {
+        if (!keep) { await fsp.rm(dir, { recursive: true, force: true }); continue; }
+        for (const v of await fsp.readdir(dir)) {
+          if (v !== keep) await fsp.rm(path.join(dir, v), { recursive: true, force: true }).catch(() => {});
+        }
+      } catch { /* in use: try again later */ }
+    }
   }
 
   /** Absolute path + args to launch an installed tool. */

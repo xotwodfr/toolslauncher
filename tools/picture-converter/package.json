@@ -1,8 +1,8 @@
 {
   "name": "picture-converter",
   "productName": "Picture Converter",
-  "version": "0.1.0",
-  "description": "Batch convert and resize images (PNG, JPG, WebP, AVIF).",
+  "version": "0.2.0",
+  "description": "Batch convert and resize images between 14 formats (JPEG, PNG, WebP, GIF, AVIF, JPEG XL, TIFF, PDF, BMP, ICO, TGA, QOI, PPM, PGM).",
   "main": "src/main.js",
   "license": "MIT",
   "author": {
@@ -12,11 +12,12 @@
   "homepage": "https://github.com/xotwodfr/toolslauncher",
   "scripts": {
     "start": "node ../../node_modules/electron/cli.js .",
-    "test": "node test/convert.test.js",
+    "test": "node test/convert.test.js && node test/codecs.test.js && node test/formats.test.js",
     "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
     "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
   },
   "dependencies": {
+    "@jsquash/jxl": "^1.3.0",
     "sharp": "^0.35.5"
   },
   "build": {
@@ -33,7 +34,9 @@
     ],
     "asarUnpack": [
       "node_modules/sharp/**",
-      "node_modules/@img/**"
+      "node_modules/@img/**",
+      "node_modules/@jsquash/**",
+      "node_modules/wasm-feature-detect/**"
     ],
     "artifactName": "PictureConverter-${version}-${os}-${arch}.${ext}",
     "executableName": "picture-converter",

@@ -46,7 +46,10 @@
     const prog = state.progress[t.id];
     const busy = state.busy.has(t.id);
 
-    const meta = el('div', { class: 'card-meta' }, el('span', {}, t.category), el('span', {}, `v${t.installedVersion || t.version}`));
+    const meta = el('div', { class: 'card-meta' }, el('span', {}, t.category),
+      t.state === 'update'
+        ? el('span', { class: 'upd', title: 'A newer version is available' }, `v${t.installedVersion} → v${t.version}`)
+        : el('span', {}, `v${t.installedVersion || t.version}`));
     if (t.size) meta.append(el('span', {}, fmtBytes(t.size)));
 
     const head = el('div', { class: 'card-head' },
@@ -67,10 +70,12 @@
     } else if (t.state === 'available') {
       foot.append(el('button', { class: 'btn primary main', onclick: () => act('install', t) }, 'Install'));
     } else {
-      foot.append(el('button', { class: 'btn go main', onclick: () => act('launch', t) }, 'Launch'));
       if (t.state === 'update') {
-        foot.append(el('button', { class: 'btn primary', title: `Update to v${t.version}`, onclick: () => act('install', t) }, 'Update'));
+        // the update gets its own full-width row so it can't be missed
+        foot.classList.add('wrap');
+        foot.append(el('button', { class: 'btn primary full', title: `Download and install v${t.version}`, onclick: () => act('install', t) }, `Update to v${t.version}`));
       }
+      foot.append(el('button', { class: 'btn go main', onclick: () => act('launch', t) }, 'Launch'));
       foot.append(
         el('button', { class: 'btn ghost small', title: 'Show files', onclick: () => act('reveal', t) }, 'Files'),
         el('button', { class: 'btn ghost small', title: 'Uninstall', onclick: () => act('uninstall', t) }, 'Remove'));

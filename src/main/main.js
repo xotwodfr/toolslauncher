@@ -157,6 +157,9 @@ if (!gotLock) {
       win.focus();
     }
   });
-  app.whenReady().then(createWindow);
+  app.whenReady().then(() => {
+    createWindow();
+    store.pruneOldVersions().catch(() => {}); // clean up leftovers of earlier updates (e.g. files that were in use)
+  });
   app.on('window-all-closed', () => app.quit());
 }

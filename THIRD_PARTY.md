@@ -9,6 +9,8 @@ components. Each downloadable package also carries the licence files its compone
 | [Electron](https://github.com/electron/electron) and Chromium | all apps | MIT; Chromium and its dependencies under various open-source licences | Full notices: `LICENSES.chromium.html` in each package |
 | [adm-zip](https://github.com/cthackers/adm-zip) | Launcher | MIT | |
 | [sharp](https://github.com/lovell/sharp) | Picture Converter | Apache-2.0 | Bundles [libvips](https://github.com/libvips/libvips) (LGPL-3.0-or-later) and other native libraries; see the `@img/sharp-*` package licences |
+| [@jsquash/jxl](https://github.com/jamsinclair/jSquash) | Picture Converter | Apache-2.0 | [libjxl](https://github.com/libjxl/libjxl) (BSD-3-Clause, with Highway under Apache-2.0) compiled to WebAssembly; used for JPEG XL. Runs in-process, no native code |
+| [wasm-feature-detect](https://github.com/GoogleChromeLabs/wasm-feature-detect) | Picture Converter | Apache-2.0 | Used by @jsquash/jxl |
 | [node-taglib-sharp](https://github.com/benrr101/node-taglib-sharp) | Audio Tagger | LGPL-2.1-or-later | Pure JavaScript; dependencies iconv-lite, os-locale, uuid (MIT) |
 | [FFmpeg](https://ffmpeg.org/) via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | Audio Converter | **GPL-3.0-or-later** (this build is GPL: libmp3lame, libopus, libvorbis and others) | See below |
 
