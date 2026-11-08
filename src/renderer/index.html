@@ -8,53 +8,140 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a class="skip" href="#content">Skip to content</a>
   <div class="app">
-    <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">◆</span><span>Tools Launcher</span></div>
-      <nav>
-        <button class="nav-item active" data-view="library">Library</button>
-        <button class="nav-item" data-view="installed">Installed <span class="badge" id="installedCount">0</span></button>
-        <button class="nav-item" data-view="settings">Settings</button>
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true" data-icon="logo"></span>
+        <div class="brand-text">
+          <div class="brand-name">Tools Launcher</div>
+          <div class="brand-sub" id="versionLabel"></div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="library" aria-current="page">
+          <span class="ico" data-icon="grid" aria-hidden="true"></span><span class="label">Library</span>
+        </button>
+        <button class="nav-item" data-view="installed">
+          <span class="ico" data-icon="check" aria-hidden="true"></span><span class="label">Installed</span>
+          <span class="badge" id="installedCount">0</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="ico" data-icon="cog" aria-hidden="true"></span><span class="label">Settings</span>
+        </button>
       </nav>
+
       <div class="sidebar-foot">
-        <div id="envLabel" class="muted small"></div>
-        <div id="versionLabel" class="muted small"></div>
+        <div class="status" id="statusChip" data-tone="info" title="">
+          <i class="dot" aria-hidden="true"></i><span id="statusText">Loading…</span>
+        </div>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <h1 id="viewTitle">Library</h1>
+        <div class="titles">
+          <h1 id="viewTitle">Library</h1>
+          <p id="viewSub" class="sub"></p>
+        </div>
         <div class="topbar-actions">
-          <input id="search" type="search" placeholder="Search tools…" autocomplete="off">
-          <button id="refresh" class="btn ghost" title="Refresh catalog">Refresh</button>
-          <button id="updateAll" class="btn primary" hidden>Update all</button>
+          <label class="search" id="searchBox">
+            <span class="ico" data-icon="search" aria-hidden="true"></span>
+            <input id="search" type="search" placeholder="Search tools" aria-label="Search tools" autocomplete="off" spellcheck="false">
+            <kbd aria-hidden="true">/</kbd>
+          </label>
+          <button id="refresh" class="btn icon" title="Check for updates" aria-label="Check for updates">
+            <span class="ico" data-icon="refresh" aria-hidden="true"></span>
+          </button>
+          <button id="updateAll" class="btn primary" hidden></button>
         </div>
       </header>
 
-      <div id="banner" class="banner" hidden></div>
+      <div id="banner" class="notice" role="status" hidden>
+        <span class="ico" data-icon="alert" aria-hidden="true"></span>
+        <span id="bannerText"></span>
+        <button id="bannerRetry" class="btn small ghost">Try again</button>
+      </div>
 
-      <section id="view-library" class="view">
-        <div id="grid" class="grid"></div>
-        <p id="empty" class="muted center" hidden>Nothing to show.</p>
-      </section>
-
-      <section id="view-settings" class="view" hidden>
-        <div class="panel">
-          <h2>Catalog</h2>
-          <p class="muted">Where the list of tools comes from. Leave empty to use the official catalog (published with each release on GitHub). Only https:// addresses are accepted.</p>
-          <input id="catalogUrl" type="url" placeholder="Default: official catalog" spellcheck="false">
-          <label class="check"><input id="checkUpdates" type="checkbox"> Check for tool updates when the launcher starts</label>
-          <div class="row">
-            <button id="saveSettings" class="btn primary">Save</button>
-            <button id="openData" class="btn ghost">Open data folder</button>
+      <div class="content" id="content" tabindex="-1">
+        <section id="view-library" class="view">
+          <div class="hero" id="hero">
+            <div class="hero-text">
+              <h2 id="heroTitle">Your creative toolkit</h2>
+              <p id="heroSub">Install a tool, launch it, and keep it up to date, all in one place.</p>
+            </div>
+            <div class="stats" id="heroStats" aria-label="Summary"></div>
           </div>
-          <p id="settingsMsg" class="muted small"></p>
-        </div>
-      </section>
+          <div class="chips" id="categories" role="group" aria-label="Filter by category"></div>
+          <div id="grid" class="grid" aria-live="polite"></div>
+          <div id="empty" class="empty" hidden>
+            <span class="ico big" data-icon="search" aria-hidden="true"></span>
+            <h3>No tools match</h3>
+            <p class="muted">Try a different search, or clear the category filter.</p>
+          </div>
+        </section>
+
+        <section id="view-installed" class="view" hidden>
+          <div id="installedList" class="list"></div>
+          <div id="installedEmpty" class="empty" hidden>
+            <span class="ico big" data-icon="grid" aria-hidden="true"></span>
+            <h3>Nothing installed yet</h3>
+            <p class="muted">Install a tool from the Library and it will show up here.</p>
+            <button class="btn primary" id="goLibrary">Browse the Library</button>
+          </div>
+        </section>
+
+        <section id="view-settings" class="view" hidden>
+          <div class="cards">
+            <div class="panel">
+              <h2>Catalog</h2>
+              <p class="muted">Where the list of tools comes from. Leave it empty to use the official catalog published with each release on GitHub. Only <code>https://</code> addresses are accepted.</p>
+              <label class="field">
+                <span class="field-label">Catalog URL</span>
+                <input id="catalogUrl" type="url" placeholder="Default: official catalog" spellcheck="false" autocomplete="off">
+              </label>
+              <div class="row">
+                <button id="saveSettings" class="btn primary">Save</button>
+                <button id="resetCatalog" class="btn ghost">Use the default</button>
+              </div>
+              <p id="settingsMsg" class="msg" role="status"></p>
+            </div>
+
+            <div class="panel">
+              <h2>Updates</h2>
+              <label class="switch">
+                <input id="checkUpdates" type="checkbox">
+                <span class="track" aria-hidden="true"><i></i></span>
+                <span class="switch-text">Check for tool updates when the launcher starts</span>
+              </label>
+              <p class="muted small">You can always check by pressing the refresh button at the top.</p>
+            </div>
+
+            <div class="panel">
+              <h2>Storage</h2>
+              <p class="muted">Installed tools and the launcher's settings are stored in your user data folder.</p>
+              <div class="row"><button id="openData" class="btn"><span class="ico" data-icon="folder" aria-hidden="true"></span>Open data folder</button></div>
+            </div>
+
+            <div class="panel">
+              <h2>About</h2>
+              <dl class="about">
+                <div><dt>Version</dt><dd id="aboutVersion"></dd></div>
+                <div><dt>Platform</dt><dd id="aboutPlatform"></dd></div>
+                <div><dt>Catalog</dt><dd id="aboutSource"></dd></div>
+                <div><dt>Source code</dt><dd><a href="https://github.com/xotwodfr/toolslauncher" target="_blank" rel="noopener">github.com/xotwodfr/toolslauncher</a></dd></div>
+                <div><dt>Licence</dt><dd>MIT</dd></div>
+              </dl>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
+
   <div id="toasts" class="toasts" aria-live="polite"></div>
+  <div id="modalRoot"></div>
   <script src="app.js"></script>
 </body>
 </html>

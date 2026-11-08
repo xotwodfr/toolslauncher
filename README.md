@@ -49,9 +49,11 @@ Requires Node 20+.
 ```bash
 npm install
 npm run dev     # builds stub tools + a dev catalog (using real built tool zips if present) and starts the launcher
-npm test        # launcher core self-tests
+npm test        # launcher core self-tests + a colour-contrast (WCAG AA) check of the UI
 npm start       # run with the real catalog/catalog.json
 ```
+
+The launcher's look is defined by the colour and spacing tokens at the top of `src/renderer/styles.css`. `scripts/contrast-check.js` reads those tokens and fails `npm test` if a change makes text or controls fall below WCAG AA contrast, so recolouring is safe to try.
 
 > npm 11 doesn't run dependency install scripts by default, which breaks Electron's binary download. If `node_modules/electron/dist` is missing after `npm install`, run `node node_modules/electron/install.js`.
 

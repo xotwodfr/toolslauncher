@@ -9,7 +9,7 @@
     "start": "electron .",
     "dev": "node scripts/make-dev-catalog.js && electron . --dev",
     "dev-catalog": "node scripts/make-dev-catalog.js",
-    "test": "node scripts/selftest.js",
+    "test": "node scripts/selftest.js && node scripts/contrast-check.js",
     "icon": "node scripts/make-icon.js",
     "pack": "electron-builder --dir",
     "dist:win": "electron-builder --win --publish never",

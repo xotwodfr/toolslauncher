@@ -386,6 +386,7 @@ class Store {
         accent: t.accent || '#7c5cff',
         version: String(t.version),
         installedVersion: rec ? rec.version : null,
+        installedAt: rec && rec.installedAt ? rec.installedAt : null,
         size: asset && asset.size ? asset.size : null,
         state,
       };
