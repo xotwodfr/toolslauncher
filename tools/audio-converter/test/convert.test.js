@@ -17,6 +17,49 @@ const run = (args) => { const r = spawnSync(ff, ['-y', '-hide_banner', '-logleve
   assert.strictEqual(ver.status, 0, 'ffmpeg must be available (run `npm run setup`)');
   console.log('  using ' + String(ver.stdout).split('\n')[0]);
 
+  // ---- tag parser against real ffmpeg report layouts (no ffmpeg needed) -----------------------------
+  // The indentation of "Metadata:" blocks differs between ffmpeg builds; these are real captured layouts.
+  const reports = {
+    'ogg, ffmpeg 6.1 (Windows): stream block at 4/6 spaces': [
+      "Input #0, ogg, from 'C:\\tmp\\t.ogg':",
+      '  Duration: 00:00:01.00, start: 0.000000, bitrate: 101 kb/s',
+      '  Stream #0:0: Audio: vorbis, 44100 Hz, mono, fltp, 192 kb/s',
+      '    Metadata:',
+      '      encoder         : Lavc60.31.102 libvorbis',
+      '      title           : Cafe',
+      'At least one output file must be specified'].join('\r\n'),
+    'ogg, ffmpeg 7.0.2 (Linux CI): stream block at 6/8 spaces': [
+      "Input #0, ogg, from '/tmp/tags/tagged.ogg':",
+      '  Duration: 00:00:02.00, start: 0.000000, bitrate: 60 kb/s',
+      '  Stream #0:0: Audio: vorbis, 44100 Hz, stereo, fltp, 192 kb/s',
+      '      Metadata:',
+      '        encoder         : Lavc61.3.100 libvorbis',
+      '        album           : Tests',
+      '        title           : Café ♪',
+      '        artist          : The Band',
+      'At least one output file must be specified'].join('\n'),
+    'flac with cover: file block, cover stream has its own metadata': [
+      "Input #0, flac, from '/tmp/x.flac':",
+      '  Metadata:',
+      '    title           : Café ♪',
+      '    artist          : The Band',
+      '  Duration: 00:00:02.00, start: 0.000000, bitrate: 53 kb/s',
+      '  Stream #0:0: Audio: flac, 44100 Hz, stereo, s16',
+      '  Stream #0:1: Video: png, rgb24(pc), 64x64 [SAR 1:1 DAR 1:1], 90k tbr, 90k tbn (attached pic)',
+      '    Metadata:',
+      '      comment         : Other',
+      'At least one output file must be specified'].join('\n'),
+  };
+  const parsed = Object.fromEntries(Object.entries(reports).map(([k, v]) => [k, C.parseProbeOutput(v)]));
+  const [pWin, pLinux, pFlac] = Object.values(parsed);
+  assert.deepStrictEqual([pWin.tags.title, pWin.tags.encoder], ['Cafe', 'Lavc60.31.102 libvorbis']);
+  assert.deepStrictEqual([pLinux.tags.title, pLinux.tags.artist, pLinux.tags.album], ['Café ♪', 'The Band', 'Tests']);
+  assert.strictEqual(pLinux.codec, 'vorbis');
+  assert.deepStrictEqual([pFlac.tags.title, pFlac.tags.artist, pFlac.coverStream], ['Café ♪', 'The Band', 1]);
+  assert(!('comment' in pFlac.tags), "the cover picture's own metadata must not leak into the track's tags");
+  assert.throws(() => C.parseProbeOutput('x.txt: Invalid data found when processing input'), /Cannot read this file/);
+  ok('tag parser handles ffmpeg 6.1 and 7.0 report layouts');
+
   // fixtures: 2s stereo 44.1k sine as WAV, and a FLAC with title/artist tags + embedded cover
   const wav = path.join(tmp, 'tone.wav');
   run(['-f', 'lavfi', '-i', 'sine=frequency=440:duration=2:sample_rate=44100', '-ac', '2', wav]);

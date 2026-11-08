@@ -67,6 +67,58 @@ function buildArgs(input, output, rawOpts, probe = {}) {
   return args;
 }
 
+/**
+ * Collect tags from ffmpeg's `-i` report. Tags appear in a "Metadata:" block, either file-level (MP3/FLAC/M4A) or
+ * under the audio stream (Ogg Vorbis / Opus). The indentation of those blocks differs between ffmpeg builds (e.g.
+ * 6.1 on Windows vs 7.0 on Linux), so a block is recognised structurally: its entries are the following lines
+ * indented deeper than the "Metadata:" header.
+ */
+function parseTags(report) {
+  const fileTags = {};
+  const streamTags = {};
+  let context = null;   // what the last non-metadata line was: 'file' | 'audio' | 'other'
+  let target = null;    // object receiving entries of the Metadata block we are inside
+  let headerIndent = -1;
+  for (const line of report.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const indent = line.length - line.trimStart().length;
+    const text = line.trim();
+    if (target && indent > headerIndent) {
+      const m = /^([^:]+?)\s*:\s*(.*)$/.exec(text);
+      if (m) target[m[1].toLowerCase()] = m[2].trim();
+      continue;
+    }
+    target = null; headerIndent = -1;
+    if (/^Input #\d+/.test(text)) context = 'file';
+    else if (/^Duration:/.test(text)) context = 'other';
+    else if (/^Stream #\d+:\d+/.test(text)) context = /\bAudio:/.test(text) ? 'audio' : 'other';
+    else if (/^Metadata:$/.test(text)) {
+      headerIndent = indent;
+      target = context === 'file' ? fileTags : context === 'audio' ? streamTags : null;
+    } else context = 'other';
+  }
+  return { ...streamTags, ...fileTags }; // file-level wins when both exist
+}
+
+/** Turn ffmpeg's `-i` report into the facts we need. Throws a readable Error if it isn't audio. */
+function parseProbeOutput(err) {
+  const dur = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(err);
+  const audio = /Stream #0:(\d+)[^\n]*Audio:\s*([^,\n(]+)/.exec(err);
+  if (!dur || !audio) {
+    const reason = /No such file|Invalid data|does not contain any stream|Permission denied/i.exec(err);
+    throw new Error(reason ? `Cannot read this file (${reason[0].toLowerCase()})` : 'Not a readable audio file');
+  }
+  const hz = /Audio:[^\n]*?(\d+) Hz/.exec(err);
+  const kbps = /Audio:[^\n]*?(\d+) kb\/s/.exec(err);
+  const cover = /Stream #0:(\d+)[^\n]*Video:[^\n]*\(attached pic\)/.exec(err);
+  return {
+    durationSec: Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]),
+    codec: audio[2].trim(), sampleRate: hz ? Number(hz[1]) : 0, bitrate: kbps ? Number(kbps[1]) : 0,
+    coverStream: cover ? Number(cover[1]) : null, tags: parseTags(err),
+    raw: err, // ffmpeg's own report, kept for diagnostics (tests print it when something looks wrong)
+  };
+}
+
 /** Run `ffmpeg -i file` and parse what we need from its stderr. */
 function probe(input) {
   return new Promise((resolve, reject) => {
@@ -77,35 +129,7 @@ function probe(input) {
     p.stderr.on('data', (d) => { err += d; if (err.length > 200000) err = err.slice(-200000); });
     p.on('error', (e) => reject(new Error(e.code === 'ENOENT' ? 'ffmpeg was not found' : e.message)));
     p.on('close', () => {
-      const dur = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(err);
-      const audio = /Stream #0:(\d+)[^\n]*Audio:\s*([^,\n(]+)/.exec(err);
-      const hz = /Audio:[^\n]*?(\d+) Hz/.exec(err);
-      const kbps = /Audio:[^\n]*?(\d+) kb\/s/.exec(err);
-      const cover = /Stream #0:(\d+)[^\n]*Video:[^\n]*\(attached pic\)/.exec(err);
-      // Tags: file-level block (MP3/FLAC/M4A) and the audio stream's block (Ogg Vorbis / Opus keep them there).
-      const meta = {};
-      const streamMeta = {};
-      let section = null;
-      for (const line of err.split(/\r?\n/)) {
-        const head = /^\s{2}(Duration:|Stream #0:\d+)/.exec(line);
-        if (/^\s{2}Metadata:/.test(line)) section = 'file';
-        else if (head && head[1] === 'Duration:') section = null;
-        else if (head) section = /Audio:/.test(line) ? 'stream' : null;
-        else if (/^\s{4}Metadata:/.test(line) && section === 'stream') section = 'stream';
-        const m = /^\s{4,6}(\w+)\s*:\s*(.+)$/.exec(line);
-        if (m && section && !/^(Metadata|Duration|Stream)$/i.test(m[1])) (section === 'file' ? meta : streamMeta)[m[1].toLowerCase()] = m[2].trim();
-      }
-      for (const [k, v] of Object.entries(streamMeta)) if (!(k in meta)) meta[k] = v;
-      if (!dur || !audio) {
-        const reason = /No such file|Invalid data|does not contain any stream|Permission denied/i.exec(err);
-        return reject(new Error(reason ? `Cannot read this file (${reason[0].toLowerCase()})` : 'Not a readable audio file'));
-      }
-      resolve({
-        durationSec: Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]),
-        codec: audio[2].trim(), sampleRate: hz ? Number(hz[1]) : 0, bitrate: kbps ? Number(kbps[1]) : 0,
-        coverStream: cover ? Number(cover[1]) : null, tags: meta,
-        raw: err, // ffmpeg's own report, kept for diagnostics (tests print it when something looks wrong)
-      });
+      try { resolve(parseProbeOutput(err)); } catch (e) { reject(e); }
     });
   });
 }
@@ -171,4 +195,4 @@ async function convertOne(input, rawOpts, hooks = {}) {
   }
 }
 
-module.exports = { convertOne, probe, buildArgs, normalizeOptions, uniquePath, ffmpegPath, isSupportedInput, INPUT_EXTS, FORMATS, SAMPLE_RATES };
+module.exports = { convertOne, probe, parseProbeOutput, parseTags, buildArgs, normalizeOptions, uniquePath, ffmpegPath, isSupportedInput, INPUT_EXTS, FORMATS, SAMPLE_RATES };
