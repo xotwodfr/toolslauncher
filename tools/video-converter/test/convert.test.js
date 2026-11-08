@@ -27,7 +27,7 @@ async function fixtures() {
     '-metadata', 'title=SecretTitle', '-metadata', 'location=+59.3293+018.0686/']);
   // noise makes the encoder need real bits, so a size target actually has to bite
   noisy = mk('noisy.mp4', ['-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=30:duration=6,noise=alls=30:allf=t', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=6', '-c:v', 'libx264', '-crf', '12', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest']);
-  noisyLong = mk('long.mp4', ['-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=40,noise=alls=40:allf=t', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '20', '-pix_fmt', 'yuv420p']);
+  noisyLong = mk('long.mp4', ['-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=20,noise=alls=40:allf=t', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '20', '-pix_fmt', 'yuv420p']);
 }
 const out = (name) => path.join(tmp, 'out-' + name);
 
@@ -193,12 +193,11 @@ test('never overwrites; temp files never left behind', async () => {
 test('cancel: stops promptly, reports cancelled, removes the partial file', async () => {
   const dir = out('cancel');
   const ac = new AbortController();
-  let progressed = false;
-  const t0 = Date.now();
-  const p = C.convertOne(noisyLong, { format: 'webm', quality: 'high', outDir: dir }, { signal: ac.signal, onProgress: (f) => { if (!progressed) { progressed = true; ac.abort(); } } });
+  let progressed = false, abortedAt = 0;
+  const p = C.convertOne(noisyLong, { format: 'mp4', quality: 'high', outDir: dir }, { signal: ac.signal, onProgress: () => { if (!progressed) { progressed = true; abortedAt = Date.now(); ac.abort(); } } });
   await assert.rejects(p, (e) => e.cancelled === true);
   assert(progressed, 'it should have started before being cancelled');
-  assert(Date.now() - t0 < 30000);
+  assert(Date.now() - abortedAt < 15000, 'stopping should take seconds, measured from the moment of cancelling');
   await new Promise((r) => setTimeout(r, 300));
   assert.deepStrictEqual(fs.existsSync(dir) ? fs.readdirSync(dir) : [], [], 'no files left behind');
 });
