@@ -1,0 +1,32 @@
+{
+  "name": "video-converter",
+  "productName": "Video Converter",
+  "version": "0.1.0",
+  "description": "Convert and shrink videos to MP4, WebM or GIF: resolution, quality or a target file size, trimming (ffmpeg).",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "setup": "node scripts/fetch-ffmpeg.js",
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/convert.test.js",
+    "dist:win": "node scripts/fetch-ffmpeg.js && node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node scripts/fetch-ffmpeg.js && node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.3.0"
+  },
+  "build": {
+    "appId": "com.toolslauncher.videoconverter",
+    "productName": "Video Converter",
+    "electronVersion": "33.4.11",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["src/**/*", "package.json"],
+    "asarUnpack": ["node_modules/ffmpeg-static/**"],
+    "artifactName": "VideoConverter-${version}-${os}-${arch}.${ext}",
+    "executableName": "video-converter",
+    "win": { "target": [{ "target": "zip", "arch": ["x64"] }], "icon": "build/icon.png", "signExecutable": false },
+    "linux": { "target": [{ "target": "zip", "arch": ["x64"] }], "icon": "build/icon.png", "category": "AudioVideo" }
+  }
+}

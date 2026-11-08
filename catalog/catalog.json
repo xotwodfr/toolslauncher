@@ -30,6 +30,36 @@
       "accent": "#7c5cff",
       "version": "0.1.0",
       "platforms": {}
+    },
+    {
+      "id": "pdf-toolkit",
+      "name": "PDF Toolkit",
+      "description": "Merge, split, rotate, extract and delete PDF pages, and turn images into a PDF. Nothing is uploaded.",
+      "category": "Documents",
+      "glyph": "▤",
+      "accent": "#e5484d",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "photo-privacy",
+      "name": "Photo Privacy Cleaner",
+      "description": "See what your photos reveal (location, camera, serial numbers, names) and remove it without touching the picture.",
+      "category": "Privacy",
+      "glyph": "◈",
+      "accent": "#2f9e6f",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "video-converter",
+      "name": "Video Converter",
+      "description": "Convert and shrink videos to MP4, WebM or GIF. Pick a resolution, quality or a target file size, and trim.",
+      "category": "Video",
+      "glyph": "▶",
+      "accent": "#3b82f6",
+      "version": "0.1.0",
+      "platforms": {}
     }
   ]
 }

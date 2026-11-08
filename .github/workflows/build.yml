@@ -73,6 +73,28 @@ jobs:
           bash ../../scripts/ci-step.sh "Audio Converter: npm test" npm test
           bash ../../scripts/ci-step.sh "Audio Converter: package" npm run ${{ matrix.script }}
 
+      - name: PDF Toolkit
+        working-directory: tools/pdf-toolkit
+        run: |
+          bash ../../scripts/ci-step.sh "PDF Toolkit: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "PDF Toolkit: npm test" npm test
+          bash ../../scripts/ci-step.sh "PDF Toolkit: package" npm run ${{ matrix.script }}
+
+      - name: Photo Privacy Cleaner
+        working-directory: tools/photo-privacy
+        run: |
+          bash ../../scripts/ci-step.sh "Photo Privacy Cleaner: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Photo Privacy Cleaner: npm test" npm test
+          bash ../../scripts/ci-step.sh "Photo Privacy Cleaner: package" npm run ${{ matrix.script }}
+
+      - name: Video Converter
+        working-directory: tools/video-converter
+        run: |
+          bash ../../scripts/ci-step.sh "Video Converter: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Video Converter: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
+          bash ../../scripts/ci-step.sh "Video Converter: npm test" npm test
+          bash ../../scripts/ci-step.sh "Video Converter: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release

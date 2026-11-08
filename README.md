@@ -11,11 +11,17 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **Audio Tagger** | Edit tags and cover art for MP3, FLAC, OGG, Opus, M4A, WAV and more. Bulk edit many files at once, number tracks in list order, rename files from their tags. Every write is backed up, verified and rolled back on failure. |
 | **Audio Converter** | Batch convert between MP3, AAC/M4A, OGG, Opus, FLAC and WAV (and pull the audio out of video files). Bitrate, sample rate, channels, keeps tags and cover art, parallel jobs with progress and Cancel. |
 | **Picture Converter** | Batch convert and resize images between **14 formats**: JPEG, PNG, WebP, GIF, AVIF, JPEG XL, TIFF, PDF, BMP, ICO (multi-size), TGA, QOI, PPM and PGM. Per-format options (quality, lossless, progressive, palette, TIFF compression, icon sizes, background colour...). It also reads BMP, ICO, TGA, QOI, PNM and JPEG XL, so any of them can be converted to any other. |
+| **PDF Toolkit** | Merge PDFs in the order you choose, split by page, range or every N pages, extract / reorder / delete / rotate pages, and turn JPEG and PNG images into a PDF (phone photos come out the right way up). Password-protected files are refused rather than mangled. |
+| **Photo Privacy Cleaner** | Shows what a JPEG, PNG or WebP quietly reveals (GPS location, camera and serial numbers, names, date, embedded thumbnails, AI prompts, hidden trailing data) and writes a clean copy. It never re-encodes the picture, and checks that the pixel data in the copy is byte-identical before saving. |
+| **Video Converter** | Convert to MP4 (H.264), WebM (VP9) or animated GIF. Cap the resolution and frame rate, pick a quality or **aim for a file size** (two-pass, so it lands on the target), trim, drop the sound, strip location metadata. Shows progress and speed, with Cancel. |
 
 <p>
   <img src="docs/screenshots/audio-tagger.png" width="32%" alt="Audio Tagger">
   <img src="docs/screenshots/audio-converter.png" width="32%" alt="Audio Converter">
   <img src="docs/screenshots/picture-converter.png" width="32%" alt="Picture Converter">
+  <img src="docs/screenshots/pdf-toolkit.png" width="32%" alt="PDF Toolkit">
+  <img src="docs/screenshots/photo-privacy.png" width="32%" alt="Photo Privacy Cleaner">
+  <img src="docs/screenshots/video-converter.png" width="32%" alt="Video Converter">
 </p>
 
 All tools never overwrite your original files.
@@ -29,7 +35,7 @@ Download the latest build from the [Releases](https://github.com/xotwodfr/toolsl
 
 Builds are **not code-signed**, so Windows SmartScreen will warn the first time. The Linux builds are produced and unit-tested by CI, but have **not yet been run on a real Linux desktop**: please report problems (a test checklist is in [docs/LINUX_TESTING.md](docs/LINUX_TESTING.md)). The Linux tools start with `--no-sandbox`.
 
-Tools are downloaded on demand (roughly 110-130 MB each) into your user data folder. The launcher checks each download's SHA-256 against the catalog and refuses anything that doesn't match, anything without a checksum, and (for hosted catalogs) anything that isn't served over HTTPS.
+Tools are downloaded on demand (roughly 100-130 MB each) into your user data folder. The launcher checks each download's SHA-256 against the catalog and refuses anything that doesn't match, anything without a checksum, and (for hosted catalogs) anything that isn't served over HTTPS.
 
 ## Updating
 
@@ -62,7 +68,7 @@ The launcher's look is defined by the colour and spacing tokens at the top of `s
 Each tool is its own small Electron app in `tools/<id>/`:
 
 ```bash
-cd tools/audio-tagger          # or tools/picture-converter, tools/audio-converter
+cd tools/audio-tagger          # or any other folder in tools/
 npm install
 npm start                      # run it
 npm test                       # core tests
@@ -70,7 +76,9 @@ npm run dist:win               # -> dist/<Name>-<version>-win-x64.zip  (dist:lin
 ```
 
 - Picture Converter: `sharp` handles JPEG, PNG, WebP, GIF, AVIF and TIFF; JPEG XL runs through libjxl compiled to WebAssembly (`@jsquash/jxl`); BMP, ICO, TGA, QOI, PNM and PDF are small pure-JavaScript codecs in `src/codecs/`. The format list and each format's options live in one registry (`src/formats.js`) that the interface builds itself from. `picture-converter --self-test=<result.json>` converts to every format and writes a report, which is handy for checking a packaged build. Its tests decode our encoders' output with ffmpeg when it is installed.
-- Audio Converter bundles ffmpeg via `ffmpeg-static`: run `npm run setup` once after `npm install`.
+- Audio Converter and Video Converter bundle ffmpeg via `ffmpeg-static`: run `npm run setup` once after `npm install`. Video Converter's tests generate their own clips with ffmpeg and check every output by decoding it. A size target runs two passes, because a single pass overshoots badly (VP9 especially).
+- PDF Toolkit uses `pdf-lib` (pure JavaScript). Its tests read the results back with pdf.js, an independent PDF reader.
+- Photo Privacy Cleaner has no runtime dependencies. Cleaning copies the file's own segments/chunks and leaves metadata ones out (so pixels cannot change); its tests compare against `exifr` (a second EXIF reader) and libvips-decoded pixels, and run a fuzz pass over damaged files.
 - Audio Tagger's tests also use ffmpeg to make FLAC/OGG/Opus/M4A fixtures if it is installed; otherwise those are skipped.
 
 To test a tool without publishing anything, build its zip; `npm run dev` in the repo root then offers it in the launcher (served from disk).

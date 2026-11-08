@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Video Converter</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <section class="left">
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Add videos">
+        <strong>Drop videos or folders here</strong>
+        <span class="muted small">MP4, MOV, MKV, WebM, AVI, WMV, FLV, MPG, TS, 3GP, GIF and more</span>
+        <div class="row center">
+          <button id="addFiles" class="btn">Add files…</button>
+          <button id="addFolder" class="btn">Add folder…</button>
+        </div>
+      </div>
+      <div id="engineWarn" class="summary warn" role="alert" hidden></div>
+      <div class="listhead">
+        <span id="count" class="muted">No files</span>
+        <button id="clear" class="btn ghost small" hidden>Clear</button>
+      </div>
+      <ul id="list" class="list" aria-label="Videos"></ul>
+    </section>
+
+    <aside class="right">
+      <div class="scroll">
+        <h2>Convert to</h2>
+        <label class="sr-label">Format
+          <select id="format" aria-label="Output format"></select>
+        </label>
+
+        <div id="vidOpts" class="opts">
+          <label>Quality
+            <select id="quality">
+              <option value="high">High (bigger files)</option>
+              <option value="balanced" selected>Balanced</option>
+              <option value="small">Small (smaller files)</option>
+            </select>
+          </label>
+          <div class="two">
+            <label>Largest height
+              <select id="maxHeight">
+                <option value="0">Keep original</option><option value="2160">2160p (4K)</option><option value="1440">1440p</option>
+                <option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option>
+                <option value="360">360p</option><option value="240">240p</option>
+              </select>
+            </label>
+            <label>Frame rate (at most)
+              <select id="fps">
+                <option value="0">Keep original</option><option value="60">60</option><option value="30">30</option>
+                <option value="24">24</option><option value="15">15</option>
+              </select>
+            </label>
+          </div>
+          <label>Aim for a file size (MB, optional)
+            <input id="targetMb" type="number" min="0.1" max="50000" step="any" placeholder="e.g. 25 for an email or chat upload">
+          </label>
+          <p id="targetNote" class="note">With a size target the video is encoded twice, so it takes about twice as long but lands close to the size. Quality setting is ignored.</p>
+          <label>Sound
+            <select id="audio"><option value="keep">Keep</option><option value="remove">Remove</option></select>
+          </label>
+        </div>
+
+        <div id="gifOpts" class="opts" hidden>
+          <div class="two">
+            <label>Width
+              <select id="gifWidth"><option value="240">240 px</option><option value="320">320 px</option><option value="480" selected>480 px</option><option value="640">640 px</option><option value="800">800 px</option></select>
+            </label>
+            <label>Frames per second
+              <select id="gifFps"><option value="8">8</option><option value="10">10</option><option value="12" selected>12</option><option value="15">15</option><option value="20">20</option></select>
+            </label>
+          </div>
+          <p class="note">GIFs get big quickly. Keep clips short (the limit is 2 minutes).</p>
+        </div>
+
+        <div class="sep"></div>
+        <h2>Trim (optional)</h2>
+        <div class="two">
+          <label>Start
+            <input id="start" type="text" placeholder="0:00" spellcheck="false" autocomplete="off">
+          </label>
+          <label>End
+            <input id="end" type="text" placeholder="end of video" spellcheck="false" autocomplete="off">
+          </label>
+        </div>
+        <p class="note">Seconds (90) or minutes:seconds (1:30). Applies to every video in the list.</p>
+        <label class="check"><input id="stripMeta" type="checkbox"> Remove metadata (location, title, dates)</label>
+
+        <div class="sep"></div>
+        <label>Save to
+          <div class="row">
+            <input id="outDir" type="text" readonly value="Same folder as each video">
+            <button id="pickOut" class="btn small">Browse</button>
+            <button id="resetOut" class="btn ghost small" hidden>Reset</button>
+          </div>
+        </label>
+        <p class="note">Originals are never changed or overwritten.</p>
+      </div>
+
+      <div class="foot">
+        <div id="summary" class="summary" role="status" hidden></div>
+        <button id="go" class="btn primary big" disabled>Convert</button>
+        <button id="cancel" class="btn big" hidden>Cancel</button>
+      </div>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -12,12 +12,17 @@ components. Each downloadable package also carries the licence files its compone
 | [@jsquash/jxl](https://github.com/jamsinclair/jSquash) | Picture Converter | Apache-2.0 | [libjxl](https://github.com/libjxl/libjxl) (BSD-3-Clause, with Highway under Apache-2.0) compiled to WebAssembly; used for JPEG XL. Runs in-process, no native code |
 | [wasm-feature-detect](https://github.com/GoogleChromeLabs/wasm-feature-detect) | Picture Converter | Apache-2.0 | Used by @jsquash/jxl |
 | [node-taglib-sharp](https://github.com/benrr101/node-taglib-sharp) | Audio Tagger | LGPL-2.1-or-later | Pure JavaScript; dependencies iconv-lite, os-locale, uuid (MIT) |
-| [FFmpeg](https://ffmpeg.org/) via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | Audio Converter | **GPL-3.0-or-later** (this build is GPL: libmp3lame, libopus, libvorbis and others) | See below |
+| [pdf-lib](https://github.com/Hopding/pdf-lib) | PDF Toolkit | MIT | Pure JavaScript; dependencies @pdf-lib/standard-fonts, @pdf-lib/upng (MIT) and pako (MIT and Zlib) |
+| [FFmpeg](https://ffmpeg.org/) via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | Audio Converter, Video Converter | **GPL-3.0-or-later** (this build is GPL: libx264, libmp3lame, libopus, libvorbis and others) | See below |
 
-## FFmpeg (GPL) - Audio Converter
+Photo Privacy Cleaner has no runtime dependencies: its JPEG, PNG and WebP handling is code in this repository.
 
-The Audio Converter package contains an unmodified FFmpeg binary built with GPL-licensed components.
-Because that binary is distributed with the Audio Converter download, the GPL applies to the binary itself:
+Test-only tools (never shipped in a package): [sharp](https://github.com/lovell/sharp) (Apache-2.0) and [exifr](https://github.com/MikeKovarik/exifr) (MIT) in Photo Privacy Cleaner's tests, and [pdf.js](https://github.com/mozilla/pdf.js) / pdfjs-dist (Apache-2.0) in PDF Toolkit's tests, used to check our output with independent implementations.
+
+## FFmpeg (GPL) - Audio Converter and Video Converter
+
+The Audio Converter and Video Converter packages each contain an unmodified FFmpeg binary built with GPL-licensed components.
+Because that binary is distributed with those downloads, the GPL applies to the binary itself:
 
 - FFmpeg is Copyright (c) the FFmpeg developers. Licence text: <https://www.gnu.org/licenses/gpl-3.0.html>
 - The Windows binary is the gyan.dev "essentials" build (GPLv3); the Linux binary is a static GPLv3 build
@@ -25,6 +30,6 @@ Because that binary is distributed with the Audio Converter download, the GPL ap
   (for example `ffmpeg.exe.LICENSE`, `ffmpeg.exe.README`).
 - **Source code** for the exact FFmpeg version bundled (6.1.1) is available from <https://ffmpeg.org/releases/>
   (`ffmpeg-6.1.1.tar.xz`). Build configuration is printed by `ffmpeg -version`.
-- Audio Converter runs ffmpeg as a separate process and does not link against it.
+- Audio Converter and Video Converter run ffmpeg as a separate process and do not link against it.
 
-If you redistribute Audio Converter, keep these files together with the binary and keep this notice.
+If you redistribute either tool, keep these files together with the binary and keep this notice.

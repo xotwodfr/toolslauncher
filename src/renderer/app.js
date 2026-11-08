@@ -31,6 +31,12 @@
     'audio-tagger': '<svg viewBox="0 0 24 24"><path d="M9 18V6.5l10-2.2V16"/><circle cx="6.5" cy="18" r="2.6"/><circle cx="16.5" cy="16" r="2.6"/></svg>',
     'audio-converter': '<svg viewBox="0 0 24 24"><path d="M4 8.5h12.5M13 5l3.5 3.5L13 12M20 15.5H7.5M11 12l-3.5 3.5L11 19"/></svg>',
     'picture-converter': '<svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3.2"/><circle cx="9" cy="10" r="1.9"/><path d="M4 17.5l4.6-4.6 3.6 3.6 2.8-2.8 5 5"/></svg>',
+    // a page with a folded corner and lines of text
+    'pdf-toolkit': '<svg viewBox="0 0 24 24"><path d="M7 3.5h6.5L19 9v10a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 6 19V5a1.5 1.5 0 0 1 1-1.5z"/><path d="M13.5 3.5V9H19M9 13h6M9 16.5h4"/></svg>',
+    // a shield with a check mark
+    'photo-privacy': '<svg viewBox="0 0 24 24"><path d="M12 3.5l7 2.8v5.4c0 4.2-2.8 7.4-7 8.8-4.2-1.4-7-4.6-7-8.8V6.3z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>',
+    // a film frame with a play triangle
+    'video-converter': '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M10 9.2v5.6l4.8-2.8z"/><path d="M3.5 8.5H6M3.5 15.5H6M18 8.5h2.5M18 15.5h2.5"/></svg>',
   };
   const icon = (name, cls = 'ico') => { const s = document.createElement('span'); s.className = cls; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name] || ''; return s; };
 

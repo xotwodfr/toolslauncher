@@ -1,0 +1,62 @@
+{
+  "name": "photo-privacy",
+  "productName": "Photo Privacy Cleaner",
+  "version": "0.1.0",
+  "description": "See what hidden data your photos carry (location, camera, serial numbers, author) and remove it without touching a single pixel.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/meta.test.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "build": {
+    "appId": "com.toolslauncher.photoprivacy",
+    "productName": "Photo Privacy Cleaner",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "artifactName": "PhotoPrivacyCleaner-${version}-${os}-${arch}.${ext}",
+    "executableName": "photo-privacy",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Graphics"
+    }
+  },
+  "devDependencies": {
+    "exifr": "^7.1.3",
+    "sharp": "^0.35.5"
+  }
+}

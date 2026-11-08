@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Photo Privacy Cleaner</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <section class="left">
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Add photos">
+        <strong>Drop photos or folders here to see what they reveal</strong>
+        <span class="muted small">JPEG, PNG and WebP. Nothing is uploaded: everything is checked on this computer.</span>
+        <div class="row center">
+          <button id="addFiles" class="btn">Add photos…</button>
+          <button id="addFolder" class="btn">Add folder…</button>
+        </div>
+      </div>
+      <div class="listhead">
+        <span id="count" class="muted">No photos</span>
+        <button id="clear" class="btn ghost small" hidden>Clear</button>
+      </div>
+      <ul id="list" class="list" role="listbox" aria-label="Photos"></ul>
+      <section id="details" class="details" aria-live="polite" hidden></section>
+    </section>
+
+    <aside class="right">
+      <div class="scroll">
+        <h2>Remove hidden data</h2>
+        <p class="muted small privacy-note">Cleaning copies each photo without its hidden data. The picture itself is not re-encoded, so quality never changes.</p>
+        <label class="check"><input id="keepOrientation" type="checkbox" checked>
+          <span>Keep the rotation flag<small>Without it, some phone photos show up sideways.</small></span></label>
+        <label class="check"><input id="keepColor" type="checkbox" checked>
+          <span>Keep the colour profile<small>Removing it can make colours look slightly different.</small></span></label>
+        <div class="sep"></div>
+        <label>Save to
+          <div class="row">
+            <input id="outDir" type="text" readonly value="Next to each photo, as name-clean">
+            <button id="pickOut" class="btn small">Browse</button>
+            <button id="resetOut" class="btn ghost small" hidden>Reset</button>
+          </div>
+        </label>
+        <p class="muted small">Your originals are never changed or overwritten. Share the "-clean" copies.</p>
+      </div>
+
+      <div class="foot">
+        <div id="summary" class="summary" role="status" hidden></div>
+        <button id="go" class="btn primary big" disabled>Clean photos</button>
+        <button id="cancel" class="btn big" hidden>Cancel</button>
+      </div>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

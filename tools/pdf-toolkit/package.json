@@ -1,0 +1,64 @@
+{
+  "name": "pdf-toolkit",
+  "productName": "PDF Toolkit",
+  "version": "0.1.0",
+  "description": "Merge, split, rotate, extract and delete PDF pages, and turn images into a PDF. Everything stays on your computer.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/pdf.test.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  },
+  "build": {
+    "appId": "com.toolslauncher.pdftoolkit",
+    "productName": "PDF Toolkit",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "artifactName": "PDFToolkit-${version}-${os}-${arch}.${ext}",
+    "executableName": "pdf-toolkit",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Office"
+    }
+  },
+  "devDependencies": {
+    "pdfjs-dist": "^4.10.38"
+  }
+}

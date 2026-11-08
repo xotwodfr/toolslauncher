@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>PDF Toolkit</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <section class="left">
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Add PDFs or images">
+        <strong>Drop PDFs, images or folders here</strong>
+        <span class="muted small">PDF files, and JPEG or PNG images (for "Images to PDF")</span>
+        <div class="row center">
+          <button id="addFiles" class="btn">Add files…</button>
+          <button id="addFolder" class="btn">Add folder…</button>
+        </div>
+      </div>
+      <div class="listhead">
+        <span id="count" class="muted">No files</span>
+        <button id="clear" class="btn ghost small" hidden>Clear</button>
+      </div>
+      <ul id="list" class="list" aria-label="Files"></ul>
+    </section>
+
+    <aside class="right">
+      <div class="scroll">
+        <h2>What do you want to do?</h2>
+        <div id="modes" class="modes" role="radiogroup" aria-label="Operation">
+          <button class="mode" role="radio" data-mode="merge" aria-checked="true">Merge</button>
+          <button class="mode" role="radio" data-mode="split" aria-checked="false">Split</button>
+          <button class="mode" role="radio" data-mode="pages" aria-checked="false">Pages</button>
+          <button class="mode" role="radio" data-mode="images" aria-checked="false">Images → PDF</button>
+        </div>
+        <p id="modeHint" class="muted small"></p>
+
+        <div id="opts-merge" class="opts-group"></div>
+
+        <div id="opts-split" class="opts-group" hidden>
+          <div class="radio" role="radiogroup" aria-label="How to split">
+            <label><input type="radio" name="splitMode" value="each" checked> One file per page</label>
+            <label><input type="radio" name="splitMode" value="ranges"> By page ranges</label>
+            <label><input type="radio" name="splitMode" value="every"> Every N pages</label>
+          </div>
+          <label id="splitSpecRow" hidden>Page ranges (each one becomes a file)
+            <input id="splitSpec" type="text" placeholder="1-3, 5, 8-" spellcheck="false" autocomplete="off">
+          </label>
+          <label id="splitEveryRow" hidden>Pages per file
+            <input id="splitEvery" type="number" min="1" max="10000" value="2">
+          </label>
+        </div>
+
+        <div id="opts-pages" class="opts-group" hidden>
+          <label>Action
+            <select id="pagesAction">
+              <option value="extract">Extract these pages (in this order)</option>
+              <option value="delete">Delete these pages</option>
+              <option value="rotate">Rotate these pages</option>
+            </select>
+          </label>
+          <label>Pages
+            <input id="pagesSpec" type="text" placeholder="1-3, 5, 8-  (or: all)" spellcheck="false" autocomplete="off">
+          </label>
+          <label id="angleRow" hidden>Turn clockwise by
+            <select id="pagesAngle"><option value="90">90°</option><option value="180">180°</option><option value="270">270° (90° anticlockwise)</option></select>
+          </label>
+          <p class="note">Page numbers start at 1. "end" means the last page. Extract keeps the order you write, so <code>3,1,2</code> reorders.</p>
+        </div>
+
+        <div id="opts-images" class="opts-group" hidden>
+          <label>Page size
+            <select id="imgSize">
+              <option value="a4">A4 (image centred)</option>
+              <option value="letter">US Letter (image centred)</option>
+              <option value="fit">Same size as each image</option>
+            </select>
+          </label>
+          <label id="marginRow">Margin (points, 72 = 1 inch)
+            <input id="imgMargin" type="number" min="0" max="150" value="24">
+          </label>
+          <label class="check"><input id="imgEach" type="checkbox"> One PDF per image</label>
+        </div>
+
+        <div class="sep"></div>
+        <label>Save to
+          <div class="row">
+            <input id="outDir" type="text" readonly value="Same folder as the first file">
+            <button id="pickOut" class="btn small">Browse</button>
+            <button id="resetOut" class="btn ghost small" hidden>Reset</button>
+          </div>
+        </label>
+        <p class="muted small">Your original files are never changed, and nothing is overwritten.</p>
+      </div>
+
+      <div class="foot">
+        <div id="summary" class="summary" role="status" hidden></div>
+        <button id="go" class="btn primary big" disabled>Merge</button>
+        <button id="cancel" class="btn big" hidden>Cancel</button>
+      </div>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
