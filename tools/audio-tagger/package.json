@@ -1,0 +1,33 @@
+{
+  "name": "audio-tagger",
+  "productName": "Audio Tagger",
+  "version": "0.1.0",
+  "description": "Edit tags and cover art of audio files (MP3, FLAC, OGG, Opus, M4A, WAV...).",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/tags.test.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip"
+  },
+  "dependencies": {
+    "node-taglib-sharp": "^6.0.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  },
+  "build": {
+    "appId": "com.toolslauncher.audiotagger",
+    "productName": "Audio Tagger",
+    "electronVersion": "33.4.11",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["src/**/*", "package.json"],
+    "artifactName": "AudioTagger-${version}-${os}-${arch}.${ext}",
+    "executableName": "audio-tagger",
+    "win": { "target": [{ "target": "zip", "arch": ["x64"] }], "icon": "build/icon.png", "signExecutable": false },
+    "linux": { "target": [{ "target": "zip", "arch": ["x64"] }], "icon": "build/icon.png", "category": "AudioVideo" }
+  }
+}

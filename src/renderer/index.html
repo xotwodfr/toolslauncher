@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Tools Launcher</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">◆</span><span>Tools Launcher</span></div>
+      <nav>
+        <button class="nav-item active" data-view="library">Library</button>
+        <button class="nav-item" data-view="installed">Installed <span class="badge" id="installedCount">0</span></button>
+        <button class="nav-item" data-view="settings">Settings</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div id="envLabel" class="muted small"></div>
+        <div id="versionLabel" class="muted small"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <h1 id="viewTitle">Library</h1>
+        <div class="topbar-actions">
+          <input id="search" type="search" placeholder="Search tools…" autocomplete="off">
+          <button id="refresh" class="btn ghost" title="Refresh catalog">Refresh</button>
+          <button id="updateAll" class="btn primary" hidden>Update all</button>
+        </div>
+      </header>
+
+      <div id="banner" class="banner" hidden></div>
+
+      <section id="view-library" class="view">
+        <div id="grid" class="grid"></div>
+        <p id="empty" class="muted center" hidden>Nothing to show.</p>
+      </section>
+
+      <section id="view-settings" class="view" hidden>
+        <div class="panel">
+          <h2>Catalog</h2>
+          <p class="muted">Where the list of tools comes from. Leave empty to use the official catalog (published with each release on GitHub). Only https:// addresses are accepted.</p>
+          <input id="catalogUrl" type="url" placeholder="Default: official catalog" spellcheck="false">
+          <label class="check"><input id="checkUpdates" type="checkbox"> Check for tool updates when the launcher starts</label>
+          <div class="row">
+            <button id="saveSettings" class="btn primary">Save</button>
+            <button id="openData" class="btn ghost">Open data folder</button>
+          </div>
+          <p id="settingsMsg" class="muted small"></p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

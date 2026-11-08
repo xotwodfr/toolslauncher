@@ -1,0 +1,65 @@
+{
+  "name": "picture-converter",
+  "productName": "Picture Converter",
+  "version": "0.1.0",
+  "description": "Batch convert and resize images (PNG, JPG, WebP, AVIF).",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/convert.test.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip"
+  },
+  "dependencies": {
+    "sharp": "^0.35.5"
+  },
+  "build": {
+    "appId": "com.toolslauncher.pictureconverter",
+    "productName": "Picture Converter",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/sharp/**",
+      "node_modules/@img/**"
+    ],
+    "artifactName": "PictureConverter-${version}-${os}-${arch}.${ext}",
+    "executableName": "picture-converter",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Graphics"
+    }
+  }
+}

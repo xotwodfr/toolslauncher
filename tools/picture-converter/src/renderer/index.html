@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Picture Converter</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <section class="left">
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Add images">
+        <strong>Drop images or folders here</strong>
+        <span class="muted">JPG, PNG, WebP, AVIF, GIF, TIFF, SVG</span>
+        <div class="row center">
+          <button id="addFiles" class="btn">Add files…</button>
+          <button id="addFolder" class="btn">Add folder…</button>
+        </div>
+      </div>
+      <div class="listhead">
+        <span id="count" class="muted">No files</span>
+        <button id="clear" class="btn ghost small" hidden>Clear</button>
+      </div>
+      <ul id="list" class="list"></ul>
+    </section>
+
+    <aside class="right">
+      <h2>Output</h2>
+      <label>Format
+        <select id="format">
+          <option value="webp">WebP</option>
+          <option value="jpeg">JPG</option>
+          <option value="png">PNG</option>
+          <option value="avif">AVIF</option>
+        </select>
+      </label>
+      <label id="qualityRow"><span>Quality <output id="qualityOut" class="muted">85</output></span>
+        <input id="quality" type="range" min="1" max="100" value="85">
+      </label>
+      <label class="check"><input id="resizeOn" type="checkbox"> Limit size (fit inside)</label>
+      <div id="resizeRow" class="row" hidden>
+        <input id="rw" type="number" min="1" max="20000" placeholder="Width px">
+        <span class="muted">×</span>
+        <input id="rh" type="number" min="1" max="20000" placeholder="Height px">
+      </div>
+      <label class="check"><input id="keepMeta" type="checkbox"> Keep metadata (EXIF)</label>
+
+      <label>Save to
+        <div class="row">
+          <input id="outDir" type="text" readonly value="Same folder as each image">
+          <button id="pickOut" class="btn small">Browse</button>
+          <button id="resetOut" class="btn ghost small" title="Use the source folder" hidden>Reset</button>
+        </div>
+      </label>
+      <p class="muted small">Originals are never changed or overwritten.</p>
+
+      <div class="grow"></div>
+      <div id="summary" class="summary" hidden></div>
+      <button id="go" class="btn primary big" disabled>Convert</button>
+      <button id="cancel" class="btn big" hidden>Cancel</button>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

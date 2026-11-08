@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Audio Tagger</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <section class="left">
+      <div class="toolbar">
+        <button id="addFiles" class="btn">Add files…</button>
+        <button id="addFolder" class="btn">Add folder…</button>
+        <span class="grow"></span>
+        <span id="count" class="muted">No files</span>
+        <button id="clear" class="btn ghost small" hidden>Clear</button>
+      </div>
+      <div id="tableWrap" class="tablewrap" tabindex="0">
+        <table id="table">
+          <thead>
+            <tr>
+              <th data-sort="track" class="num">#</th>
+              <th data-sort="title">Title</th>
+              <th data-sort="artist">Artist</th>
+              <th data-sort="album">Album</th>
+              <th data-sort="name">File</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div id="empty" class="empty">
+          <strong>Drop audio files or folders here</strong>
+          <span class="muted">MP3, FLAC, OGG, Opus, M4A, WAV, WMA, AIFF, APE, WV</span>
+        </div>
+      </div>
+      <div id="status" class="status muted" aria-live="polite"></div>
+    </section>
+
+    <aside class="right">
+      <div id="noSel" class="muted">Select one or more files to edit their tags.</div>
+      <form id="editor" hidden autocomplete="off">
+        <div id="selInfo" class="selinfo"></div>
+
+        <div class="coverbox">
+          <div id="coverFrame" class="cover"><img id="coverImg" alt="Cover art" hidden><span id="coverNone" class="muted small">No cover</span></div>
+          <div class="coverbtns">
+            <button type="button" id="coverSet" class="btn small">Change…</button>
+            <button type="button" id="coverRemove" class="btn ghost small">Remove</button>
+            <span id="coverNote" class="muted small"></span>
+          </div>
+        </div>
+
+        <label>Title <input data-field="title" type="text"></label>
+        <label>Artist <input data-field="artist" type="text" placeholder="Separate several with ;"></label>
+        <label>Album <input data-field="album" type="text"></label>
+        <label>Album artist <input data-field="albumArtist" type="text"></label>
+        <div class="grid2">
+          <label>Year <input data-field="year" type="number" min="0" max="9999"></label>
+          <label>Genre <input data-field="genre" type="text"></label>
+        </div>
+        <div class="grid4">
+          <label>Track <input data-field="track" type="number" min="0" max="9999"></label>
+          <label>of <input data-field="trackCount" type="number" min="0" max="9999"></label>
+          <label>Disc <input data-field="disc" type="number" min="0" max="9999"></label>
+          <label>of <input data-field="discCount" type="number" min="0" max="9999"></label>
+        </div>
+        <label>Composer <input data-field="composer" type="text"></label>
+        <label>Comment <textarea data-field="comment" rows="2"></textarea></label>
+
+        <fieldset>
+          <legend>On save</legend>
+          <label class="check" id="autoNumRow"><input id="autoNum" type="checkbox"> Number tracks in list order</label>
+          <label class="check"><input id="renameOn" type="checkbox"> Rename files from tags</label>
+          <input id="renamePat" type="text" value="{track} - {title}" spellcheck="false" disabled>
+          <span class="muted small">Tokens: {track} {title} {artist} {album} {albumartist} {disc} {year}</span>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" id="revert" class="btn" disabled>Revert</button>
+          <button type="submit" id="save" class="btn primary" disabled>Save</button>
+        </div>
+      </form>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

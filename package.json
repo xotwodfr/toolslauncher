@@ -1,0 +1,89 @@
+{
+  "name": "tools-launcher",
+  "productName": "Tools Launcher",
+  "version": "0.1.0",
+  "description": "Cross-platform launcher to install, update and run small creative tools (audio tagger, audio converter, picture converter).",
+  "main": "src/main/main.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "node scripts/make-dev-catalog.js && electron . --dev",
+    "dev-catalog": "node scripts/make-dev-catalog.js",
+    "test": "node scripts/selftest.js",
+    "icon": "node scripts/make-icon.js",
+    "pack": "electron-builder --dir",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xotwodfr/toolslauncher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xotwodfr/toolslauncher/issues"
+  },
+  "build": {
+    "appId": "com.toolslauncher.app",
+    "productName": "Tools Launcher",
+    "copyright": "Copyright (c) 2026 xotwodfr",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "catalog/**/*",
+      "package.json"
+    ],
+    "artifactName": "ToolsLauncher-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "portable": {
+      "artifactName": "ToolsLauncher-Portable-${version}.exe"
+    },
+    "nsis": {
+      "artifactName": "ToolsLauncher-Setup-${version}.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "maintainer": "xotwodfr <xotwodfr@users.noreply.github.com>"
+    }
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.1"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^26.18.0"
+  }
+}

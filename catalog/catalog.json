@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "id": "audio-tagger",
+      "name": "Audio Tagger",
+      "description": "Edit ID3 and Vorbis tags, cover art and filenames in batches.",
+      "category": "Audio",
+      "glyph": "♪",
+      "accent": "#f0883e",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "audio-converter",
+      "name": "Audio Converter",
+      "description": "Convert between MP3, AAC/M4A, OGG, Opus, FLAC and WAV, in batches.",
+      "category": "Audio",
+      "glyph": "⇄",
+      "accent": "#3fb9a8",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "picture-converter",
+      "name": "Picture Converter",
+      "description": "Convert and resize PNG, JPG, WebP and AVIF images in bulk.",
+      "category": "Images",
+      "glyph": "▣",
+      "accent": "#7c5cff",
+      "version": "0.1.0",
+      "platforms": {}
+    }
+  ]
+}

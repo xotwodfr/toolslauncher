@@ -1,0 +1,120 @@
+name: Build and release
+
+# Push a tag like v0.1.0 to build Windows + Linux packages, run every test suite, generate catalog.json from the
+# real files, and publish them as a GitHub release.
+#   v1.2.3      -> normal release; becomes "latest", so the launcher's default catalog URL picks it up
+#   v1.2.3-rc1  -> prerelease; never "latest", so users are not affected (test it by pasting its
+#                  .../releases/download/<tag>/catalog.json URL into the launcher's Settings)
+# "Run workflow" (workflow_dispatch) builds and uploads artifacts only; it does not publish.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+          - os: ubuntu-22.04 # older glibc => AppImage/deb run on more distros
+            script: dist:linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash # a multi-line step must stop at the first failing command (the Windows default, pwsh, does not)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: '**/package-lock.json'
+
+      - name: Tag must match the launcher version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "${tag%%-*}" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - name: Launcher - install, test, package
+        run: |
+          npm ci
+          npm test
+          npm run ${{ matrix.script }}
+
+      - name: Picture Converter
+        working-directory: tools/picture-converter
+        run: |
+          npm ci
+          npm test
+          npm run ${{ matrix.script }}
+
+      - name: Audio Tagger
+        working-directory: tools/audio-tagger
+        run: |
+          npm ci
+          npm test
+          npm run ${{ matrix.script }}
+
+      - name: Audio Converter
+        working-directory: tools/audio-converter
+        run: |
+          npm ci
+          npm run setup   # downloads the bundled ffmpeg binary (ffmpeg-static)
+          npm test
+          npm run ${{ matrix.script }}
+
+      - name: Collect release files into one flat folder
+        run: |
+          mkdir release
+          find dist -maxdepth 1 -type f -name 'ToolsLauncher-*' ! -name '*.blockmap' -exec cp {} release/ \;
+          cp tools/*/dist/*-x64.zip release/
+          ls -l release
+          test "$(ls release | wc -l)" -ge 4
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build # every matrix job must pass, so a broken Linux build can never publish a half catalog
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Build catalog.json from the real packages
+        run: |
+          node scripts/build-catalog.js \
+            --artifacts artifacts \
+            --base-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}" \
+            --out artifacts/catalog.json \
+            --require windows,linux
+          ls -l artifacts
+          cat artifacts/catalog.json
+
+      # Third-party action: consider pinning to a commit SHA instead of a version tag.
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
