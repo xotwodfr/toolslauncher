@@ -22,12 +22,12 @@ All tools never overwrite your original files.
 
 ## Install
 
-Download the latest build from the [Releases](https://github.com/xotwodfr/toolslauncher/releases) page *(no release has been published yet)*:
+Download the latest build from the [Releases](https://github.com/xotwodfr/toolslauncher/releases/latest) page:
 
 - **Windows:** `ToolsLauncher-Setup-<version>.exe` (installer) or `ToolsLauncher-Portable-<version>.exe`.
 - **Linux:** `ToolsLauncher-<version>-linux-x64.AppImage` (`chmod +x`, then run) or the `.deb`.
 
-Builds are **not code-signed**, so Windows SmartScreen will warn the first time. Linux support is built by CI but has not been tested on real machines yet.
+Builds are **not code-signed**, so Windows SmartScreen will warn the first time. The Linux builds are produced and unit-tested by CI, but have **not yet been run on a real Linux desktop**: please report problems. The Linux tools start with `--no-sandbox`.
 
 Tools are downloaded on demand (roughly 110-130 MB each) into your user data folder. The launcher checks each download's SHA-256 against the catalog and refuses anything that doesn't match, anything without a checksum, and (for hosted catalogs) anything that isn't served over HTTPS.
 
