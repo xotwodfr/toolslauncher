@@ -1,7 +1,7 @@
 {
   "name": "audio-converter",
   "productName": "Audio Converter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Batch convert audio between MP3, FLAC, WAV, OGG, Opus and AAC/M4A (ffmpeg).",
   "main": "src/main.js",
   "license": "MIT",

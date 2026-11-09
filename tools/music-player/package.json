@@ -1,7 +1,7 @@
 {
   "name": "music-player",
   "productName": "Music Player",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Play a folder of music with full tag, cover art and lyrics support. Everything stays on your computer.",
   "main": "src/main.js",
   "license": "MIT",

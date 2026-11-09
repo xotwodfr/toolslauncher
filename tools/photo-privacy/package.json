@@ -1,7 +1,7 @@
 {
   "name": "photo-privacy",
   "productName": "Photo Privacy Cleaner",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "See what hidden data your photos carry (location, camera, serial numbers, author) and remove it without touching a single pixel.",
   "main": "src/main.js",
   "license": "MIT",

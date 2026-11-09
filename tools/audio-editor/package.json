@@ -1,7 +1,7 @@
 {
   "name": "audio-editor",
   "productName": "Audio Editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Trim, cut, join, fade and normalize audio on a waveform. Never changes your original files (ffmpeg).",
   "main": "src/main.js",
   "license": "MIT",

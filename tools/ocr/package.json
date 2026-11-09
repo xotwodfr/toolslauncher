@@ -1,7 +1,7 @@
 {
   "name": "image-text-extractor",
   "productName": "Image Text Extractor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Read the text in screenshots, photos and scans (OCR), offline. Copy it or save it as a text file.",
   "main": "src/main.js",
   "license": "MIT",

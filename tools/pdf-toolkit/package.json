@@ -1,7 +1,7 @@
 {
   "name": "pdf-toolkit",
   "productName": "PDF Toolkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Merge, split, rotate, extract and delete PDF pages, and turn images into a PDF. Everything stays on your computer.",
   "main": "src/main.js",
   "license": "MIT",

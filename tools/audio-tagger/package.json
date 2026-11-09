@@ -1,7 +1,7 @@
 {
   "name": "audio-tagger",
   "productName": "Audio Tagger",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Edit tags and cover art of audio files (MP3, FLAC, OGG, Opus, M4A, WAV...).",
   "main": "src/main.js",
   "license": "MIT",

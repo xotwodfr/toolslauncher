@@ -1,7 +1,7 @@
 {
   "name": "picture-converter",
   "productName": "Picture Converter",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Batch convert and resize images between 14 formats (JPEG, PNG, WebP, GIF, AVIF, JPEG XL, TIFF, PDF, BMP, ICO, TGA, QOI, PPM, PGM).",
   "main": "src/main.js",
   "license": "MIT",
