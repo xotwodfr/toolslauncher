@@ -4,8 +4,8 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
   const state = {
-    tools: [], view: 'library', query: '', category: 'All', progress: {}, busy: new Set(),
-    loaded: false, source: '', remoteError: null, dev: false, platform: '', appVersion: '',
+    tools: [], view: 'library', query: '', category: 'All', filter: 'all', progress: {}, busy: new Set(),
+    loaded: false, source: '', remoteError: null, dev: false, platform: '', appVersion: '', checkedAt: 0,
   };
 
   // ---- icons (static, trusted strings: never built from catalog data) -------------------------------------------
@@ -118,10 +118,11 @@
   const accentOf = (t) => /^#[0-9a-f]{3,8}$/i.test(t.accent) ? t.accent : '#8e6dff';
 
   function statusPill(t) {
-    if (t.state === 'update') return el('span', { class: 'pill warn tag' }, 'Update available');
-    if (t.state === 'installed') return el('span', { class: 'pill ok tag' }, 'Installed');
-    if (t.state === 'unavailable') return el('span', { class: 'pill tag' }, 'Coming soon');
-    return el('span', { class: 'pill tag' }, 'Not installed');
+    if (state.busy.has(t.id)) return el('span', { class: 'tag info' }, 'Downloading…');
+    if (t.state === 'update') return el('span', { class: 'tag warn' }, 'Update available');
+    if (t.state === 'installed') return el('span', { class: 'tag ok' }, 'Installed · up to date');
+    if (t.state === 'unavailable') return el('span', { class: 'tag' }, 'Coming soon');
+    return el('span', { class: 'tag info' }, 'Available to install');
   }
 
   function progressBlock(t) {
@@ -131,7 +132,7 @@
     const label = PHASES[p && p.phase] || 'Starting';
     return el('div', { class: 'progress-block', role: 'progressbar', 'aria-label': `${label} ${t.name}`, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': determinate ? pct : undefined },
       el('div', { class: 'progress-head' }, el('span', {}, `${label}…`), el('span', {}, determinate ? `${pct}%` : '')),
-      el('div', { class: `bar${determinate ? '' : ' indet'}` }, el('i', { style: determinate ? `width:${pct}%` : null })));
+      el('div', { class: `bar-track${determinate ? '' : ' indet'}` }, el('i', { style: determinate ? `width:${pct}%` : null })));
   }
 
   const btn = (cls, label, action, t, extra = {}) => el('button', { class: `btn ${cls}`, 'data-action': action, 'data-tool': t.id, onclick: () => act(action, t), ...extra }, ...(Array.isArray(label) ? label : [label]));
@@ -148,14 +149,22 @@
     return frag;
   }
 
-  function card(t, index, enter) {
-    const art = el('div', { class: 'card-art', 'data-glyph': t.glyph }, artIcon(t), statusPill(t));
-    const meta = el('div', { class: 'card-meta' },
-      el('span', { class: 'pill plain' }, t.category),
-      t.state === 'update' ? el('span', { class: 'upd-ver', title: 'A newer version is available' }, `v${t.installedVersion} → v${t.version}`) : el('span', {}, `v${t.installedVersion || t.version}`),
-      t.size && t.state !== 'available' ? el('span', {}, fmtBytes(t.size)) : null);
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  function versionLine(t) {
+    if (t.state === 'update') return el('div', { class: 'card-version' }, `v${t.installedVersion} installed → `, el('span', { class: 'upd-ver' }, `v${t.version}`), ' available');
+    const bits = [];
+    if (t.installedVersion && t.installedAt) bits.push(`Installed ${timeAgo(t.installedAt)}`);
+    if (t.size) bits.push(t.installedVersion ? fmtBytes(t.size) : `${fmtBytes(t.size)} download`);
+    return el('div', { class: 'card-version' }, bits.join(' · ') || ' ');
+  }
+
+  function card(t, index, enter, number) {
     const c = el('article', { class: `card${enter ? ' enter' : ''}`, 'data-tool': t.id, 'data-state': t.state, 'aria-label': t.name },
-      art, el('div', { class: 'card-body' }, el('h3', { class: 'card-title' }, t.name), meta, el('p', { class: 'card-desc' }, t.description)),
+      el('div', { class: 'card-top' }, el('span', { class: 'num', 'aria-hidden': 'true' }, pad2(number)), el('span', { class: 'card-cat' }, `v${t.installedVersion || t.version}`)),
+      el('div', { class: 'card-head' }, artIcon(t), el('div', {}, el('h3', { class: 'card-title' }, t.name), el('p', { class: 'card-desc' }, t.description))),
+      el('div', { class: 'card-status' }, statusPill(t)),
+      versionLine(t),
       el('div', { class: 'card-foot' }, ...actions(t, 'card')));
     c.style.setProperty('--a', accentOf(t));
     c.style.setProperty('--i', String(index));
@@ -175,9 +184,16 @@
 
   // ---- rendering -------------------------------------------------------------------------------------------------------
   let firstGridRender = true;
-  const matches = (t) => {
+  const FILTERS = [
+    ['all', 'All', () => true],
+    ['installed', 'Installed', (t) => !!t.installedVersion],
+    ['updates', 'Updates', (t) => t.state === 'update'],
+    ['new', 'Not installed', (t) => !t.installedVersion],
+  ];
+  const matches = (t, withStatus) => {
     const q = state.query.trim().toLowerCase();
     if (state.category !== 'All' && t.category !== state.category) return false;
+    if (withStatus && !FILTERS.find((f) => f[0] === state.filter)[2](t)) return false;
     return !q || `${t.name} ${t.description} ${t.category}`.toLowerCase().includes(q);
   };
   const updatable = () => state.tools.filter((t) => t.state === 'update');
@@ -190,15 +206,8 @@
     ua.hidden = n === 0 || state.view === 'settings';
     ua.replaceChildren(icon('up'), `Update all (${n})`);
     ua.disabled = [...state.busy].length > 0 && updatable().every((t) => state.busy.has(t.id));
-    const titles = { library: 'Library', installed: 'Installed', settings: 'Settings' };
-    $('#viewTitle').textContent = titles[state.view];
-    const subs = {
-      library: state.loaded ? `${state.tools.length} tools${n ? ` · ${n} update${n > 1 ? 's' : ''} available` : ''}` : '',
-      installed: `${installed.length} installed`,
-      settings: 'Catalog, updates and storage',
-    };
-    $('#viewSub').textContent = subs[state.view];
-    $('#searchBox').hidden = state.view === 'settings';
+    $('#toolbar').hidden = state.view === 'settings';
+    $('#stateFilter').hidden = state.view !== 'library';
     $$('.nav-item').forEach((b) => { const on = b.dataset.view === state.view; b.classList.toggle('active', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('#view-library').hidden = state.view !== 'library';
     $('#view-installed').hidden = state.view !== 'installed';
@@ -209,33 +218,44 @@
     $('#statusText').textContent = tone[1];
     $('#statusChip').title = state.remoteError ? `Could not reach the online catalog: ${state.remoteError}` : '';
     $('#versionLabel').textContent = state.appVersion ? `v${state.appVersion}` : '';
+    $('#footEnd').textContent = [state.appVersion && `Tools Launcher v${state.appVersion}`, { win32: 'Windows', linux: 'Linux', darwin: 'macOS' }[state.platform]].filter(Boolean).join(' · ');
+    renderChecked();
     $('#aboutVersion').textContent = state.appVersion ? `v${state.appVersion}` : '';
     $('#aboutPlatform').textContent = { win32: 'Windows', linux: 'Linux', darwin: 'macOS' }[state.platform] || state.platform;
     $('#aboutSource').textContent = { remote: 'Online (GitHub)', cache: 'Saved copy (offline)', bundled: 'Built-in (offline)', dev: 'Development' }[state.source] || '';
   }
 
-  function renderHero() {
-    const installed = state.tools.filter((t) => t.installedVersion).length;
-    const n = updatable().length;
-    $('#heroTitle').textContent = n ? (n === 1 ? 'An update is ready' : `${n} updates are ready`) : 'Your creative toolkit';
-    $('#heroSub').textContent = n
-      ? 'Keep your tools current with one click. Updating is safe even while a tool is open.'
-      : 'Install a tool, launch it, and keep it up to date, all in one place.';
-    const stat = (value, label, warn) => el('div', { class: `stat${warn ? ' warn' : ''}` }, el('b', {}, String(value)), el('span', {}, label));
-    $('#heroStats').replaceChildren(stat(state.tools.length, 'tools'), stat(installed, 'installed'), stat(n, n === 1 ? 'update' : 'updates', n > 0));
+  /** "Checked 3 min ago" in the footer; shows nothing until the first catalog answer. */
+  function renderChecked() {
+    $('#checkedLabel').textContent = state.checkedAt ? `Checked ${timeAgo(new Date(state.checkedAt).toISOString())}` : '';
   }
 
-  function renderCategories() {
+  /** The status tabs (All / Installed / Updates / Not installed, each with its count) and the category select. */
+  function renderFilters() {
+    $('#stateFilter').replaceChildren(...FILTERS.map(([id, label, test]) => {
+      const n = state.tools.filter(test).length;
+      return el('button', { class: `seg-btn${id === 'updates' && n ? ' hot' : ''}`, 'aria-pressed': String(state.filter === id), 'data-filter': id, onclick: () => { state.filter = id; render(); } },
+        label, ' ', el('span', { class: 'n' }, String(n)));
+    }));
     const cats = ['All', ...new Set(state.tools.map((t) => t.category))];
-    $('#categories').hidden = cats.length <= 2;
-    $('#categories').replaceChildren(...cats.map((c) => el('button', { class: 'chip-btn', 'aria-pressed': String(state.category === c), 'data-category': c, onclick: () => { state.category = c; render(); } }, c)));
+    const sel = $('#category');
+    $('#categoryBox').hidden = cats.length <= 2;
+    if (state.category !== 'All' && !cats.includes(state.category)) state.category = 'All';
+    sel.replaceChildren(...cats.map((c) => el('option', { value: c }, c === 'All' ? 'All categories' : c)));
+    sel.value = state.category;
   }
 
   function renderGrid() {
     const grid = $('#grid');
-    if (!state.loaded) { grid.replaceChildren(...[0, 1, 2].map(() => el('div', { class: 'skeleton', 'aria-hidden': 'true' }))); $('#empty').hidden = true; return; }
-    const list = state.tools.filter(matches);
-    grid.replaceChildren(...list.map((t, i) => card(t, i, firstGridRender)));
+    if (!state.loaded) { grid.replaceChildren(el('div', { class: 'grid' }, ...[0, 1, 2].map(() => el('div', { class: 'skeleton', 'aria-hidden': 'true' })))); $('#empty').hidden = true; return; }
+    const list = state.tools.filter((t) => matches(t, true));
+    // one labelled group per category, numbered continuously (01, 02, ...) the way the list reads top to bottom
+    const groups = new Map();
+    for (const t of list) { if (!groups.has(t.category)) groups.set(t.category, []); groups.get(t.category).push(t); }
+    let number = 0, index = 0, g = 0;
+    grid.replaceChildren(...[...groups].map(([cat, tools]) => el('section', { class: 'group', 'aria-label': cat },
+      el('div', { class: 'group-head' }, el('span', {}, pad2(++g), ' / ', el('b', {}, cat)), el('span', {}, `${tools.length} ${tools.length === 1 ? 'tool' : 'tools'}`)),
+      el('div', { class: 'grid' }, ...tools.map((t) => card(t, index++, firstGridRender, ++number))))));
     if (list.length) firstGridRender = false;
     $('#empty').hidden = list.length > 0;
   }
@@ -249,7 +269,7 @@
   }
 
   function render() {
-    renderChrome(); renderHero(); renderCategories();
+    renderChrome(); renderFilters();
     if (state.view === 'library') renderGrid();
     if (state.view === 'installed') renderInstalled();
   }
@@ -259,7 +279,9 @@
     const t = state.tools.find((x) => x.id === id);
     if (!t) return;
     $$(`[data-tool="${id}"].card, [data-tool="${id}"].row-item`).forEach((node) => {
-      const foot = node.classList.contains('card') ? $('.card-foot', node) : $('.row-actions', node);
+      const status = $('.card-status', node);
+      if (status) status.replaceChildren(statusPill(t));
+      const foot =node.classList.contains('card') ? $('.card-foot', node) : $('.row-actions', node);
       if (foot) foot.replaceChildren(...actions(t, node.classList.contains('card') ? 'card' : 'row').map((n) => { if (!node.classList.contains('card') && n.classList && n.classList.contains('grow')) n.classList.remove('grow'); return n; }));
     });
   }
@@ -270,7 +292,7 @@
     btnEl.classList.add('spin'); btnEl.disabled = true;
     try {
       const lib = await window.launcher.getLibrary(refresh);
-      Object.assign(state, { tools: lib.tools, source: lib.source, remoteError: lib.remoteError, dev: lib.dev, platform: lib.platform, appVersion: lib.appVersion, loaded: true });
+      Object.assign(state, { tools: lib.tools, source: lib.source, remoteError: lib.remoteError, dev: lib.dev, platform: lib.platform, appVersion: lib.appVersion, loaded: true, checkedAt: Date.now() });
       const offline = { cache: 'Can\'t reach the online catalog, so this is the last list that was downloaded.', bundled: 'Can\'t reach the online catalog, so this is the built-in list and some tools may be unavailable.' }[lib.source];
       $('#banner').hidden = !offline;
       if (offline) $('#bannerText').textContent = offline;
@@ -332,6 +354,8 @@
   $$('.nav-item').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
   $('#goLibrary').addEventListener('click', () => setView('library'));
   $('#search').addEventListener('input', (e) => { state.query = e.target.value; render(); });
+  $('#category').addEventListener('change', (e) => { state.category = e.target.value; render(); });
+  setInterval(renderChecked, 30000);
   $('#refresh').addEventListener('click', async () => { await load(true); toast(updatable().length ? `${updatable().length} update${updatable().length > 1 ? 's' : ''} available` : 'Everything is up to date', 'info'); });
   $('#bannerRetry').addEventListener('click', () => load(true));
   $('#updateAll').addEventListener('click', () => updatable().forEach((t) => act('install', t)));

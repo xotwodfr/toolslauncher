@@ -10,53 +10,41 @@
 <body>
   <a class="skip" href="#content">Skip to content</a>
   <div class="app">
-    <aside class="sidebar" aria-label="Main navigation">
+    <header class="bar">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true" data-icon="logo"></span>
-        <div class="brand-text">
-          <div class="brand-name">Tools Launcher</div>
-          <div class="brand-sub" id="versionLabel"></div>
-        </div>
+        <span class="brand-name">TOOLS LAUNCHER</span>
+        <span class="brand-tag" id="versionLabel"></span>
       </div>
 
-      <nav class="nav">
-        <button class="nav-item active" data-view="library" aria-current="page">
-          <span class="ico" data-icon="grid" aria-hidden="true"></span><span class="label">Library</span>
-        </button>
-        <button class="nav-item" data-view="installed">
-          <span class="ico" data-icon="check" aria-hidden="true"></span><span class="label">Installed</span>
-          <span class="badge" id="installedCount">0</span>
-        </button>
-        <button class="nav-item" data-view="settings">
-          <span class="ico" data-icon="cog" aria-hidden="true"></span><span class="label">Settings</span>
-        </button>
+      <nav class="nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="library" aria-current="page"><span class="label">Library</span></button>
+        <button class="nav-item" data-view="installed"><span class="label">Installed</span><span class="badge" id="installedCount">0</span></button>
+        <button class="nav-item" data-view="settings"><span class="label">Settings</span></button>
       </nav>
 
-      <div class="sidebar-foot">
-        <div class="status" id="statusChip" data-tone="info" title="">
-          <i class="dot" aria-hidden="true"></i><span id="statusText">Loading…</span>
-        </div>
+      <div class="bar-right">
+        <button id="refresh" class="btn icon" title="Check for updates" aria-label="Check for updates">
+          <span class="ico" data-icon="refresh" aria-hidden="true"></span>
+        </button>
       </div>
-    </aside>
+    </header>
 
     <main class="main">
-      <header class="topbar">
-        <div class="titles">
-          <h1 id="viewTitle">Library</h1>
-          <p id="viewSub" class="sub"></p>
-        </div>
-        <div class="topbar-actions">
+      <div class="toolbar" id="toolbar">
+        <div class="seg" id="stateFilter" role="group" aria-label="Filter by status"></div>
+        <div class="toolbar-actions">
+          <label class="select" id="categoryBox">
+            <span class="select-label">Category</span>
+            <select id="category" aria-label="Filter by category"></select>
+          </label>
           <label class="search" id="searchBox">
             <span class="ico" data-icon="search" aria-hidden="true"></span>
             <input id="search" type="search" placeholder="Search tools" aria-label="Search tools" autocomplete="off" spellcheck="false">
             <kbd aria-hidden="true">/</kbd>
           </label>
-          <button id="refresh" class="btn icon" title="Check for updates" aria-label="Check for updates">
-            <span class="ico" data-icon="refresh" aria-hidden="true"></span>
-          </button>
           <button id="updateAll" class="btn primary" hidden></button>
         </div>
-      </header>
+      </div>
 
       <div id="banner" class="notice" role="status" hidden>
         <span class="ico" data-icon="alert" aria-hidden="true"></span>
@@ -66,19 +54,11 @@
 
       <div class="content" id="content" tabindex="-1">
         <section id="view-library" class="view">
-          <div class="hero" id="hero">
-            <div class="hero-text">
-              <h2 id="heroTitle">Your creative toolkit</h2>
-              <p id="heroSub">Install a tool, launch it, and keep it up to date, all in one place.</p>
-            </div>
-            <div class="stats" id="heroStats" aria-label="Summary"></div>
-          </div>
-          <div class="chips" id="categories" role="group" aria-label="Filter by category"></div>
-          <div id="grid" class="grid" aria-live="polite"></div>
+          <div id="grid" class="groups" aria-live="polite"></div>
           <div id="empty" class="empty" hidden>
             <span class="ico big" data-icon="search" aria-hidden="true"></span>
             <h3>No tools match</h3>
-            <p class="muted">Try a different search, or clear the category filter.</p>
+            <p class="muted">Try a different search, or clear the filters.</p>
           </div>
         </section>
 
@@ -137,6 +117,14 @@
           </div>
         </section>
       </div>
+
+      <footer class="foot">
+        <div class="status" id="statusChip" data-tone="info" title="">
+          <i class="dot" aria-hidden="true"></i><span id="statusText">Loading…</span>
+        </div>
+        <span class="foot-mid" id="checkedLabel"></span>
+        <span class="foot-end" id="footEnd"></span>
+      </footer>
     </main>
   </div>
 

@@ -20,7 +20,6 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
 
 const C = (n) => rgb(need(n));
 const black = [0, 0, 0], white = [255, 255, 255];
-const cardPill = over(rgb('#0a0c13'), 0.6, C('surface'));          // translucent pill background over a card
 const pairs = [
   ['body text on page', C('text'), C('bg'), 4.5],
   ['body text on card', C('text'), C('surface'), 4.5],
@@ -29,21 +28,25 @@ const pairs = [
   ['muted text on page', C('muted'), C('bg'), 4.5],
   ['muted text on input background', C('muted'), C('bg-raised'), 4.5],
   ['muted text on hovered surface', C('muted'), C('surface-2'), 4.5],
-  ['inactive nav text on sidebar', C('text-2'), C('bg-raised'), 4.5],
-  ['white on primary button (start)', white, C('btn-a'), 4.5],
-  ['white on primary button (end)', white, C('btn-b'), 4.5],
-  ['Launch text on green button', rgb('#04271a'), mix(C('ok'), 0.88, black), 4.5],
+  ['inactive nav text on top bar', C('muted'), C('bg'), 4.5],
+  ['active nav / selected tab text', C('btn-ink'), C('btn'), 4.5],
+  ['primary button text', C('btn-ink'), C('btn'), 4.5],
+  ['primary button text (hover)', C('btn-ink'), C('btn-hover'), 4.5],
+  ['outlined button text on hovered card', C('text'), C('surface-2'), 4.5],
   ['Remove text on red button', rgb('#2a0707'), mix(C('err'), 0.85, black), 4.5],
-  ['"Installed" pill', C('ok'), mix(C('ok'), 0.1, cardPill), 4.5],
-  ['"Update available" pill', C('warn'), mix(C('warn'), 0.12, cardPill), 4.5],
+  ['"Installed" tag on card', C('ok'), C('surface'), 4.5],
+  ['"Installed" tag on hovered card', C('ok'), C('surface-2'), 4.5],
+  ['"Update available" tag on hovered card', C('warn'), C('surface-2'), 4.5],
+  ['"Available to install" tag on hovered card', C('info'), C('surface-2'), 4.5],
+  ['update count on a tab', C('warn'), C('bg'), 4.5],
   ['update version text on card', C('warn'), C('surface'), 4.5],
-  ['hero text on its glow', C('text-2'), over(C('accent'), 0.28, C('surface')), 4.5],
-  ['offline notice text', rgb('#f6d9a3'), mix(C('warn'), 0.11, C('surface')), 4.5],
+  ['index number on the dimmest tool colour', rgb('#0b0b0d'), rgb('#7c5cff'), 4.5],
+  ['offline notice text', rgb('#f6d9a3'), mix(C('warn'), 0.08, C('surface')), 4.5],
   ['link on card', C('info'), C('surface'), 4.5],
   ['toast text', C('text'), C('surface-3'), 4.5],
   ['success message on card', C('ok'), C('surface'), 4.5],
   ['error message on card', C('err'), C('surface'), 4.5],
-  ['focus ring on card', rgb('#b8a6ff'), C('surface'), 3],
+  ['focus ring on card', C('accent'), C('surface'), 3],
   ['control outline (inputs, switch) on card', C('control-edge'), C('surface'), 3],
 ];
 
