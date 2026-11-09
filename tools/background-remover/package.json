@@ -1,0 +1,43 @@
+{
+  "name": "background-remover",
+  "productName": "Background Remover",
+  "version": "0.1.0",
+  "description": "Cut the subject out of a picture and keep it transparent or put it on a new background. Offline (ISNet).",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "setup": "node scripts/fetch-model.js",
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/cutout.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node scripts/fetch-model.js && node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node scripts/fetch-model.js && node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.22.0"
+  },
+  "build": {
+    "appId": "com.toolslauncher.backgroundremover",
+    "productName": "Background Remover",
+    "electronVersion": "33.4.11",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["src/**/*", "models/*.onnx", "package.json"],
+    "asarUnpack": ["node_modules/onnxruntime-node/**", "models/**"],
+    "artifactName": "BackgroundRemover-${version}-${os}-${arch}.${ext}",
+    "executableName": "background-remover",
+    "win": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "signExecutable": false,
+      "files": ["!node_modules/onnxruntime-node/bin/napi-v6/darwin/**", "!node_modules/onnxruntime-node/bin/napi-v6/linux/**", "!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**"]
+    },
+    "linux": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "category": "Graphics",
+      "files": ["!node_modules/onnxruntime-node/bin/napi-v6/darwin/**", "!node_modules/onnxruntime-node/bin/napi-v6/win32/**", "!node_modules/onnxruntime-node/bin/napi-v6/linux/arm64/**", "!node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_cuda.so", "!node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_tensorrt.so"]
+    }
+  }
+}

@@ -92,6 +92,36 @@
       "platforms": {}
     },
     {
+      "id": "lyrics-maker",
+      "name": "Lyrics Maker",
+      "description": "Listen to a song and write its lyrics with the time each line starts. Play it, fix any line, and save a timed .lrc file for your music player. Works offline in 99 languages; nothing is uploaded.",
+      "category": "Audio",
+      "glyph": "✎",
+      "accent": "#ffd166",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "bpm-key-finder",
+      "name": "BPM & Key Finder",
+      "description": "Find the tempo and musical key of your songs, a whole folder at a time, correct them, and write them into the tags (BPM and Initial Key, in musical or Camelot names). Nothing is uploaded.",
+      "category": "Audio",
+      "glyph": "♯",
+      "accent": "#ff8fb1",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "background-remover",
+      "name": "Background Remover",
+      "description": "Cut the subject out of a picture and keep it transparent or put it on a colour, a blurred copy of the picture or another picture. Fix edges with a brush. Works offline; nothing is uploaded.",
+      "category": "Images",
+      "glyph": "◩",
+      "accent": "#6ee7a8",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
       "id": "duplicate-finder",
       "name": "Duplicate Finder",
       "description": "Find duplicate files, look-alike photos and repeated songs, review them, and move the extras to the Recycle Bin. Nothing is deleted for good and nothing is uploaded.",

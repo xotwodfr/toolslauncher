@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; media-src lyrics:; connect-src lyrics:;">
+  <title>Lyrics Maker</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Lyrics Maker</h1>
+      <span class="muted small tagline">listen · write down · time</span>
+      <span class="grow"></span>
+      <span id="fileInfo" class="muted small trunc"></span>
+      <button id="open" class="btn">Open song…</button>
+    </header>
+
+    <div id="engineWarn" class="banner" role="alert" hidden></div>
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="stage">
+      <section id="empty" class="drop" tabindex="0" role="button" aria-label="Open a song">
+        <strong class="big">Drop a song here</strong>
+        <span class="muted">MP3, FLAC, WAV, OGG, Opus, M4A, AAC and more, up to 30 minutes</span>
+        <button id="open2" class="btn primary">Open song…</button>
+        <p class="muted small fine">The song is listened to on this computer, offline, and its words are written down with the time each line starts. You can play it, fix any line, and save a timed <code>.lrc</code> file that music players show as the song plays. The audio file is never changed.</p>
+      </section>
+
+      <section id="work" class="work" hidden>
+        <div class="lyrics">
+          <div id="progressBox" class="progressbox" hidden aria-live="polite">
+            <div class="progressrow"><span id="phase" class="phase">Starting…</span><span class="grow"></span><span id="eta" class="muted small"></span><button id="cancel" class="btn small">Cancel</button></div>
+            <div class="progress" id="bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="fill"></div></div>
+          </div>
+          <div class="listhead"><span id="status" class="muted small" aria-live="polite"></span></div>
+          <div id="lines" class="lines" aria-label="Lyric lines, each with the time it starts"></div>
+          <p id="placeholder" class="placeholder muted">No lyrics yet. Choose the language (or let it be detected) and press <strong>Make lyrics</strong>.</p>
+        </div>
+
+        <aside class="side" aria-label="Controls">
+          <fieldset id="playSet" disabled>
+            <legend>Play</legend>
+            <div class="opt">
+              <button id="play" class="btn" aria-label="Play or pause (Space)">▶ Play</button>
+              <span class="clock"><span id="pos">0:00</span> <span class="muted">/ <span id="len">0:00</span></span></span>
+            </div>
+            <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position in the song">
+          </fieldset>
+
+          <fieldset id="makeSet" disabled>
+            <legend>Make</legend>
+            <div class="opt"><label for="lang">Language</label><select id="lang" aria-label="Language of the lyrics"></select></div>
+            <div class="opt"><button id="make" class="btn primary">Make lyrics</button></div>
+            <p id="makeNote" class="muted small"></p>
+          </fieldset>
+
+          <fieldset id="timeSet" disabled>
+            <legend>Timing</legend>
+            <div class="opt shift" role="group" aria-label="Move every line">
+              <button class="btn small" data-shift="-0.5">−0.5 s</button><button class="btn small" data-shift="-0.1">−0.1 s</button>
+              <button class="btn small" data-shift="0.1">+0.1 s</button><button class="btn small" data-shift="0.5">+0.5 s</button>
+            </div>
+            <div class="opt">
+              <button id="stamp" class="btn small" title="Start the selected line at the playhead (S)">Stamp line here</button>
+              <button id="addLine" class="btn small" title="Add a line at the playhead">Add line</button>
+              <button id="revert" class="btn ghost small" title="Throw away your edits and go back to the lyrics as they were made" disabled>Undo all edits</button>
+            </div>
+            <p class="muted small">Click ▶ on a line to hear it. If a line starts late or early, press play, wait for the moment it begins and press <kbd>S</kbd> with that line selected.</p>
+          </fieldset>
+
+          <fieldset id="saveSet" disabled>
+            <legend>Save</legend>
+            <div class="opt"><button id="saveLrc" class="btn primary">Save timed lyrics (.lrc)…</button></div>
+            <div class="opt"><button id="saveTxt" class="btn small">Save as plain text (.txt)…</button></div>
+            <div id="result" class="result" hidden role="status"></div>
+          </fieldset>
+        </aside>
+      </section>
+    </main>
+    <audio id="player" preload="auto"></audio>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../plan.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

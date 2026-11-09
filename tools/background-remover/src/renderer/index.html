@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data: blob:;">
+  <title>Background Remover</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Background Remover</h1>
+      <span class="muted small tagline">cut out · replace · save</span>
+      <span class="grow"></span>
+      <span id="fileInfo" class="muted small trunc"></span>
+      <button id="open" class="btn">Open picture…</button>
+    </header>
+
+    <div id="engineWarn" class="banner" role="alert" hidden></div>
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="stage">
+      <section id="empty" class="drop" tabindex="0" role="button" aria-label="Open a picture">
+        <strong class="big">Drop a picture here</strong>
+        <span class="muted">PNG, JPEG, WebP, BMP, GIF or AVIF, up to 50 megapixels</span>
+        <button id="open2" class="btn primary">Open picture…</button>
+        <p class="muted small fine">The subject is found on this computer, offline. Then keep the background transparent or swap in a colour, a blurred copy of the picture or another picture, fix any edge with the brush, and save a new file. Your original is never changed.</p>
+      </section>
+
+      <section id="work" class="work" hidden>
+        <div id="viewwrap" class="viewwrap">
+          <canvas id="view" aria-label="The picture with its background removed. Scroll to zoom, drag to move, and use the brush in the side panel to touch up edges."></canvas>
+          <div id="busy" class="busy" hidden role="status" aria-live="polite">
+            <p id="busyText" class="phase">Opening…</p>
+            <div id="busyBar" class="progress indeterminate" aria-hidden="true"><div></div></div>
+            <div class="row"><button id="cancel" class="btn">Cancel</button><button id="retry" class="btn primary" hidden>Try again</button></div>
+          </div>
+          <div class="viewbar">
+            <button id="fit" class="btn small" title="Fit the picture in the window (F)">Fit</button>
+            <button id="show" class="btn small" title="Hold to see the original (O)" aria-pressed="false">Hold: original</button>
+            <span id="zoomInfo" class="muted small"></span>
+          </div>
+        </div>
+
+        <aside class="side" aria-label="Controls">
+          <fieldset id="bgSet" disabled>
+            <legend>Background</legend>
+            <div class="seg grid2" role="radiogroup" aria-label="Background">
+              <label class="segbtn"><input type="radio" name="bg" id="bg-transparent" value="transparent" checked><span>Transparent</span></label>
+              <label class="segbtn"><input type="radio" name="bg" id="bg-colour" value="colour"><span>Colour</span></label>
+              <label class="segbtn"><input type="radio" name="bg" id="bg-blur" value="blur"><span>Blur</span></label>
+              <label class="segbtn"><input type="radio" name="bg" id="bg-picture" value="picture"><span>Picture</span></label>
+            </div>
+            <div id="optColour" class="opt" hidden>
+              <input type="color" id="colour" value="#ffffff" aria-label="Background colour">
+              <span id="swatches" class="swatches"></span>
+            </div>
+            <div id="optBlur" class="opt" hidden>
+              <label for="blur">Blur</label>
+              <input type="range" id="blur" min="0" max="100" value="40">
+              <output id="blurVal">40</output>
+            </div>
+            <div id="optPicture" class="opt" hidden>
+              <button id="pickBg" class="btn small">Choose picture…</button>
+              <span id="bgName" class="muted small trunc"></span>
+            </div>
+          </fieldset>
+
+          <fieldset id="edgeSet" disabled>
+            <legend>Edge</legend>
+            <div class="opt">
+              <input type="range" id="edge" min="-100" max="100" value="0" aria-label="Edge: tighter to looser" aria-describedby="edgeHelp">
+              <output id="edgeVal">0</output>
+              <button id="edgeReset" class="btn ghost small" title="Back to the model's own edge">Reset</button>
+            </div>
+            <p id="edgeHelp" class="muted small">Left shrinks the cutout into the subject, right lets more of the soft edge through.</p>
+          </fieldset>
+
+          <fieldset id="toolSet" disabled>
+            <legend>Touch-up brush</legend>
+            <div class="seg" role="radiogroup" aria-label="Brush">
+              <label class="segbtn"><input type="radio" name="tool" id="tool-off" value="off" checked><span>Off</span></label>
+              <label class="segbtn"><input type="radio" name="tool" id="tool-erase" value="erase"><span>Erase</span></label>
+              <label class="segbtn"><input type="radio" name="tool" id="tool-restore" value="restore"><span>Restore</span></label>
+            </div>
+            <div class="opt">
+              <label for="brush">Size</label>
+              <input type="range" id="brush" min="2" max="200" value="36">
+              <output id="brushVal">36</output>
+            </div>
+            <div class="opt">
+              <button id="undo" class="btn small" disabled>Undo</button>
+              <button id="redo" class="btn small" disabled>Redo</button>
+              <button id="resetEdits" class="btn ghost small" disabled>Remove all strokes</button>
+            </div>
+            <p class="muted small">Erase takes away what the model kept; Restore brings back what it removed. Scroll to zoom in for fine work, drag to move, hold Space to move while the brush is on.</p>
+          </fieldset>
+
+          <fieldset id="saveSet" disabled>
+            <legend>Save</legend>
+            <div class="opt">
+              <label for="format">As</label>
+              <select id="format" aria-label="File format"></select>
+            </div>
+            <div class="opt"><button id="save" class="btn primary">Save cutout…</button></div>
+            <div id="result" class="result" hidden role="status"></div>
+          </fieldset>
+        </aside>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../plan.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

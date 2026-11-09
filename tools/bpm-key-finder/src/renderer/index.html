@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>BPM &amp; Key Finder</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>BPM &amp; Key Finder</h1>
+      <span class="muted small tagline">tempo · key · tags</span>
+      <span class="grow"></span>
+      <button id="clear" class="btn ghost" hidden>Clear list</button>
+      <button id="addFolder" class="btn">Add folder…</button>
+      <button id="addFiles" class="btn">Add songs…</button>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="stage">
+      <section id="empty" class="drop" tabindex="0" role="button" aria-label="Add songs">
+        <strong class="big">Drop songs or a folder here</strong>
+        <span class="muted">MP3, FLAC, WAV, OGG, Opus, M4A, AAC and more</span>
+        <span class="row"><button id="addFiles2" class="btn primary">Add songs…</button><button id="addFolder2" class="btn">Add folder…</button></span>
+        <p class="muted small fine">Each song is analysed on this computer, offline, a few at a time. You see the tempo and the key, can correct them, and then write them into the song's tags. Songs are only changed when you press <em>Write to tags</em>.</p>
+      </section>
+
+      <section id="list" hidden>
+        <div class="statusbar" aria-live="polite">
+          <span id="status" class="status"></span>
+          <div id="prog" class="progress" role="progressbar" aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="fill"></div></div>
+          <span class="grow"></span>
+          <button id="analyseRest" class="btn small" hidden>Analyse the rest</button>
+          <button id="cancel" class="btn small" hidden>Cancel</button>
+        </div>
+        <div class="tablewrap">
+          <table id="grid" aria-label="Songs with the tempo and key found">
+            <thead>
+              <tr>
+                <th class="c-sel"><input type="checkbox" id="selAll" aria-label="Select all songs"></th>
+                <th class="c-song"><button class="sort" data-sort="name">Song</button></th>
+                <th class="c-time"><button class="sort" data-sort="time">Time</button></th>
+                <th class="c-bpm"><button class="sort" data-sort="bpm">BPM</button></th>
+                <th class="c-key"><button class="sort" data-sort="key">Key</button></th>
+                <th class="c-sure">How sure</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div id="result" class="result" role="status" hidden></div>
+
+    <footer id="writebar" class="writebar" hidden>
+      <span class="label muted">Write to tags</span>
+      <label class="check"><input type="checkbox" id="wBpm" checked> BPM</label>
+      <label class="check"><input type="checkbox" id="wKey" checked> Key as</label>
+      <select id="style" aria-label="How the key is written"></select>
+      <label class="check" title="Off: songs that already have a BPM or key in their tags keep it. On: the found values replace them."><input type="checkbox" id="replace"> Replace existing</label>
+      <span class="grow"></span>
+      <span id="selInfo" class="muted small"></span>
+      <button id="remove" class="btn ghost small" title="Take the ticked songs out of the list (the files stay on disk)">Remove</button>
+      <button id="csv" class="btn">Export CSV…</button>
+      <button id="write" class="btn primary">Write to tags</button>
+    </footer>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../music.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

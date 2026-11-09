@@ -136,6 +136,35 @@ jobs:
           bash ../../scripts/ci-step.sh "Stem Splitter: npm test" npm test   # includes a run of the real model
           bash ../../scripts/ci-step.sh "Stem Splitter: package" npm run ${{ matrix.script }}
 
+      - name: BPM & Key Finder
+        working-directory: tools/bpm-key-finder
+        run: |
+          bash ../../scripts/ci-step.sh "BPM & Key Finder: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "BPM & Key Finder: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
+          bash ../../scripts/ci-step.sh "BPM & Key Finder: npm test" npm test
+          bash ../../scripts/ci-step.sh "BPM & Key Finder: package" npm run ${{ matrix.script }}
+
+      - name: Background Remover
+        working-directory: tools/background-remover
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip   # onnxruntime-node would download ~hundreds of MB of CUDA libraries on Linux; this tool is CPU-only
+        run: |
+          bash ../../scripts/ci-step.sh "Background Remover: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Background Remover: model setup" npm run setup   # downloads the ISNet model (~170 MB)
+          bash ../../scripts/ci-step.sh "Background Remover: npm test" npm test   # includes a run of the real model
+          bash ../../scripts/ci-step.sh "Background Remover: package" npm run ${{ matrix.script }}
+
+      - name: Lyrics Maker
+        working-directory: tools/lyrics-maker
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip   # CPU-only, see above
+        run: |
+          bash ../../scripts/ci-step.sh "Lyrics Maker: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Lyrics Maker: ffmpeg and model setup" npm run setup   # downloads the bundled ffmpeg and the Whisper model (~250 MB)
+          bash ../../scripts/ci-step.sh "Lyrics Maker: npm test" npm test   # runs the real model; the spoken-clip tests need the Windows voices and are skipped on Linux
+          bash ../../scripts/ci-step.sh "Lyrics Maker: package" npm run ${{ matrix.script }}
+
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release

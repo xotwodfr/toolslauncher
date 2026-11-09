@@ -41,6 +41,12 @@
     'audio-editor': '<svg viewBox="0 0 24 24"><path d="M4 10.5v3M8 7v10M12 4v16M16 8.5v7M20 10.5v3"/></svg>',
     // three stacked wave lines: the separate parts of one song
     'stem-splitter': '<svg viewBox="0 0 24 24"><path d="M3.5 5h3.5l1.4-2 1.6 4 1.4-2h8.6M3.5 12h7.5l1.4-2.2 1.6 4.4 1.4-2.2h4.6M3.5 19h3l1.4-2 1.6 4 1.4-2h9.6"/></svg>',
+    // a metronome: the beat
+    'bpm-key-finder': '<svg viewBox="0 0 24 24"><path d="M8.2 20.5h7.6l-2.3-15.5h-3z"/><path d="M12 16.2l3.8-8.4"/><circle cx="15.8" cy="7.8" r="1.1"/><path d="M9.4 12.5h5.2"/></svg>',
+    // a picture with the subject cut out of a dashed outline
+    'background-remover': '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2.6" stroke-dasharray="3.2 2.6"/><circle cx="12" cy="10" r="2.7"/><path d="M6.9 18c.7-3.1 2.8-4.5 5.1-4.5s4.4 1.4 5.1 4.5"/></svg>',
+    // a speech bubble with two lines of words
+    'lyrics-maker': '<svg viewBox="0 0 24 24"><path d="M5.2 4.8h13.6a1.7 1.7 0 0 1 1.7 1.7v8a1.7 1.7 0 0 1-1.7 1.7h-6.6l-4.4 3.5v-3.5H5.2a1.7 1.7 0 0 1-1.7-1.7v-8a1.7 1.7 0 0 1 1.7-1.7z"/><path d="M8 9h8M8 12.2h5"/></svg>',
     // two overlapping pages
     'duplicate-finder': '<svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="12" rx="2.4"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6.5a2 2 0 0 0-2 2v8.5a2 2 0 0 0 2 2h2"/></svg>',
     // a picture with lines of text
