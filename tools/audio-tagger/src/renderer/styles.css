@@ -12,16 +12,16 @@ body { background: var(--bg); color: var(--text); font: 14px/1.4 "Segoe UI", sys
 .app { display: grid; grid-template-columns: 1fr 340px; height: 100vh; }
 .left { display: flex; flex-direction: column; min-width: 0; padding: 14px 14px 8px; gap: 10px; }
 .toolbar { display: flex; align-items: center; gap: 8px; }
-.tablewrap { position: relative; flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); outline: none; }
+.tablewrap { position: relative; flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 0; background: var(--panel); outline: none; }
 .tablewrap.over { border-color: var(--accent); background: #1d1812; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th { position: sticky; top: 0; background: var(--panel-2); text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); padding: 8px 10px; cursor: pointer; user-select: none; border-bottom: 1px solid var(--line); z-index: 1; }
 th.num, td.num { width: 46px; text-align: right; }
 th:last-child, td:last-child { width: 78px; text-align: right; }
 th.sorted::after { content: " ▲"; font-size: 9px; } th.sorted.desc::after { content: " ▼"; }
-td { padding: 7px 10px; border-bottom: 1px solid #20242f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td { padding: 7px 10px; border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tr.row { cursor: default; }
-tr.row:hover { background: #1b1f2a; }
+tr.row:hover { background: var(--panel-2); }
 tr.row.selected { background: var(--sel); box-shadow: inset 3px 0 0 var(--accent); }
 tr.row.error td { color: var(--err); }
 td.st { font-size: 12px; color: var(--muted); }
@@ -39,23 +39,23 @@ label.check { flex-direction: row; align-items: center; gap: 8px; font-size: 13p
 .grid2 { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 input[type="text"], input[type="number"], textarea {
-  background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 7px; padding: 6px 9px; font: inherit; min-width: 0; width: 100%; resize: vertical;
+  background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 0; padding: 6px 9px; font: inherit; min-width: 0; width: 100%; resize: vertical;
 }
 input.dirty, textarea.dirty { border-color: var(--accent); }
 input::placeholder, textarea::placeholder { color: #5e6579; font-style: italic; }
-fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; margin: 2px 0 0; }
+fieldset { border: 1px solid var(--line); border-radius: 0; padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; margin: 2px 0 0; }
 legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
 .coverbox { display: flex; gap: 12px; align-items: flex-start; }
-.cover { width: 120px; height: 120px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); display: grid; place-items: center; overflow: hidden; flex: none; }
+.cover { width: 120px; height: 120px; border-radius: 0; border: 1px solid var(--line); background: var(--bg); display: grid; place-items: center; overflow: hidden; flex: none; }
 .cover img { width: 100%; height: 100%; object-fit: cover; }
 .cover.pending { border-color: var(--accent); }
 .coverbtns { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .actions { display: flex; gap: 8px; justify-content: flex-end; position: sticky; bottom: -16px; margin: 4px -16px -16px; padding: 10px 16px; background: var(--panel); border-top: 1px solid var(--line); }
 .btn {
-  all: unset; box-sizing: border-box; cursor: pointer; text-align: center; padding: 7px 14px; border-radius: 8px;
+  all: unset; box-sizing: border-box; cursor: pointer; text-align: center; padding: 7px 14px; border-radius: 0;
   font-weight: 600; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); white-space: nowrap; font-size: 13px;
 }
-.btn:hover { background: #262b39; }
+.btn:hover { background: var(--panel-3); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #1b1006; }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.ghost { background: transparent; } .btn.small { padding: 4px 10px; font-size: 12px; }

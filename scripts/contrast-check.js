@@ -50,6 +50,34 @@ const pairs = [
   ['control outline (inputs, switch) on card', C('control-edge'), C('surface'), 3],
 ];
 
+// ---- the shared skin used by every tool (tools/_shared/skin.css) -----------------------------------------------------
+const skinCss = fs.readFileSync(path.join(__dirname, '..', 'tools', '_shared', 'skin.css'), 'utf8');
+const skinRoot = /:root\s*\{([\s\S]*?)\n\}/.exec(skinCss)[1];
+const sk = {};
+for (const m of skinRoot.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})\b/g)) sk[m[1]] = m[2];
+const S = (n) => { if (!sk[n]) throw new Error(`token --${n} not found in tools/_shared/skin.css`); return rgb(sk[n]); };
+const skinPairs = [
+  ['tools: text on page', S('text'), S('bg'), 4.5],
+  ['tools: text on panel', S('text'), S('panel'), 4.5],
+  ['tools: text on raised panel', S('text'), S('panel-2'), 4.5],
+  ['tools: secondary text on panel', S('text-2'), S('panel'), 4.5],
+  ['tools: muted text on page', S('muted'), S('bg'), 4.5],
+  ['tools: muted text on panel', S('muted'), S('panel'), 4.5],
+  ['tools: muted text on raised panel', S('muted'), S('panel-2'), 4.5],
+  ['tools: muted text on hovered panel', S('muted'), S('panel-3'), 4.5],
+  ['tools: primary button text', S('ink'), S('fill'), 4.5],
+  ['tools: primary button text (hover)', S('ink'), S('fill-hover'), 4.5],
+  ['tools: disabled primary button text', S('muted'), S('panel-2'), 4.5],
+  ['tools: link on panel', S('focus'), S('panel'), 4.5],
+  ['tools: success text on panel', S('ok'), S('panel'), 4.5],
+  ['tools: error text on panel', S('err'), S('panel'), 4.5],
+  ['tools: warning text on panel', S('warn'), S('panel'), 4.5],
+  ['tools: danger button text', rgb('#2a0707'), mix(S('err'), 0.85, black), 4.5],
+  ['tools: focus ring on panel', S('focus'), S('panel'), 3],
+  ['tools: control outline on panel', S('edge'), S('panel'), 3],
+];
+pairs.push(...skinPairs);
+
 let failed = 0;
 for (const [name, fg, bg, min] of pairs) {
   const r = ratio(fg, bg);

@@ -21,20 +21,20 @@ p { margin: 0; }
 /* ---- left ---- */
 .side { background: var(--panel); border-right: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
 .modes { display: grid; gap: 6px; }
-.mode { all: unset; cursor: pointer; display: flex; flex-direction: column; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.mode { all: unset; cursor: pointer; display: flex; flex-direction: column; padding: 8px 12px; border: 1px solid var(--line); border-radius: 0; background: var(--panel-2); }
 .mode span { font-size: 12px; color: var(--muted); }
 .mode[aria-selected="true"] { border-color: var(--accent); background: rgba(47, 196, 222, .1); }
 .mode:hover { border-color: var(--accent); }
 .mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .block { display: flex; flex-direction: column; gap: 8px; }
-.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: border-color .15s, background .15s; }
+.drop { border: 2px dashed var(--line); border-radius: 0; padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: border-color .15s, background .15s; }
 .drop.over { border-color: var(--accent); background: rgba(47, 196, 222, .08); }
 .roots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.root { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 4px 4px 10px; }
+.root { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 0; padding: 4px 4px 4px 10px; }
 .root.prot { border-color: var(--keep); }
 .root .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-size: 12px; }
 .root .path bdi { direction: ltr; unicode-bidi: plaintext; }
-.root button { all: unset; cursor: pointer; padding: 3px 8px; border-radius: 6px; font-size: 12px; color: var(--muted); border: 1px solid transparent; }
+.root button { all: unset; cursor: pointer; padding: 3px 8px; border-radius: 0; font-size: 12px; color: var(--muted); border: 1px solid transparent; }
 .root button:hover { color: var(--text); border-color: var(--line); }
 .root button[aria-pressed="true"] { color: var(--keep); border-color: var(--keep); }
 .root button:focus-visible { outline: 2px solid var(--accent); }
@@ -43,12 +43,12 @@ p { margin: 0; }
 label { display: flex; flex-direction: column; gap: 4px; }
 label.check { flex-direction: row; align-items: center; gap: 8px; }
 label.inline { flex-direction: row; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
-select { background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 7px 10px; font: inherit; min-width: 0; width: 100%; }
+select { background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 0; padding: 7px 10px; font: inherit; min-width: 0; width: 100%; }
 label.inline select { width: auto; }
 select option { background: var(--panel); color: var(--text); }
 input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
 .scanbox { display: flex; flex-direction: column; gap: 8px; }
-.progress { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.progress { height: 6px; background: var(--bg); border-radius: 0; overflow: hidden; }
 .progress div { height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
 .status { min-height: 32px; }
 
@@ -62,12 +62,12 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 .summary { font-size: 15px; }
 .summary b { font-weight: 600; }
 .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.notice { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; background: var(--panel); }
+.notice { border: 1px solid var(--line); border-radius: 0; padding: 8px 12px; font-size: 13px; background: var(--panel); }
 .notice.ok { border-color: var(--ok); }
 .notice.warn { border-color: var(--warn); }
 .notice ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
 .groups { display: flex; flex-direction: column; gap: 12px; }
-.group { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.group { background: var(--panel); border: 1px solid var(--line); border-radius: 0; overflow: hidden; }
 .ghead { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--panel-2); border-bottom: 1px solid var(--line); font-size: 13px; }
 .ghead .kind { font-weight: 600; }
 .ghead .free { color: var(--muted); }
@@ -80,9 +80,9 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 .frow .box .tag { font-size: 11px; font-weight: 600; }
 .frow .box .tag.keepit { color: var(--keep); }
 .frow.sel .box .tag { color: var(--err); }
-.thumb { width: 72px; height: 54px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); object-fit: cover; cursor: zoom-in; display: block; }
-.ext { width: 72px; height: 54px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; overflow: hidden; }
-.playbtn { width: 72px; height: 54px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-size: 18px; }
+.thumb { width: 72px; height: 54px; border-radius: 0; background: var(--bg); border: 1px solid var(--line); object-fit: cover; cursor: zoom-in; display: block; }
+.ext { width: 72px; height: 54px; border-radius: 0; background: var(--bg); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; overflow: hidden; }
+.playbtn { width: 72px; height: 54px; border-radius: 0; background: var(--bg); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-size: 18px; }
 .playbtn:hover { border-color: var(--accent); }
 .playbtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .info { min-width: 0; }
@@ -90,9 +90,9 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 .info .dir { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; direction: rtl; text-align: left; }
 .info .dir bdi { direction: ltr; unicode-bidi: plaintext; }
 .info .meta { color: var(--muted); font-size: 12px; }
-.chip { display: inline-block; border: 1px solid var(--keep); color: var(--keep); border-radius: 999px; padding: 0 7px; font-size: 11px; margin-left: 6px; font-weight: 600; }
+.chip { display: inline-block; border: 1px solid var(--keep); color: var(--keep); border-radius: 0; padding: 0 7px; font-size: 11px; margin-left: 6px; font-weight: 600; }
 .chip.lock { border-color: var(--warn); color: var(--warn); }
-.rowbtns button { all: unset; cursor: pointer; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--muted); }
+.rowbtns button { all: unset; cursor: pointer; padding: 4px 10px; border: 1px solid var(--line); border-radius: 0; font-size: 12px; color: var(--muted); }
 .rowbtns button:hover { color: var(--text); border-color: var(--accent); }
 .rowbtns button:focus-visible { outline: 2px solid var(--accent); }
 .wide-more { align-self: center; }
@@ -100,7 +100,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 .picked { font-size: 14px; }
 
 /* ---- controls ---- */
-.btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; font: inherit; cursor: pointer; }
+.btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 0; padding: 7px 14px; font: inherit; cursor: pointer; }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:disabled { opacity: .45; cursor: default; }
 .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
@@ -112,7 +112,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 .btn.small { padding: 4px 10px; font-size: 12px; }
 .btn.wide { width: 100%; }
 
-dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; padding: 0; max-width: 560px; width: calc(100vw - 48px); }
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 0; padding: 0; max-width: 560px; width: calc(100vw - 48px); }
 dialog::backdrop { background: rgba(0, 0, 0, .6); }
 .dlg { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
 .dlg h2 { text-transform: none; letter-spacing: 0; font-size: 17px; color: var(--text); margin: 0; }
@@ -124,9 +124,9 @@ dialog::backdrop { background: rgba(0, 0, 0, .6); }
 .lightbox .close { float: right; }
 .lightbox p { text-align: center; }
 
-.toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: #2a2f3d; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 16px; box-shadow: 0 6px 24px rgba(0, 0, 0, .45); max-width: 70vw; z-index: 10; pointer-events: none; }
+.toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: var(--panel-3); color: var(--text); border: 1px solid var(--line); border-radius: 0; padding: 9px 16px; box-shadow: 0 6px 24px rgba(0, 0, 0, .45); max-width: 70vw; z-index: 10; pointer-events: none; }
 .toast.err { border-color: var(--err); }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #3d4458; border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb { background: #34343b; border-radius: 0; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
