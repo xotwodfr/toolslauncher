@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('at', {
   save: (req) => ipcRenderer.invoke('tags:save', req),
   reveal: (file) => ipcRenderer.invoke('reveal', file),
   onSaveProgress: (cb) => ipcRenderer.on('save:progress', (_e, p) => cb(p)),
+  onOpenPaths: (cb) => ipcRenderer.on('files:open', (_e, paths) => cb(paths)),
 });

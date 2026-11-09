@@ -35,6 +35,8 @@
     'pdf-toolkit': '<svg viewBox="0 0 24 24"><path d="M7 3.5h6.5L19 9v10a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 6 19V5a1.5 1.5 0 0 1 1-1.5z"/><path d="M13.5 3.5V9H19M9 13h6M9 16.5h4"/></svg>',
     // a shield with a check mark
     'photo-privacy': '<svg viewBox="0 0 24 24"><path d="M12 3.5l7 2.8v5.4c0 4.2-2.8 7.4-7 8.8-4.2-1.4-7-4.6-7-8.8V6.3z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>',
+    // headphones
+    'music-player': '<svg viewBox="0 0 24 24"><path d="M4.5 14.5v-2.5a7.5 7.5 0 0 1 15 0v2.5"/><rect x="3.5" y="13.5" width="4.2" height="6.5" rx="1.7"/><rect x="16.3" y="13.5" width="4.2" height="6.5" rx="1.7"/></svg>',
     // a film frame with a play triangle
     'video-converter': '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M10 9.2v5.6l4.8-2.8z"/><path d="M3.5 8.5H6M3.5 15.5H6M18 8.5h2.5M18 15.5h2.5"/></svg>',
   };

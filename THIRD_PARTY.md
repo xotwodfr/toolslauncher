@@ -11,9 +11,11 @@ components. Each downloadable package also carries the licence files its compone
 | [sharp](https://github.com/lovell/sharp) | Picture Converter | Apache-2.0 | Bundles [libvips](https://github.com/libvips/libvips) (LGPL-3.0-or-later) and other native libraries; see the `@img/sharp-*` package licences |
 | [@jsquash/jxl](https://github.com/jamsinclair/jSquash) | Picture Converter | Apache-2.0 | [libjxl](https://github.com/libjxl/libjxl) (BSD-3-Clause, with Highway under Apache-2.0) compiled to WebAssembly; used for JPEG XL. Runs in-process, no native code |
 | [wasm-feature-detect](https://github.com/GoogleChromeLabs/wasm-feature-detect) | Picture Converter | Apache-2.0 | Used by @jsquash/jxl |
-| [node-taglib-sharp](https://github.com/benrr101/node-taglib-sharp) | Audio Tagger | LGPL-2.1-or-later | Pure JavaScript; dependencies iconv-lite, os-locale, uuid (MIT) |
+| [node-taglib-sharp](https://github.com/benrr101/node-taglib-sharp) | Audio Tagger, Music Player | LGPL-2.1-or-later | Pure JavaScript; dependencies iconv-lite, os-locale, uuid (MIT) |
 | [pdf-lib](https://github.com/Hopding/pdf-lib) | PDF Toolkit | MIT | Pure JavaScript; dependencies @pdf-lib/standard-fonts, @pdf-lib/upng (MIT) and pako (MIT and Zlib) |
 | [FFmpeg](https://ffmpeg.org/) via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | Audio Converter, Video Converter | **GPL-3.0-or-later** (this build is GPL: libx264, libmp3lame, libopus, libvorbis and others) | See below |
+
+Music Player's playback uses the audio decoders built into Electron / Chromium (MP3, FLAC, Ogg Vorbis, Opus, AAC, WAV); it bundles no extra codecs. Its LRC lyrics, M3U playlist and library code is code in this repository.
 
 Photo Privacy Cleaner has no runtime dependencies: its JPEG, PNG and WebP handling is code in this repository.
 

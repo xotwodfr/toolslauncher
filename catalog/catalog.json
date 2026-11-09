@@ -60,6 +60,16 @@
       "accent": "#3b82f6",
       "version": "0.1.0",
       "platforms": {}
+    },
+    {
+      "id": "music-player",
+      "name": "Music Player",
+      "description": "Play a folder of music with covers, tags and synced lyrics. Gapless, equalizer, ReplayGain, playlists. Nothing is uploaded.",
+      "category": "Audio",
+      "glyph": "♫",
+      "accent": "#d6409f",
+      "version": "0.1.0",
+      "platforms": {}
     }
   ]
 }

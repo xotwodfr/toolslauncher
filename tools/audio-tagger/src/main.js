@@ -6,6 +6,9 @@ const T = require('./tags');
 
 let win = null;
 let saving = false;
+
+/** Files or folders given on the command line (Music Player's "Edit tags in Audio Tagger", or "Open with"). */
+const pathsFromArgs = (argv) => argv.filter((a) => typeof a === 'string' && a && !a.startsWith('-') && fs.existsSync(a)).map((a) => path.resolve(a));
 let pickedCover = null; // the only image path the renderer may ask us to embed (chosen via our own dialog)
 
 function createWindow() {
@@ -18,6 +21,8 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const startup = pathsFromArgs(process.argv.slice(app.isPackaged ? 1 : 2));
+  if (startup.length) win.webContents.once('did-finish-load', () => win.webContents.send('files:open', startup));
 }
 
 async function expandPaths(inputs) {
@@ -112,7 +117,13 @@ ipcMain.handle('reveal', (_e, file) => { if (typeof file === 'string' && T.isAud
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 else {
-  app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+  app.on('second-instance', (_e, argv) => {
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+    const paths = pathsFromArgs(argv.slice(1)); // a second launch with files adds them to this window
+    if (paths.length) win.webContents.send('files:open', paths);
+  });
   app.whenReady().then(createWindow);
   app.on('window-all-closed', () => app.quit());
 }

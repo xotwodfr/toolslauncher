@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data: blob: mpm:; media-src mpm:; connect-src mpm:; base-uri 'none'; form-action 'none';">
+  <title>Music Player</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="side" aria-label="Library">
+      <div class="brand"><span class="logo" aria-hidden="true"></span><span>Music Player</span></div>
+      <button id="folderBtn" class="folder" aria-haspopup="menu" aria-expanded="false" title="Change music folder">
+        <span class="folder-ico" id="folderIco" aria-hidden="true"></span>
+        <span class="folder-text"><span id="folderName">Choose a folder</span><span id="folderPath" class="muted small"></span></span>
+        <span class="caret" aria-hidden="true">▾</span>
+      </button>
+      <nav class="nav" id="nav" aria-label="Views">
+        <button class="navbtn" data-view="songs">Songs<span class="count" id="cSongs"></span></button>
+        <button class="navbtn" data-view="albums">Albums<span class="count" id="cAlbums"></span></button>
+        <button class="navbtn" data-view="artists">Artists<span class="count" id="cArtists"></span></button>
+        <button class="navbtn" data-view="folders">Folders</button>
+        <button class="navbtn" data-view="queue">Queue<span class="count" id="cQueue"></span></button>
+        <button class="navbtn" data-view="now">Now playing</button>
+      </nav>
+      <div class="plhead">
+        <span class="muted small">PLAYLISTS</span>
+        <span class="plbtns">
+          <button id="plNew" class="iconbtn" title="New playlist" aria-label="New playlist"></button>
+          <button id="plImport" class="iconbtn" title="Import an M3U playlist" aria-label="Import an M3U playlist"></button>
+        </span>
+      </div>
+      <ul id="plList" class="pl" aria-label="Playlists"></ul>
+      <div class="sidefoot muted small" id="libInfo"></div>
+    </aside>
+
+    <main class="main" id="main">
+      <header class="top" id="top">
+        <h1 id="viewTitle">Songs</h1>
+        <div class="tools">
+          <label class="searchbox"><span class="visually-hidden">Search</span>
+            <input id="search" type="search" placeholder="Search songs, artists, albums   ( / )" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="sortbox" id="sortWrap"><span class="muted small">Sort</span>
+            <select id="sort" aria-label="Sort songs by">
+              <option value="default">Artist, album</option>
+              <option value="title">Title</option>
+              <option value="artist">Artist</option>
+              <option value="album">Album</option>
+              <option value="year">Year</option>
+              <option value="duration">Length</option>
+              <option value="added">Recently added</option>
+            </select>
+          </label>
+          <button id="sortDir" class="iconbtn" title="Reverse order" aria-label="Reverse sort order" aria-pressed="false"></button>
+        </div>
+      </header>
+      <div id="notice" class="notice" role="status" hidden></div>
+      <div id="view" class="view" tabindex="-1"></div>
+    </main>
+
+    <footer class="bar" id="bar">
+      <button class="nowbtn" id="barTrack" title="Open Now playing" aria-label="Open Now playing">
+        <span class="cover sm" id="barCover"></span>
+        <span class="meta"><span id="barTitle" class="t">Nothing playing</span><span id="barArtist" class="a muted"></span></span>
+      </button>
+      <div class="center">
+        <div class="transport">
+          <button id="bShuffle" class="iconbtn" title="Shuffle (S)" aria-label="Shuffle" aria-pressed="false"></button>
+          <button id="bPrev" class="iconbtn" title="Previous (P)" aria-label="Previous song"></button>
+          <button id="bPlay" class="playbtn" title="Play / pause (Space)" aria-label="Play"></button>
+          <button id="bNext" class="iconbtn" title="Next (N)" aria-label="Next song"></button>
+          <button id="bRepeat" class="iconbtn" title="Repeat (R)" aria-label="Repeat: off"></button>
+        </div>
+        <div class="seekrow">
+          <span id="tNow" class="time">0:00</span>
+          <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" disabled>
+          <span id="tTotal" class="time">0:00</span>
+        </div>
+      </div>
+      <div class="extras">
+        <button id="bLyrics" class="iconbtn" title="Lyrics (L)" aria-label="Lyrics"></button>
+        <button id="bQueue" class="iconbtn" title="Queue (Q)" aria-label="Queue"></button>
+        <button id="bSound" class="iconbtn" title="Equalizer and volume levelling" aria-label="Sound settings" aria-haspopup="dialog" aria-expanded="false"></button>
+        <button id="bSleep" class="iconbtn" title="Sleep timer" aria-label="Sleep timer" aria-haspopup="dialog" aria-expanded="false"></button>
+        <button id="bMute" class="iconbtn" title="Mute (M)" aria-label="Mute"></button>
+        <input id="vol" type="range" min="0" max="100" value="80" step="1" aria-label="Volume">
+        <button id="bMini" class="iconbtn" title="Mini player" aria-label="Mini player" aria-pressed="false"></button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="popSound" class="pop" role="dialog" aria-label="Sound settings" hidden>
+    <div class="pophead"><strong>Sound</strong><label class="check"><input type="checkbox" id="eqOn"> Equalizer</label></div>
+    <div class="row">
+      <label class="grow">Preset
+        <select id="eqPreset"></select>
+      </label>
+      <label>Preamp <output id="preampOut">0 dB</output>
+        <input type="range" id="preamp" min="-12" max="12" step="0.5" value="0" aria-label="Preamp in dB">
+      </label>
+    </div>
+    <div class="eq" id="eqBands" role="group" aria-label="Equalizer bands"></div>
+    <div class="sep"></div>
+    <div class="row">
+      <label class="grow">Volume levelling (ReplayGain)
+        <select id="rgMode">
+          <option value="off">Off</option>
+          <option value="track">Per song</option>
+          <option value="album">Per album</option>
+        </select>
+      </label>
+      <label>Extra gain <output id="rgPreOut">0 dB</output>
+        <input type="range" id="rgPre" min="-12" max="12" step="0.5" value="0" aria-label="ReplayGain extra gain in dB">
+      </label>
+    </div>
+    <p class="muted small" id="rgNote">Uses the ReplayGain tags in your files. Songs without them play at their original level.</p>
+  </div>
+
+  <div id="popSleep" class="pop narrow" role="dialog" aria-label="Sleep timer" hidden>
+    <div class="pophead"><strong>Sleep timer</strong></div>
+    <div id="sleepStatus" class="muted small" aria-live="polite"></div>
+    <div class="chips" id="sleepChips">
+      <button class="chip" data-min="15">15 min</button>
+      <button class="chip" data-min="30">30 min</button>
+      <button class="chip" data-min="45">45 min</button>
+      <button class="chip" data-min="60">1 hour</button>
+      <button class="chip" data-min="end">End of song</button>
+    </div>
+    <label class="check"><input type="checkbox" id="sleepFade" checked> Fade out gently</label>
+    <button id="sleepCancel" class="btn ghost" hidden>Cancel timer</button>
+  </div>
+
+  <div id="menu" class="menu" role="menu" hidden></div>
+
+  <dialog id="ask" class="dlg">
+    <form method="dialog" id="askForm">
+      <h2 id="askTitle"></h2>
+      <p id="askText" class="muted"></p>
+      <input id="askInput" type="text" maxlength="120" spellcheck="false" autocomplete="off" hidden>
+      <div class="dlgbtns"><button type="button" class="btn ghost" id="askCancel">Cancel</button><button value="ok" class="btn primary" id="askOk">OK</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="editor" class="dlg wide" aria-labelledby="edTitle">
+    <div class="edhead">
+      <div><h2 id="edTitle">Edit lyrics</h2><div class="muted small" id="edSong"></div></div>
+      <div class="tabs" role="tablist" aria-label="Editor mode">
+        <button role="tab" id="tabText" aria-selected="true" aria-controls="paneText">Text</button>
+        <button role="tab" id="tabSync" aria-selected="false" aria-controls="paneSync">Sync</button>
+      </div>
+    </div>
+    <div id="paneText" role="tabpanel" aria-labelledby="tabText">
+      <p class="muted small">Type or paste the lyrics, one line per row. Lines that start with a time like <code>[01:23.45]</code> are already synced.</p>
+      <textarea id="edText" spellcheck="false" aria-label="Lyrics text"></textarea>
+    </div>
+    <div id="paneSync" role="tabpanel" aria-labelledby="tabSync" hidden>
+      <p class="muted small">Play the song, then press <kbd>Enter</kbd> (or Stamp) at the start of each line you hear. The highlighted line gets the current time. <kbd>Space</kbd> plays or pauses, <kbd>Backspace</kbd> goes back one line.</p>
+      <div class="synctools">
+        <button class="btn" id="syPlay">Play</button>
+        <button class="btn primary" id="syStamp">Stamp line</button>
+        <button class="btn" id="syBack">Back a line</button>
+        <span class="grow"></span>
+        <span class="muted small">Selected line</span>
+        <button class="btn small" id="syMinus" aria-label="Move selected line 0.1 seconds earlier">−0.1 s</button>
+        <button class="btn small" id="syPlus" aria-label="Move selected line 0.1 seconds later">+0.1 s</button>
+        <span class="muted small">All lines</span>
+        <button class="btn small" id="syAllMinus" aria-label="Move all lines 0.5 seconds earlier">−0.5 s</button>
+        <button class="btn small" id="syAllPlus" aria-label="Move all lines 0.5 seconds later">+0.5 s</button>
+      </div>
+      <div class="synctime"><span id="syNow">0:00.00</span></div>
+      <ol id="syList" class="sylist" tabindex="0" aria-label="Lyric lines"></ol>
+    </div>
+    <div class="edfoot">
+      <span id="edInfo" class="muted small" aria-live="polite"></span>
+      <span class="grow"></span>
+      <button class="btn ghost" id="edCancel">Cancel</button>
+      <button class="btn primary" id="edSave">Save lyrics</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div class="drophint" id="dropHint" hidden><div>Drop a music folder to play it</div></div>
+
+  <script src="../lrc.js"></script>
+  <script src="../model.js"></script>
+  <script src="../eq-presets.js"></script>
+  <script src="engine.js"></script>
+  <script src="lyrics-ui.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

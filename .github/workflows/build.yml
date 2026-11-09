@@ -95,6 +95,13 @@ jobs:
           bash ../../scripts/ci-step.sh "Video Converter: npm test" npm test
           bash ../../scripts/ci-step.sh "Video Converter: package" npm run ${{ matrix.script }}
 
+      - name: Music Player
+        working-directory: tools/music-player
+        run: |
+          bash ../../scripts/ci-step.sh "Music Player: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Music Player: npm test" npm test
+          bash ../../scripts/ci-step.sh "Music Player: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release

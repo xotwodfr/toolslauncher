@@ -226,6 +226,9 @@
     renderList();
   });
 
+  // files handed over on the command line / by a second launch
+  window.at.onOpenPaths(async (paths) => addItems(await window.at.loadPaths(paths)));
+
   // drag & drop
   const wrap = $('#tableWrap');
   ['dragenter', 'dragover'].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); wrap.classList.add('over'); }));

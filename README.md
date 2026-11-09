@@ -13,6 +13,7 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **Picture Converter** | Batch convert and resize images between **14 formats**: JPEG, PNG, WebP, GIF, AVIF, JPEG XL, TIFF, PDF, BMP, ICO (multi-size), TGA, QOI, PPM and PGM. Per-format options (quality, lossless, progressive, palette, TIFF compression, icon sizes, background colour...). It also reads BMP, ICO, TGA, QOI, PNM and JPEG XL, so any of them can be converted to any other. |
 | **PDF Toolkit** | Merge PDFs in the order you choose, split by page, range or every N pages, extract / reorder / delete / rotate pages, and turn JPEG and PNG images into a PDF (phone photos come out the right way up). Password-protected files are refused rather than mangled. |
 | **Photo Privacy Cleaner** | Shows what a JPEG, PNG or WebP quietly reveals (GPS location, camera and serial numbers, names, date, embedded thumbnails, AI prompts, hidden trailing data) and writes a clean copy. It never re-encodes the picture, and checks that the pixel data in the copy is byte-identical before saving. |
+| **Music Player** | Pick a folder and play everything in it (MP3, FLAC, OGG, Opus, M4A/AAC, WAV). Albums, artists, folders, search, queue and M3U playlists, with covers, tags and **synced lyrics** (`.lrc` files or lyrics stored in the tags). Gapless, 10-band equalizer, ReplayGain volume levelling, sleep timer, mini player. It includes a lyrics editor where you tap along to time each line. |
 | **Video Converter** | Convert to MP4 (H.264), WebM (VP9) or animated GIF. Cap the resolution and frame rate, pick a quality or **aim for a file size** (two-pass, so it lands on the target), trim, drop the sound, strip location metadata. Shows progress and speed, with Cancel. |
 
 <p>
@@ -22,9 +23,19 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/pdf-toolkit.png" width="32%" alt="PDF Toolkit">
   <img src="docs/screenshots/photo-privacy.png" width="32%" alt="Photo Privacy Cleaner">
   <img src="docs/screenshots/video-converter.png" width="32%" alt="Video Converter">
+  <img src="docs/screenshots/music-player.png" width="32%" alt="Music Player: now playing with synced lyrics">
+  <img src="docs/screenshots/music-player-albums.png" width="32%" alt="Music Player: albums">
 </p>
 
-All tools never overwrite your original files.
+No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`.)
+
+### Music Player
+
+- **Open a folder** (or drop one on the window). It scans in the background and remembers the result, so the next start is instant. Files it can't play (WMA, APE, AIFF, WavPack...) are counted and reported, not hidden.
+- **Lyrics** come from a `Song.lrc` next to the song (synced or plain), from lyrics stored in the tags (plain, LRC text, or ID3 synced lyrics), or `Song.txt`. Synced lyrics follow the song and you can click a line to jump there. **Edit lyrics** lets you type them and tap *Stamp* as each line is sung.
+- **Tags are read-only here.** *Edit tags in Audio Tagger* opens the song in [Audio Tagger](#tools) if you have installed it from the launcher.
+- **Keys:** <kbd>Space</kbd> play/pause, <kbd>N</kbd> / <kbd>P</kbd> next / previous, <kbd>←</kbd> <kbd>→</kbd> seek 5 s (<kbd>Shift</kbd> 30 s), <kbd>Ctrl</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> volume, <kbd>M</kbd> mute, <kbd>S</kbd> shuffle, <kbd>R</kbd> repeat, <kbd>L</kbd> lyrics, <kbd>Q</kbd> queue, <kbd>/</kbd> search. In a list: <kbd>Enter</kbd> plays, <kbd>Delete</kbd> removes (queue and playlists), <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> reorders. The keyboard media keys work too.
+- **Gapless:** the next song is loaded in advance and started 25 ms before the current one ends. Measured with the end-to-end test: no silence and no overlap between two WAV files over 40 consecutive hand-overs. MP3 and AAC files only play gaplessly as far as their own encoder-delay information allows.
 
 ## Install
 
