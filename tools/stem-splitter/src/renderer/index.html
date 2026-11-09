@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src stems:;">
+  <title>Stem Splitter</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Stem Splitter</h1>
+      <span class="muted small tagline">vocals · drums · bass · guitar · piano · other</span>
+      <span class="grow"></span>
+      <span id="cacheInfo" class="muted small"></span>
+      <button id="clearCache" class="btn ghost small" hidden title="Delete the separated copies kept for quick re-opening. Your songs are not touched.">Clear saved stems</button>
+      <button id="open" class="btn">Open song…</button>
+    </header>
+
+    <div id="engineWarn" class="note warn" role="alert" hidden></div>
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="stage">
+      <!-- nothing open -->
+      <section id="empty" class="drop" tabindex="0" role="button" aria-label="Open a song">
+        <strong class="big">Drop a song here</strong>
+        <span class="muted">MP3, FLAC, WAV, OGG, Opus, M4A, AAC and more</span>
+        <button id="open2" class="btn primary">Open song…</button>
+        <p class="muted small fine">The song is split into six parts on this computer, offline. Then tick any combination, for example voice + bass, or drums + bass + guitar, listen to it and save it as a new file. Your original is never changed.</p>
+      </section>
+
+      <!-- a long song waits for a click before the (long) split starts -->
+      <section id="confirm" class="card" hidden>
+        <h2 id="cName" class="trunc"></h2>
+        <p id="cInfo" class="muted"></p>
+        <div class="row"><button id="splitBtn" class="btn primary">Split into stems</button></div>
+      </section>
+
+      <!-- splitting -->
+      <section id="working" class="card" hidden aria-live="polite">
+        <h2 id="wName" class="trunc"></h2>
+        <p id="wPhase" class="phase">Starting…</p>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="wBar"><div id="wFill"></div></div>
+        <p id="wEta" class="muted small">&nbsp;</p>
+        <div class="row"><button id="cancelBtn" class="btn">Cancel</button></div>
+        <p class="muted small fine">Splitting runs on the processor and takes roughly two thirds of the length of the song. Keep this window open.</p>
+      </section>
+
+      <!-- the six stems -->
+      <section id="ready" hidden>
+        <div class="song">
+          <h2 id="rName" class="trunc"></h2>
+          <span id="rInfo" class="muted small"></span>
+        </div>
+
+        <div class="presets" role="group" aria-label="Combinations">
+          <span class="muted small label">Combination</span>
+          <span id="presets" class="chips"></span>
+        </div>
+
+        <div id="lanes" class="lanes" aria-label="The six stems">
+          <div class="phwrap" aria-hidden="true"><div id="playhead"></div></div>
+        </div>
+        <p id="noPreview" class="note warn" hidden>This song is too long for the live preview. You can still tick stems and save the mix.</p>
+
+        <div class="bar transport">
+          <button id="play" class="btn primary" aria-label="Play or pause (Space)">▶ Play</button>
+          <span class="clock"><span id="pos">0:00</span> <span class="muted">/ <span id="len">0:00</span></span></span>
+          <span class="muted small hint">Click a waveform to jump. Keys 1–6 tick the stems.</span>
+          <span class="grow"></span>
+        </div>
+
+        <div class="exportbar">
+          <label for="format">Save as</label>
+          <select id="format" aria-label="File format"></select>
+          <span id="summary" class="muted summary-text"></span>
+          <span class="grow"></span>
+          <button id="exportBtn" class="btn primary">Save mix…</button>
+          <button id="exportCancel" class="btn" hidden>Cancel</button>
+        </div>
+        <div id="exportProgress" class="progress slim" hidden><div id="exportFill"></div></div>
+        <div id="result" class="result" hidden role="status"></div>
+        <p class="muted small fine">Separation is never perfect: faint traces of other instruments can remain in a stem, and guitar and piano are the hardest to pull apart.</p>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../plan.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

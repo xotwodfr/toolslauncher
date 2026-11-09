@@ -82,6 +82,16 @@
       "platforms": {}
     },
     {
+      "id": "stem-splitter",
+      "name": "Stem Splitter",
+      "description": "Split a song into vocals, drums, bass, guitar, piano and the rest, then pick any combination (voice + bass, drums + guitar...), listen and save it. Runs offline on your computer; nothing is uploaded.",
+      "category": "Audio",
+      "glyph": "≋",
+      "accent": "#c6e03a",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
       "id": "duplicate-finder",
       "name": "Duplicate Finder",
       "description": "Find duplicate files, look-alike photos and repeated songs, review them, and move the extras to the Recycle Bin. Nothing is deleted for good and nothing is uploaded.",

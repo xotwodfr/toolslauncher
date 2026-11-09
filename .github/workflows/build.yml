@@ -126,6 +126,16 @@ jobs:
           bash ../../scripts/ci-step.sh "Image Text Extractor: npm test" npm test
           bash ../../scripts/ci-step.sh "Image Text Extractor: package" npm run ${{ matrix.script }}
 
+      - name: Stem Splitter
+        working-directory: tools/stem-splitter
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip   # onnxruntime-node would download ~hundreds of MB of CUDA libraries on Linux; this tool is CPU-only
+        run: |
+          bash ../../scripts/ci-step.sh "Stem Splitter: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Stem Splitter: ffmpeg and model setup" npm run setup   # downloads the bundled ffmpeg and the Demucs model (~136 MB)
+          bash ../../scripts/ci-step.sh "Stem Splitter: npm test" npm test   # includes a run of the real model
+          bash ../../scripts/ci-step.sh "Stem Splitter: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release

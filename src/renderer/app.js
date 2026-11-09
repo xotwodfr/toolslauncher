@@ -39,6 +39,8 @@
     'music-player': '<svg viewBox="0 0 24 24"><path d="M4.5 14.5v-2.5a7.5 7.5 0 0 1 15 0v2.5"/><rect x="3.5" y="13.5" width="4.2" height="6.5" rx="1.7"/><rect x="16.3" y="13.5" width="4.2" height="6.5" rx="1.7"/></svg>',
     // waveform bars
     'audio-editor': '<svg viewBox="0 0 24 24"><path d="M4 10.5v3M8 7v10M12 4v16M16 8.5v7M20 10.5v3"/></svg>',
+    // three stacked wave lines: the separate parts of one song
+    'stem-splitter': '<svg viewBox="0 0 24 24"><path d="M3.5 5h3.5l1.4-2 1.6 4 1.4-2h8.6M3.5 12h7.5l1.4-2.2 1.6 4.4 1.4-2.2h4.6M3.5 19h3l1.4-2 1.6 4 1.4-2h9.6"/></svg>',
     // two overlapping pages
     'duplicate-finder': '<svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="12" rx="2.4"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6.5a2 2 0 0 0-2 2v8.5a2 2 0 0 0 2 2h2"/></svg>',
     // a picture with lines of text
