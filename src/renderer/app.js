@@ -37,6 +37,12 @@
     'photo-privacy': '<svg viewBox="0 0 24 24"><path d="M12 3.5l7 2.8v5.4c0 4.2-2.8 7.4-7 8.8-4.2-1.4-7-4.6-7-8.8V6.3z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>',
     // headphones
     'music-player': '<svg viewBox="0 0 24 24"><path d="M4.5 14.5v-2.5a7.5 7.5 0 0 1 15 0v2.5"/><rect x="3.5" y="13.5" width="4.2" height="6.5" rx="1.7"/><rect x="16.3" y="13.5" width="4.2" height="6.5" rx="1.7"/></svg>',
+    // waveform bars
+    'audio-editor': '<svg viewBox="0 0 24 24"><path d="M4 10.5v3M8 7v10M12 4v16M16 8.5v7M20 10.5v3"/></svg>',
+    // two overlapping pages
+    'duplicate-finder': '<svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="12" rx="2.4"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6.5a2 2 0 0 0-2 2v8.5a2 2 0 0 0 2 2h2"/></svg>',
+    // a picture with lines of text
+    'ocr': '<svg viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>',
     // a film frame with a play triangle
     'video-converter': '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M10 9.2v5.6l4.8-2.8z"/><path d="M3.5 8.5H6M3.5 15.5H6M18 8.5h2.5M18 15.5h2.5"/></svg>',
   };

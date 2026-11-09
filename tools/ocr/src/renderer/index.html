@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data: blob: ocr:; connect-src ocr:;">
+  <title>Image Text Extractor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="files">
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Add pictures">
+        <strong>Drop pictures here</strong>
+        <span class="muted small">PNG, JPG, WebP, BMP, GIF, AVIF</span>
+        <div class="row center">
+          <button id="addFiles" class="btn small">Add pictures…</button>
+          <button id="paste" class="btn small" title="Use the picture on the clipboard, for example a screenshot (Ctrl+V)">Paste</button>
+        </div>
+      </div>
+      <div class="listhead">
+        <span id="count" class="muted">No pictures</span>
+        <button id="clear" class="btn ghost small" hidden>Remove all</button>
+      </div>
+      <ol id="list" class="list" aria-label="Pictures"></ol>
+      <div class="listfoot">
+        <button id="readAll" class="btn" hidden>Read all</button>
+        <button id="copyAll" class="btn" hidden>Copy all text</button>
+        <button id="saveAll" class="btn" hidden>Save all as text files…</button>
+      </div>
+    </aside>
+
+    <main class="stage">
+      <div id="empty" class="empty">
+        <h1>Image Text Extractor</h1>
+        <p>Read the text in a screenshot, a photo of a page or a scan, then copy it or save it.<br>Everything happens on this computer: no picture is uploaded.</p>
+        <div class="row center"><button id="addFiles2" class="btn primary">Add pictures…</button><button id="paste2" class="btn">Paste a screenshot</button></div>
+        <p class="muted small">Tip: press Ctrl+V to paste a picture you copied.</p>
+      </div>
+
+      <section id="viewer" hidden>
+        <header class="vhead">
+          <h2 id="fname" class="trunc"></h2>
+          <span id="finfo" class="muted small"></span>
+        </header>
+        <div class="vbar">
+          <button id="readSel" class="btn small" disabled title="Read only the part you have drawn a box around">Read selection</button>
+          <button id="clearSel" class="btn ghost small" disabled>Clear selection</button>
+          <span class="grow"></span>
+          <label class="check small"><input id="boxes" type="checkbox" checked> Show what was read</label>
+          <button id="zoomOut" class="btn small" aria-label="Zoom out" title="Zoom out (−)">−</button>
+          <button id="zoomIn" class="btn small" aria-label="Zoom in" title="Zoom in (+)">+</button>
+          <button id="zoomFit" class="btn small" title="Fit the picture in the window">Fit</button>
+        </div>
+        <div id="view" class="view"><canvas id="canvas" aria-label="The picture. Drag to draw a box around the part to read."></canvas></div>
+        <p class="muted small hint">Drag on the picture to draw a box, then choose <b>Read selection</b> to read only that part.</p>
+      </section>
+    </main>
+
+    <aside class="out">
+      <div class="settings">
+        <label>Language of the text
+          <select id="lang" aria-label="Language"></select>
+        </label>
+        <label>Also read
+          <select id="lang2" aria-label="Second language"></select>
+        </label>
+        <label>Layout
+          <select id="psm" aria-label="Layout of the text">
+            <option value="auto">Automatic (pages, columns)</option>
+            <option value="block">One block of text</option>
+            <option value="line">A single line</option>
+            <option value="sparse">Scattered text (signs, labels)</option>
+          </select>
+        </label>
+        <label class="check"><input id="enlarge" type="checkbox" checked> Enlarge small pictures</label>
+        <label class="check"><input id="enhance" type="checkbox" checked> Even out contrast first</label>
+        <button id="read" class="btn primary" disabled>Read the text</button>
+        <button id="cancel" class="btn danger" hidden>Stop</button>
+        <div id="progress" class="progress" hidden><div id="bar"></div></div>
+      </div>
+
+      <div class="textwrap">
+        <div class="texthead"><strong>Text</strong><span id="stats" class="muted small"></span></div>
+        <textarea id="text" spellcheck="false" placeholder="The text will appear here. You can edit it." aria-label="The text that was read"></textarea>
+        <p id="hint" class="muted small" hidden></p>
+      </div>
+
+      <div class="foot">
+        <div class="row">
+          <button id="copy" class="btn primary" disabled>Copy</button>
+          <button id="save" class="btn" disabled>Save as .txt…</button>
+        </div>
+        <div class="row">
+          <button id="join" class="btn small" disabled title="Join the lines of each paragraph into one line">Join lines</button>
+          <button id="reset" class="btn small ghost" disabled title="Go back to exactly what was read">Reset</button>
+        </div>
+        <div id="result" class="result" hidden></div>
+      </div>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="../prep.js"></script>
+  <script src="../tidy.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

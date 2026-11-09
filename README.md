@@ -14,6 +14,9 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **PDF Toolkit** | Merge PDFs in the order you choose, split by page, range or every N pages, extract / reorder / delete / rotate pages, and turn JPEG and PNG images into a PDF (phone photos come out the right way up). Password-protected files are refused rather than mangled. |
 | **Photo Privacy Cleaner** | Shows what a JPEG, PNG or WebP quietly reveals (GPS location, camera and serial numbers, names, date, embedded thumbnails, AI prompts, hidden trailing data) and writes a clean copy. It never re-encodes the picture, and checks that the pixel data in the copy is byte-identical before saving. |
 | **Music Player** | Pick a folder and play everything in it (MP3, FLAC, OGG, Opus, M4A/AAC, WAV). Albums, artists, folders, search, queue and M3U playlists, with covers, tags and **synced lyrics** (`.lrc` files or lyrics stored in the tags). Gapless, 10-band equalizer, ReplayGain volume levelling, sleep timer, mini player. It includes a lyrics editor where you tap along to time each line. |
+| **Audio Editor** | Cut, trim, join, fade and level out audio on a waveform. Drag to select, press Delete to cut a part out, add more files to join them (with a pause or a crossfade). Fade in and out, normalize to a peak or a loudness target, cut silence from the ends, hear the real result with **Preview**, and save as MP3, M4A, Ogg, Opus, FLAC or WAV. It always writes a new file. |
+| **Duplicate Finder** | Finds exact duplicate files (any type), look-alike photos (resized, re-saved or lightly edited) and repeated songs (identical audio, or the same artist, title and length, for example an MP3 and a FLAC). You review every group, mark folders as protected, and move the extras to the Recycle Bin. Nothing is deleted for good. |
+| **Image Text Extractor** | Reads the text in screenshots, photos of pages and scans (OCR), offline, in 12 languages. Paste a screenshot with Ctrl+V, draw a box to read only part of a picture, see which words were read and how sure it was, edit the text, then copy it or save it as a .txt file. |
 | **Video Converter** | Convert to MP4 (H.264), WebM (VP9) or animated GIF. Cap the resolution and frame rate, pick a quality or **aim for a file size** (two-pass, so it lands on the target), trim, drop the sound, strip location metadata. Shows progress and speed, with Cancel. |
 
 <p>
@@ -25,9 +28,37 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/video-converter.png" width="32%" alt="Video Converter">
   <img src="docs/screenshots/music-player.png" width="32%" alt="Music Player: now playing with synced lyrics">
   <img src="docs/screenshots/music-player-albums.png" width="32%" alt="Music Player: albums">
+  <img src="docs/screenshots/audio-editor.png" width="32%" alt="Audio Editor: a waveform with two parts cut out">
+  <img src="docs/screenshots/duplicate-finder.png" width="32%" alt="Duplicate Finder: groups of look-alike pictures, the extra copies marked to move">
+  <img src="docs/screenshots/image-text-extractor.png" width="32%" alt="Image Text Extractor: a recipe card with the words that were read outlined, and the text beside it">
 </p>
 
 No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`.)
+
+### Image Text Extractor
+
+- **Offline.** It uses the Tesseract OCR engine compiled to WebAssembly, and the language files are inside the app (English, Swedish, German, French, Spanish, Italian, Portuguese, Dutch, Danish, Norwegian, Finnish, Polish), so no picture and no text ever leaves the computer and it needs no internet. You can pick a second language to read mixed text.
+- **Getting pictures in.** Add files, drop them on the window, or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste whatever is on the clipboard, such as a screenshot. PNG, JPEG, WebP, BMP, GIF and AVIF open (TIFF and PDF do not).
+- **See what was read.** Every word is outlined on the picture, green when the engine is sure and amber or red when it is not, so doubtful words are easy to check. Drag a box around part of the picture and choose *Read selection* to read only that.
+- **The text is yours to edit.** Correct it in the box, join the lines of each paragraph into one line, or reset to what was read. *Copy* puts it on the clipboard and *Save as .txt* writes a new text file (never over a picture). With several pictures, *Read all*, *Copy all text* and *Save all as text files* work on the whole list, and an existing file is never overwritten.
+- **Good to know.** Small pictures are enlarged and contrast is evened out before reading (both can be switched off). It reads printed text well; handwriting and very stylised fonts are hit and miss, and the reading is only as good as the picture: sharp, straight and well lit is best. It does not rotate a sideways picture for you. Chinese, Japanese, Korean, Arabic and other scripts are not included.
+
+### Duplicate Finder
+
+- **Three ways to look.** *Files* finds files with exactly the same contents (any type, any name): by size, then the start and end, then a full SHA-256, so most files are never read in full, and hashes are remembered for the next scan. *Photos* finds pictures that look the same (the same photo resized, re-saved, recompressed or lightly edited, from a 64-bit difference hash; JPEG, PNG, WebP, GIF, BMP, AVIF) and shows them side by side with their pixel sizes. *Music* finds songs with identical decoded audio, and songs with the same artist, title and about the same length. It does not listen to the music, so a different recording, or the same recording with different tags, is not matched.
+- **Review first, nothing automatic.** Nothing is selected until you choose. "Select the others" keeps one copy per group by a rule you pick (oldest, newest, shortest path, first folder, best quality) and you can still tick or untick any file. At least one copy of every group always stays.
+- **Protected folders.** Mark a folder as protected and its copies are always the ones kept and can never be moved, even if you try.
+- **Recycle Bin, not delete.** Files are moved to the Recycle Bin (Trash on Linux), so you can get them back. Right before moving, each file is checked again: if it changed after the scan it is left alone, and for exact duplicates it is compared byte for byte with the copy that stays. Files in Windows or other system folders are refused.
+- **What it does not do.** It does not follow shortcuts or links, it skips `.git`, `node_modules` and hidden folders by default, and it counts hard links to one file as a single file. Files that exist only in the cloud (for example OneDrive "online only" files) are downloaded when they are read, so scan those folders only if that is what you want.
+
+### Audio Editor
+
+- **Cut by selecting.** Drag on the waveform (or type times in the Start / End boxes), then press <kbd>Delete</kbd> to cut that part out, or **Keep only** to trim to it. Removed parts stay visible (dimmed) with a ↺ button to put them back, and everything can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>. Playback skips the removed parts, and every cut edge gets a 5 ms fade so a cut never clicks.
+- **Join.** Add more files and use the arrows to set the order; choose nothing, a pause of silence, or a crossfade between them. Mono and stereo files, and different sample rates, can be mixed.
+- **Fades and volume.** Fade in and out, change the volume by up to ±30 dB (a boost is limited so it cannot clip), or level out: peak to −1 dB, or a loudness target (−23, −16 or −14 LUFS, measured first and then applied in a second pass). Cutting silence from the start and end is one tick box.
+- **Hear it before you save.** *Preview result* renders the real thing (cuts, fades, volume) and plays it.
+- **Saving.** MP3, M4A (AAC), Ogg Vorbis, Opus, FLAC or WAV, with tags and cover art kept where the format allows (a joined file keeps artist and album but not the first file's title and track number). The result is always a new file next to the original (or in a folder you choose), never an overwrite, and Cancel leaves nothing behind. MP3, AAC, Ogg and Opus are encoded again when saved, so for several rounds of editing save as FLAC or WAV and make the final lossy copy last.
+- **Keys:** <kbd>Space</kbd> play/pause, <kbd>Delete</kbd> cut out the selection, <kbd>[</kbd> <kbd>]</kbd> set the selection start / end at the playhead, <kbd>←</kbd> <kbd>→</kbd> move the playhead by 0.5 s (<kbd>Shift</kbd> 5 s, <kbd>Alt</kbd> 10 ms), <kbd>+</kbd> <kbd>−</kbd> or <kbd>Ctrl</kbd>+mouse wheel zoom, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all, <kbd>Esc</kbd> clear the selection.
 
 ### Music Player
 
@@ -90,6 +121,8 @@ npm run dist:win               # -> dist/<Name>-<version>-win-x64.zip  (dist:lin
 - Audio Converter and Video Converter bundle ffmpeg via `ffmpeg-static`: run `npm run setup` once after `npm install`. Video Converter's tests generate their own clips with ffmpeg and check every output by decoding it. A size target runs two passes, because a single pass overshoots badly (VP9 especially).
 - PDF Toolkit uses `pdf-lib` (pure JavaScript). Its tests read the results back with pdf.js, an independent PDF reader.
 - Photo Privacy Cleaner has no runtime dependencies. Cleaning copies the file's own segments/chunks and leaves metadata ones out (so pixels cannot change); its tests compare against `exifr` (a second EXIF reader) and libvips-decoded pixels, and run a fuzz pass over damaged files.
+- Audio Editor and Duplicate Finder bundle ffmpeg the same way (`npm run setup`). Audio Editor's tests make tones of known pitch and loudness and measure every export; Duplicate Finder's tests use real files, real hashing and real tags, and try to break each safety promise (the last copy, protected folders, files that changed, the byte-for-byte check).
+- Image Text Extractor bundles the OCR language files by copying them from the `@tesseract.js-data/*` dev dependencies into `langs/` (run `npm run setup` once after `npm install`; the build scripts do it too). Its tests read pictures with known text (`test/fixtures`) with the real engine and grade the result, the position of every word included.
 - Audio Tagger's tests also use ffmpeg to make FLAC/OGG/Opus/M4A fixtures if it is installed; otherwise those are skipped.
 
 To test a tool without publishing anything, build its zip; `npm run dev` in the repo root then offers it in the launcher (served from disk).

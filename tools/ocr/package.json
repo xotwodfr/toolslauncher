@@ -1,0 +1,82 @@
+{
+  "name": "image-text-extractor",
+  "productName": "Image Text Extractor",
+  "version": "0.1.0",
+  "description": "Read the text in screenshots, photos and scans (OCR), offline. Copy it or save it as a text file.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "setup": "node scripts/fetch-langs.js",
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/ocr.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node scripts/fetch-langs.js && node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node scripts/fetch-langs.js && node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "tesseract.js": "^7.0.0"
+  },
+  "build": {
+    "appId": "com.toolslauncher.imagetextextractor",
+    "productName": "Image Text Extractor",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "langs/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/**",
+      "langs/**"
+    ],
+    "artifactName": "ImageTextExtractor-${version}-${os}-${arch}.${ext}",
+    "executableName": "image-text-extractor",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Graphics"
+    }
+  },
+  "devDependencies": {
+    "@tesseract.js-data/dan": "^1.0.0",
+    "@tesseract.js-data/deu": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/fin": "^1.0.0",
+    "@tesseract.js-data/fra": "^1.0.0",
+    "@tesseract.js-data/ita": "^1.0.0",
+    "@tesseract.js-data/nld": "^1.0.0",
+    "@tesseract.js-data/nor": "^1.0.0",
+    "@tesseract.js-data/pol": "^1.0.0",
+    "@tesseract.js-data/por": "^1.0.0",
+    "@tesseract.js-data/spa": "^1.0.0",
+    "@tesseract.js-data/swe": "^1.0.0"
+  }
+}

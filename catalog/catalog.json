@@ -70,6 +70,36 @@
       "accent": "#d6409f",
       "version": "0.1.0",
       "platforms": {}
+    },
+    {
+      "id": "audio-editor",
+      "name": "Audio Editor",
+      "description": "Cut, trim, join, fade and level out audio on a waveform. Always saves a new file; originals are never changed. Nothing is uploaded.",
+      "category": "Audio",
+      "glyph": "✂",
+      "accent": "#e0a526",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "duplicate-finder",
+      "name": "Duplicate Finder",
+      "description": "Find duplicate files, look-alike photos and repeated songs, review them, and move the extras to the Recycle Bin. Nothing is deleted for good and nothing is uploaded.",
+      "category": "Files",
+      "glyph": "⧉",
+      "accent": "#2fc4de",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "ocr",
+      "name": "Image Text Extractor",
+      "description": "Read the text in screenshots, photos and scans (OCR) in 12 languages. Copy it or save it as a text file. Works offline; nothing is uploaded.",
+      "category": "Images",
+      "glyph": "≣",
+      "accent": "#9d86f5",
+      "version": "0.1.0",
+      "platforms": {}
     }
   ]
 }

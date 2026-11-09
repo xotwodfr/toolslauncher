@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data: blob: dfx:; media-src dfx:; connect-src dfx:;">
+  <title>Duplicate Finder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <div class="modes" role="tablist" aria-label="What to look for">
+        <button id="mode-files" class="mode" role="tab" data-mode="files"><strong>Files</strong><span>Exact copies of anything</span></button>
+        <button id="mode-photos" class="mode" role="tab" data-mode="photos"><strong>Photos</strong><span>Look-alike pictures</span></button>
+        <button id="mode-music" class="mode" role="tab" data-mode="music"><strong>Music</strong><span>Repeated songs</span></button>
+      </div>
+
+      <section class="block">
+        <h2>Folders to scan</h2>
+        <div id="drop" class="drop" tabindex="0" role="button" aria-label="Add folders">
+          <span class="muted small">Drop folders here</span>
+          <button id="addFolders" class="btn small">Add folders…</button>
+        </div>
+        <ul id="roots" class="roots" aria-label="Folders to scan"></ul>
+        <p id="rootsHint" class="muted small">A <b>protected</b> folder is a place you trust: its copies are always kept and can never be moved.</p>
+      </section>
+
+      <section class="block" id="options">
+        <div id="opt-files">
+          <label>Look at
+            <select id="type" aria-label="Type of files">
+              <option value="all">All files</option><option value="images">Pictures</option><option value="audio">Music</option>
+              <option value="video">Videos</option><option value="documents">Documents</option>
+            </select>
+          </label>
+          <label>Ignore files smaller than
+            <select id="minSize" aria-label="Smallest file">
+              <option value="1">Nothing (only empty files)</option><option value="1024">1 KB</option><option value="102400">100 KB</option>
+              <option value="1048576">1 MB</option><option value="10485760">10 MB</option>
+            </select>
+          </label>
+        </div>
+        <div id="opt-photos" hidden>
+          <label>How alike
+            <select id="threshold" aria-label="How alike pictures must be">
+              <option value="4">Very alike (same picture, re-saved or resized)</option>
+              <option value="8" selected>Alike (also small edits, filters)</option>
+              <option value="12">Loosely alike (more matches, more mistakes)</option>
+            </select>
+          </label>
+        </div>
+        <div id="opt-music" hidden>
+          <p class="muted small">Finds songs whose <b>sound is identical</b>, and songs with the <b>same artist and title and about the same length</b> (for example an MP3 and a FLAC of one track). It does not listen to the music, so a song with different tags or a different recording is not matched.</p>
+        </div>
+        <label id="hiddenRow" class="check"><input id="skipHidden" type="checkbox" checked> Skip hidden and system folders</label>
+      </section>
+
+      <div class="grow"></div>
+      <div class="scanbox">
+        <button id="scan" class="btn primary wide">Scan</button>
+        <button id="stop" class="btn danger wide" hidden>Stop</button>
+        <div id="progress" class="progress" hidden><div id="bar"></div></div>
+        <div id="status" class="status muted small" role="status" aria-live="polite"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="intro" class="intro">
+        <h1 id="introTitle">Find files that are there more than once</h1>
+        <p id="introText" class="muted"></p>
+        <ul class="promises">
+          <li>Nothing is deleted for good: files go to the <span class="binName">Recycle Bin</span>, where you can get them back.</li>
+          <li>You review every group first. At least one copy of each always stays.</li>
+          <li>Files that changed since the scan, or that are no longer identical, are left alone.</li>
+        </ul>
+      </div>
+
+      <section id="results" hidden>
+        <div class="reshead">
+          <div id="summary" class="summary"></div>
+          <div class="tools">
+            <label class="inline">In each group
+              <select id="rule" aria-label="Which copy to keep"></select>
+            </label>
+            <button id="select" class="btn">Select the others</button>
+            <button id="clear" class="btn ghost">Clear</button>
+          </div>
+        </div>
+        <div id="notice" class="notice" role="status" hidden></div>
+        <div id="groups" class="groups" aria-label="Groups of duplicates"></div>
+        <button id="more" class="btn wide-more" hidden>Show more groups</button>
+      </section>
+
+      <div id="actionbar" class="actionbar" hidden>
+        <div id="picked" class="picked" aria-live="polite">Nothing selected</div>
+        <button id="trash" class="btn danger" disabled>Move to Recycle Bin…</button>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="confirm" aria-labelledby="confirmTitle">
+    <form method="dialog" class="dlg">
+      <h2 id="confirmTitle">Move files to the Recycle Bin?</h2>
+      <p id="confirmText"></p>
+      <ul id="confirmList" class="samples"></ul>
+      <p id="confirmProblems" class="warnline" hidden></p>
+      <p class="muted small">One copy of every group stays where it is. You can restore the files from the <span class="binName">Recycle Bin</span>.</p>
+      <div class="dlgbtns">
+        <button id="confirmNo" class="btn" value="no" autofocus>Cancel</button>
+        <button id="confirmYes" class="btn danger" value="yes">Move to Recycle Bin</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="lightbox" aria-label="Picture preview" class="lightbox">
+    <form method="dialog"><button class="btn small close" aria-label="Close preview">Close</button></form>
+    <img id="lightImg" alt="">
+    <p id="lightCaption" class="muted small"></p>
+  </dialog>
+
+  <audio id="player" preload="none"></audio>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="../rules.js"></script>
+  <script src="../similar.js"></script>
+  <script src="../imgsize.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; media-src aed:;">
+  <title>Audio Editor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="files">
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Add audio files">
+        <strong>Drop audio here</strong>
+        <span class="muted small">MP3, FLAC, WAV, OGG, Opus, M4A, AAC and more</span>
+        <button id="addFiles" class="btn">Add files…</button>
+      </div>
+      <div id="engineWarn" class="note warn" role="alert" hidden></div>
+      <div class="listhead">
+        <span id="count" class="muted">No files</span>
+        <button id="clear" class="btn ghost small" hidden>Remove all</button>
+      </div>
+      <ol id="list" class="list" aria-label="Files, in the order they are joined"></ol>
+      <p id="joinHint" class="muted small" hidden>With more than one file, the result plays them one after another. Use the arrows to change the order.</p>
+    </aside>
+
+    <main class="stage">
+      <div id="empty" class="empty">
+        <h1>Audio Editor</h1>
+        <p>Cut, trim, join, fade and level out audio on a waveform.<br>Your original files are never changed: the result is saved as a new file.</p>
+        <button id="addFiles2" class="btn primary">Add files…</button>
+      </div>
+
+      <section id="editor" hidden>
+        <header class="ehead">
+          <h2 id="fname" class="trunc"></h2>
+          <span id="finfo" class="muted small"></span>
+        </header>
+
+        <div class="wavewrap">
+          <canvas id="wave" aria-label="Waveform. Drag to select a part, click to place the playhead, Ctrl and the mouse wheel to zoom."></canvas>
+          <div id="hscroll" class="hscroll" aria-hidden="true"><div id="thumb" class="thumb"></div></div>
+        </div>
+
+        <div class="bar transport">
+          <button id="play" class="btn primary" aria-label="Play or pause (Space)">▶ Play</button>
+          <button id="playSel" class="btn" disabled>Play selection</button>
+          <span class="clock"><span id="pos">0:00.000</span> <span class="muted">/ <span id="len">0:00.000</span></span></span>
+          <span class="grow"></span>
+          <label class="check"><input id="boost" type="checkbox"> Taller waveform</label>
+          <button id="zoomOut" class="btn small" aria-label="Zoom out" title="Zoom out (−)">−</button>
+          <button id="zoomIn" class="btn small" aria-label="Zoom in" title="Zoom in (+)">+</button>
+          <button id="zoomFit" class="btn small" title="Show the whole file">Fit</button>
+        </div>
+
+        <div class="bar edit">
+          <label class="time">Start <input id="selStart" type="text" inputmode="decimal" placeholder="0:00.000" aria-label="Selection start"></label>
+          <label class="time">End <input id="selEnd" type="text" inputmode="decimal" placeholder="0:00.000" aria-label="Selection end"></label>
+          <span class="muted small">Length <span id="selLen">–</span></span>
+          <span class="grow"></span>
+          <button id="cut" class="btn danger" disabled title="Remove the selected part from the result (Delete)">Cut out</button>
+          <button id="keep" class="btn" disabled title="Keep only the selected part: everything before and after it is removed">Keep only</button>
+        </div>
+
+        <div class="cutsbar">
+          <button id="undo" class="btn small" disabled title="Undo (Ctrl+Z)">Undo</button>
+          <button id="redo" class="btn small" disabled title="Redo (Ctrl+Y)">Redo</button>
+          <span class="muted small" id="cutsLabel">Nothing removed yet. Drag on the waveform to select a part, then press Delete.</span>
+          <ul id="cuts" class="cuts" aria-label="Removed parts"></ul>
+          <button id="restoreAll" class="btn ghost small" hidden>Put everything back</button>
+        </div>
+
+        <div id="previewBox" class="preview" hidden>
+          <strong>Result preview</strong>
+          <span class="muted small" id="previewInfo"></span>
+          <audio id="previewAudio" controls preload="auto"></audio>
+          <button id="previewClose" class="btn ghost small">Close</button>
+        </div>
+      </section>
+    </main>
+
+    <aside class="out">
+      <div class="scroll">
+        <h2>Save as</h2>
+        <label>Format
+          <select id="format" aria-label="Output format"></select>
+        </label>
+        <label id="qualityRow">Quality
+          <select id="bitrate" aria-label="Quality"></select>
+        </label>
+        <p id="formatHint" class="muted small"></p>
+
+        <div class="sep"></div>
+        <h2>Fades</h2>
+        <div class="two">
+          <label>Fade in (s)<input id="fadeIn" type="number" min="0" max="60" step="0.1" value="0"></label>
+          <label>Fade out (s)<input id="fadeOut" type="number" min="0" max="60" step="0.1" value="0"></label>
+        </div>
+
+        <div class="sep"></div>
+        <h2>Volume</h2>
+        <label>Level out
+          <select id="normalize" aria-label="Normalize">
+            <option value="off">Off</option>
+            <option value="peak">Make the loudest point −1 dB</option>
+            <option value="loudness">Match a loudness target</option>
+          </select>
+        </label>
+        <label id="loudRow" hidden>Target loudness
+          <select id="loudness" aria-label="Loudness target">
+            <option value="-23">−23 LUFS (broadcast, quiet)</option>
+            <option value="-16" selected>−16 LUFS (podcasts, streaming)</option>
+            <option value="-14">−14 LUFS (loud)</option>
+          </select>
+        </label>
+        <label id="gainRow">Change volume (dB)
+          <input id="gain" type="number" min="-30" max="30" step="0.5" value="0">
+        </label>
+        <label class="check"><input id="trimSilence" type="checkbox"> Cut silence from the start and end</label>
+
+        <div id="joinBox" hidden>
+          <div class="sep"></div>
+          <h2>Between files</h2>
+          <label>When files meet
+            <select id="join" aria-label="Between files">
+              <option value="none">Nothing, straight after each other</option>
+              <option value="gap">A pause of silence</option>
+              <option value="cross">Crossfade them</option>
+            </select>
+          </label>
+          <label id="joinSecRow" hidden><span id="joinSecLabel">Seconds</span>
+            <input id="joinSeconds" type="number" min="0" max="10" step="0.1" value="1">
+          </label>
+        </div>
+
+        <div class="sep"></div>
+        <h2>File</h2>
+        <label>Name <input id="name" type="text" placeholder="Same name + (edited)" aria-label="File name"></label>
+        <label>Save in
+          <div class="row"><input id="outDir" type="text" readonly placeholder="Next to the first file"><button id="pickDir" class="btn small" aria-label="Choose folder">…</button></div>
+        </label>
+        <label class="check"><input id="keepTags" type="checkbox" checked> Keep tags and cover art</label>
+      </div>
+
+      <div class="foot">
+        <div id="summary" class="summary" aria-live="polite"></div>
+        <div id="progress" class="progress" hidden><div id="bar"></div></div>
+        <div class="row">
+          <button id="preview" class="btn" disabled>Preview result</button>
+          <button id="export" class="btn primary grow" disabled>Save</button>
+          <button id="cancel" class="btn danger" hidden>Cancel</button>
+        </div>
+        <div id="result" class="result" hidden></div>
+      </div>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="../plan.js"></script>
+  <script src="wave.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

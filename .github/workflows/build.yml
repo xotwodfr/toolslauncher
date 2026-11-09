@@ -102,6 +102,30 @@ jobs:
           bash ../../scripts/ci-step.sh "Music Player: npm test" npm test
           bash ../../scripts/ci-step.sh "Music Player: package" npm run ${{ matrix.script }}
 
+      - name: Audio Editor
+        working-directory: tools/audio-editor
+        run: |
+          bash ../../scripts/ci-step.sh "Audio Editor: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Audio Editor: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
+          bash ../../scripts/ci-step.sh "Audio Editor: npm test" npm test
+          bash ../../scripts/ci-step.sh "Audio Editor: package" npm run ${{ matrix.script }}
+
+      - name: Duplicate Finder
+        working-directory: tools/duplicate-finder
+        run: |
+          bash ../../scripts/ci-step.sh "Duplicate Finder: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Duplicate Finder: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
+          bash ../../scripts/ci-step.sh "Duplicate Finder: npm test" npm test
+          bash ../../scripts/ci-step.sh "Duplicate Finder: package" npm run ${{ matrix.script }}
+
+      - name: Image Text Extractor
+        working-directory: tools/ocr
+        run: |
+          bash ../../scripts/ci-step.sh "Image Text Extractor: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Image Text Extractor: language data" npm run setup   # copies the bundled OCR language files
+          bash ../../scripts/ci-step.sh "Image Text Extractor: npm test" npm test
+          bash ../../scripts/ci-step.sh "Image Text Extractor: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release
