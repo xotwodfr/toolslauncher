@@ -379,7 +379,13 @@ test('similar: 3000 pictures compare quickly', () => {
 test('picture sizes read from headers: PNG, JPEG, GIF, BMP, WebP, and EXIF rotation', () => {
   const dirp = resetDir('img');
   const out = {};
-  for (const ext of ['png', 'jpg', 'gif', 'bmp', 'webp']) { out[ext] = path.join(dirp, 'p.' + ext); sh(['-f', 'lavfi', '-i', 'testsrc=size=96x64:duration=1', '-frames:v', '1', out[ext]]); }
+  const skipped = [];
+  for (const ext of ['png', 'jpg', 'gif', 'bmp', 'webp']) {
+    out[ext] = path.join(dirp, 'p.' + ext);
+    const r = spawnSync(ff, ['-hide_banner', '-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=96x64:duration=1', '-frames:v', '1', out[ext]], { encoding: 'utf8', windowsHide: true });
+    if (r.status !== 0) { delete out[ext]; skipped.push(ext); }       // this ffmpeg build cannot write that format
+  }
+  assert(out.png && out.jpg, 'ffmpeg must at least make PNG and JPEG');
   for (const [ext, f] of Object.entries(out)) assert.deepStrictEqual(imageSize(new Uint8Array(fs.readFileSync(f))), { w: 96, h: 64 }, ext);
   // a JPEG whose EXIF says "turned 90 degrees" is shown 64 x 96
   const jpg = fs.readFileSync(out.jpg);
@@ -389,6 +395,7 @@ test('picture sizes read from headers: PNG, JPEG, GIF, BMP, WebP, and EXIF rotat
   const rotated = Buffer.concat([jpg.subarray(0, 2), seg, jpg.subarray(2)]);
   assert.deepStrictEqual(imageSize(new Uint8Array(rotated)), { w: 64, h: 96 });
   assert.strictEqual(imageSize(new Uint8Array(10)), null); assert.strictEqual(imageSize(new Uint8Array(100)), null);
+  return skipped.length ? 'skipped formats this ffmpeg cannot write: ' + skipped.join(', ') : undefined;
 });
 
 test('photos: grouping through the scan module keeps the biggest picture first', () => {

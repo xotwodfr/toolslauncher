@@ -181,7 +181,8 @@ const p = (...a) => path.join(tmp, ...a);
     ok('library: readCover returns embedded or folder art, null otherwise, refuses paths outside the folder');
 
     assert.strictEqual(Lib.resolveInside(lib, 'Band/2001 First/01 Alpha.wav', 'audio'), path.join(lib, 'Band', '2001 First', '01 Alpha.wav'));
-    for (const bad of ['../x.mp3', 'Band/../../x.mp3', '/etc/passwd.mp3', 'C:\\Windows\\x.mp3', '', 'Band/notes.txt', 'a\0.mp3', '..', '.']) {
+    // a drive-letter / backslash name is only refused on Windows: on Linux it is a legal file name that stays inside the folder
+    for (const bad of ['../x.mp3', 'Band/../../x.mp3', '/etc/passwd.mp3', ...(process.platform === 'win32' ? ['C:\\Windows\\x.mp3'] : []), '', 'Band/notes.txt', 'a\0.mp3', '..', '.']) {
       assert.throws(() => Lib.resolveInside(lib, bad, 'audio'), undefined, `should refuse ${JSON.stringify(bad)}`);
     }
     assert.throws(() => Lib.resolveInside(lib, 'Band/2001 First/cover.png', 'audio'));

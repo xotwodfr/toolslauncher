@@ -17,7 +17,7 @@ function systemDirs() {
   if (WIN) {
     for (const v of ['SystemRoot', 'windir', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'ProgramData']) if (process.env[v]) list.push(process.env[v]);
   } else {
-    list.push('/bin', '/boot', '/dev', '/etc', '/lib', '/lib32', '/lib64', '/proc', '/run', '/sbin', '/sys', '/usr', '/System', '/Library');
+    list.push('/bin', '/boot', '/dev', '/etc', '/lib', '/lib32', '/lib64', '/proc', '/sbin', '/sys', '/usr', '/System', '/Library');
   }
   return list.map(norm);
 }
