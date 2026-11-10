@@ -371,6 +371,44 @@ exports.run = async ({ app, getWin, getLib, openLibrary, outFile, shotsDir }) =>
       return 'saved: ' + parsed.lines.map((l) => LRC.formatTime(l.t)).join(' ');
     });
 
+    await step('word-synced lyrics: a .ttml next to the song (newer than the .lrc) lights up word by word as the song plays, and clicking a word plays from it', async () => {
+      const assert = (c, m) => { if (!c) throw new Error(m); };
+      const rel = await js('window.__app.S.tracks.find(t=>t.title==="No Words").rel');
+      const ttml = path.join(lib, 'Singer', 'Karaoke', '02 No Words.ttml');
+      const sp = (w, a, b) => `<span begin="00:00:0${a.toFixed(3)}" end="00:00:0${b.toFixed(3)}">${w}</span>`;
+      fs.writeFileSync(ttml, '<?xml version="1.0" encoding="UTF-8"?>\n<tt xmlns="http://www.w3.org/ns/ttml" xml:lang="en"><body><div>'
+        + `<p begin="00:00:01.000" end="00:00:03.000">${sp('Every', 1, 1.6)} ${sp('word', 1.6, 2.2)} ${sp('counts', 2.2, 3)}</p>`
+        + `<p begin="00:00:03.500" end="00:00:06.000">${sp('Sing', 3.5, 4.2)} ${sp('it', 4.2, 4.6)} ${sp('back', 4.6, 6)}</p>`
+        + '</div></body></tt>\n');
+      const later = Date.now() / 1000 + 2; fs.utimesSync(ttml, later, later);
+      await js(`window.__app.engine.seek(0); window.LyricsUI.load(${JSON.stringify(rel)})`);
+      await waitFor('document.querySelectorAll(".lyrics.words p").length === 2', 4000, 'the word-synced lyrics are shown');
+      assert(/Word-synced · 02 No Words\.ttml/.test(await js('document.getElementById("lyrSrc").textContent')), 'labelled as word-synced: ' + await js('document.getElementById("lyrSrc").textContent'));
+      eq(await js('[...document.querySelectorAll(".lyrics p:first-child .w")].map((e) => e.textContent).join("|")'), 'Every|word|counts', 'one span per word');
+      await js('window.__app.engine.seek(1.9); window.__app.engine.resume()');
+      await waitFor('(document.querySelector(".lyrics p.active .w.singing")||{}).textContent === "word"', 3000, 'the second word is being sung');
+      eq(await js('[...document.querySelectorAll(".lyrics p.active .w.sung")].map((e) => e.textContent).join("|")'), 'Every', 'the word before it is sung');
+      const fill = await js('parseFloat(document.querySelector(".lyrics p.active .w.singing").style.getPropertyValue("--p"))');
+      assert(fill > 0 && fill < 100, 'the word fills as it is sung: ' + fill + '%');
+      await shot('05b-word-synced');
+      // click a word of the second line: the song plays from that word
+      const r = await js('(()=>{const e=document.querySelector(".lyrics p[data-i=\'1\'] .w[data-k=\'2\']"); e.scrollIntoView({block:"center"}); const b=e.getBoundingClientRect(); return {x:Math.round(b.x+b.width/2), y:Math.round(b.y+b.height/2)};})()');
+      wc.sendInputEvent({ type: 'mouseDown', x: r.x, y: r.y, button: 'left', clickCount: 1 });
+      wc.sendInputEvent({ type: 'mouseUp', x: r.x, y: r.y, button: 'left', clickCount: 1 });
+      await waitFor('window.__app.engine.position >= 4.6 && window.__app.engine.position < 5.6', 3000, 'seek to "back"');
+      await waitFor('(document.querySelector(".lyrics p.active .w.singing")||{}).textContent === "back"', 3000, '"back" is being sung');
+      // the line editor explains that it writes an .lrc and leaves the .ttml alone
+      await click('#lyrEdit');
+      await waitFor('document.getElementById("editor").open', 2000, 'editor');
+      assert(/word-synced \(02 No Words\.ttml\).*Lyrics Maker/.test(await js('document.getElementById("edInfo").textContent')), 'the editor says what saving does: ' + await js('document.getElementById("edInfo").textContent'));
+      await js('document.getElementById("editor").close()');
+      await js('window.__app.engine.pause && window.__app.engine.pause()');
+      fs.rmSync(ttml);
+      await js(`window.LyricsUI.load(${JSON.stringify(rel)})`);
+      await waitFor('document.querySelectorAll(".lyrics p").length === 3 && !document.querySelector(".lyrics.words")', 3000, 'back to the .lrc');
+      await js('window.__app.engine.seek(0)');
+    });
+
     await js('(()=>{const d=document.getElementById("editor"); if (d.open) d.close();})()');
     await step('sleep timer fades out and pauses', async () => {
       await js('window.__app.engine.resume()');

@@ -1,11 +1,13 @@
 'use strict';
-// Lyrics: the scrolling, click-to-seek lyrics view on the Now playing screen, and the editor (type lyrics, or tap along to
-// the song to time every line). Saves a "<song>.lrc" file next to the song; the audio file itself is never changed.
+// Lyrics: the scrolling, click-to-seek lyrics view on the Now playing screen (word by word, karaoke style, for word-synced
+// lyrics such as a .ttml file), and the editor (type lyrics, or tap along to the song to time every line). Saves a
+// "<song>.lrc" file next to the song; the audio file itself is never changed.
 (function () {
   let C = null; // context handed over by app.js: { S, engine, mp, h, toast, ask, M }
   let cur = { rel: '', data: null, loading: false };
   let host = null;         // the .lyrics element currently on screen
   let activeIdx = -2;
+  let activeWordIdx = -2;
   let manualUntil = 0;
   const ed = { rel: '', mode: 'text', lines: [], meta: {}, pointer: 0, sel: -1, dirty: false, data: null };
 
@@ -44,7 +46,7 @@
     const i = Math.max(0, Math.min(2, order.indexOf(C.S.settings.lyricsSize) + dir));
     C.S.settings.lyricsSize = order[i];
     C.mp.setSettings({ lyricsSize: order[i] });
-    if (host) host.className = 'lyrics ' + order[i] + (cur.data && cur.data.synced ? ' synced' : ' plain');
+    if (host) host.className = 'lyrics ' + order[i] + (cur.data && cur.data.synced ? ' synced' : ' plain') + (cur.data && cur.data.wordSynced ? ' words' : '');
   }
 
   function renderInto() {
@@ -67,29 +69,62 @@
       return;
     }
     host.className = 'lyrics ' + C.S.settings.lyricsSize + (d.synced ? ' synced' : ' plain');
-    if (srcEl) srcEl.textContent = (d.synced ? 'Synced' : 'Plain') + ' · ' + (d.source === 'sidecar' ? d.fileName : 'from the song\'s tags');
+    if (d.wordSynced) host.classList.add('words');
+    if (srcEl) srcEl.textContent = (d.wordSynced ? 'Word-synced' : d.synced ? 'Synced' : 'Plain') + ' · ' + (d.source === 'sidecar' ? d.fileName : 'from the song\'s tags');
     d.lines.forEach((l, i) => {
-      const p = h('p', { text: l.text || ' ', 'data-i': String(i) });
+      const p = h('p', { 'data-i': String(i) });
+      if (Array.isArray(l.words) && l.words.length) {
+        // one <span> per word: clicking a word plays from it
+        l.words.forEach((w, k) => {
+          if (k && !w.glue) p.append(' ');
+          const sp = h('span', { class: 'w', text: w.text, 'data-k': String(k) });
+          sp.addEventListener('click', (e) => { e.stopPropagation(); C.engine.seek(w.t / 1000); });
+          p.append(sp);
+        });
+      } else p.textContent = l.text || ' ';
       if (!l.text) p.classList.add('gap');
       if (d.synced) { p.addEventListener('click', () => { C.engine.seek(l.t / 1000); }); }
       host.append(p);
     });
-    activeIdx = -2;
+    activeIdx = -2; activeWordIdx = -2;
     tick();
+  }
+
+  /** Light up the words of the active line: the ones already sung, and the one being sung (filled from left to right). */
+  function tickWords(p, line, ms) {
+    const words = line && line.words;
+    if (!p || !words || !words.length) return;
+    let k = -1;
+    for (let i = 0; i < words.length; i++) { if (words[i].t <= ms) k = i; else break; }
+    const spans = p.querySelectorAll('.w');
+    if (k !== activeWordIdx) {
+      for (let i = 0; i < spans.length; i++) { spans[i].classList.toggle('sung', i < k || (i === k && ms >= words[k].end)); spans[i].classList.toggle('singing', i === k && ms < words[k].end); if (i !== k) spans[i].style.removeProperty('--p'); }
+      activeWordIdx = k;
+    }
+    if (k >= 0 && spans[k]) {
+      const w = words[k];
+      const f = w.end > w.t ? Math.min(1, Math.max(0, (ms - w.t) / (w.end - w.t))) : 1;
+      if (f >= 1 && spans[k].classList.contains('singing')) { spans[k].classList.remove('singing'); spans[k].classList.add('sung'); }
+      spans[k].style.setProperty('--p', Math.round(f * 100) + '%');
+    }
   }
 
   /** Called every frame: highlights the line being sung and keeps it in view. */
   function tick() {
     const d = cur.data;
     if (!host || !d || !d.synced || !d.lines.length) return;
-    const idx = C.LRC.activeIndex(d.lines, msOf() + 120); // a touch early: the eye needs a moment to find the line
-    if (idx === activeIdx) return;
-    activeIdx = idx;
+    const ms = msOf();
+    const idx = C.LRC.activeIndex(d.lines, ms + 120); // a touch early: the eye needs a moment to find the line
     const ps = host.children;
+    if (d.wordSynced && idx >= 0 && idx === activeIdx) tickWords(ps[idx], d.lines[idx], ms);   // words follow the song itself, not early
+    if (idx === activeIdx) return;
+    if (activeIdx >= 0 && ps[activeIdx]) for (const sp of ps[activeIdx].querySelectorAll('.w')) { sp.classList.remove('singing'); sp.classList.add('sung'); sp.style.removeProperty('--p'); }
+    activeIdx = idx; activeWordIdx = -2;
     for (let i = 0; i < ps.length; i++) {
       ps[i].classList.toggle('active', i === idx);
       ps[i].classList.toggle('past', i < idx);
     }
+    if (d.wordSynced && idx >= 0) tickWords(ps[idx], d.lines[idx], ms);
     const p = ps[idx];
     if (p && performance.now() > manualUntil) host.scrollTo({ top: Math.max(0, p.offsetTop - host.clientHeight * 0.38), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
@@ -112,7 +147,11 @@
     }
     $('edText').value = text;
     $('edSong').textContent = t ? C.M.titleOf(t) + ' — ' + C.M.artistOf(t) : '';
-    $('edInfo').textContent = d && d.source === 'sidecar' ? 'Will replace ' + d.fileName + ' (a backup is kept).' : 'Will be saved as ' + (d ? d.sidecarName : 'Song.lrc') + ' next to the song.';
+    const fromTtml = d && d.source === 'sidecar' && /\.ttml$/i.test(d.fileName);
+    $('edInfo').textContent = fromTtml
+      ? `These lyrics are word-synced (${d.fileName}). This editor times whole lines: saving writes ${d.sidecarName}, which is shown from then on, and ${d.fileName} is kept as it is. To fix the time of single words, use Lyrics Maker.`
+      : d && d.source === 'sidecar' ? 'Will replace ' + d.fileName + ' (a backup is kept).' + (d.wordSynced ? ' The word times in it are not kept by this editor, only the line times.' : '')
+        : 'Will be saved as ' + (d ? d.sidecarName : 'Song.lrc') + ' next to the song.';
     setMode('text');
     $('editor').showModal();
     $('edText').focus();
@@ -181,7 +220,7 @@
   async function save() {
     const text = currentText();
     if (!text.trim()) { C.toast('There is nothing to save.', true); return; }
-    const exists = ed.data && ed.data.source === 'sidecar';
+    const exists = ed.data && ed.data.source === 'sidecar' && !/\.ttml$/i.test(ed.data.fileName);   // saving never replaces a .ttml
     if (exists) {
       const ok = await C.ask({ title: 'Replace ' + ed.data.fileName + '?', text: 'The current file is kept as ' + ed.data.fileName + '.bak.', ok: 'Replace' });
       if (!ok) return;

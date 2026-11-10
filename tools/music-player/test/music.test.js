@@ -5,6 +5,7 @@ const os = require('os');
 const path = require('path');
 const LRC = require('../src/lrc');
 const Lyrics = require('../src/lyrics');
+const TTML = require('../src/ttml');
 const Lib = require('../src/library');
 const M = require('../src/model');
 const PL = require('../src/playlists');
@@ -44,7 +45,12 @@ const p = (...a) => path.join(tmp, ...a);
     ok('lrc: [offset] shifts lines earlier when positive, never below 0');
 
     assert.strictEqual(LRC.parse('[00:10.00]<00:10.00>Hel<00:10.50>lo <00:11.00>world').lines[0].text, 'Hello world');
-    ok('lrc: enhanced word-time tags are removed');
+    assert.deepStrictEqual(LRC.parse('[00:10.00]<00:10.00>Hel<00:10.50>lo <00:11.00>world <00:11.60>').lines[0].words,
+      [{ t: 10000, end: 11000, text: 'Hello' }, { t: 11000, end: 11600, text: 'world' }], 'syllables join into words; the last tag ends the last word');
+    assert.deepStrictEqual(LRC.parse('[offset:+500]\n[00:10.00]<00:10.00>a <00:10.40>b').lines[0].words.map((w) => w.t), [9500, 9900], 'the offset moves the words too');
+    assert.strictEqual(LRC.parse('[00:10.00][00:20.00]<00:10.00>twice').lines[0].words, undefined, 'a line sung twice has no word times');
+    assert.strictEqual(LRC.parse('[00:10.00]no word times').lines[0].words, undefined);
+    ok('lrc: enhanced word-time tags are taken out of the text and kept as word times');
 
     const plain = LRC.parse('Just words\n\nSecond line');
     assert.strictEqual(plain.synced, false);
@@ -318,6 +324,55 @@ const p = (...a) => path.join(tmp, ...a);
     Lyrics.saveSidecar(target, '[00:03.00]three');
     assert.deepStrictEqual(fs.readFileSync(target), audioBefore, 'the audio file is never touched');
     ok('lyrics: save writes <song>.lrc atomically, keeps a .bak, refuses empty / huge, never touches the audio');
+    // ---- TTML (word-synced) ----
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xml:lang="en"><head><metadata><ttm:title>A &amp; B</ttm:title></metadata></head>'
+      + '<body><div><p begin="00:00:01.000" end="00:00:03.000"><span begin="00:00:01.000" end="00:00:01.500">Hello</span> <span begin="00:00:01.600" end="00:00:02.900">world &amp; you</span></p>'
+      + '<p begin="4.5s" end="6s"><span begin="4.5s" end="5s">Ba</span><span begin="5s" end="5.4s">by</span> <span ttm:role="x-bg"><span begin="5.4" end="6">yeah</span></span></p>'
+      + '<p begin="00:07.000" end="00:08.000">only a line</p><p begin="9" end="10"><span begin="9" end="9.5">你</span><span begin="9.5" end="10">好</span></p></div></body></tt>';
+    const tt = TTML.parse(xml);
+    assert.deepStrictEqual([tt.synced, tt.wordSynced, tt.meta], [true, true, { language: 'en', title: 'A & B' }]);
+    assert.deepStrictEqual(tt.lines.map((x) => x.text), ['Hello world & you', 'Baby (yeah)', 'only a line', '你好']);
+    assert.deepStrictEqual(tt.lines[0].words, [{ t: 1000, end: 1500, text: 'Hello' }, { t: 1600, end: 2900, text: 'world & you' }]);
+    assert.deepStrictEqual(tt.lines[1].words.map((w) => [w.text, w.t, w.end]), [['Baby', 4500, 5400], ['(yeah)', 5400, 6000]], 'syllables make one word; background vocals in brackets');
+    assert.strictEqual(tt.lines[2].words, undefined, 'a line timed by line only');
+    assert.deepStrictEqual(tt.lines[3].words.map((w) => [w.text, !!w.glue]), [['你', true], ['好', true]], 'characters of a language written without spaces stay separate, shown without a space');
+    for (const [s, v] of [['00:01:05.400', 65400], ['1:05.4', 65400], ['65.4s', 65400], ['1200ms', 1200], ['1.5m', 90000], ['7', 7000]]) assert.strictEqual(TTML.parseTime(s), v, s);
+    for (const bad of ['', 'x', '1:75', '-1s']) assert.strictEqual(TTML.parseTime(bad), null, bad);
+    assert.deepStrictEqual(TTML.parse('[00:01.00]not ttml'), { lines: [], synced: false, wordSynced: false, meta: {} });
+    assert.strictEqual(TTML.activeWord(tt.lines[0].words, 1550), 0); assert.strictEqual(TTML.activeWord(tt.lines[0].words, 999), -1); assert.strictEqual(TTML.activeWord(tt.lines[0].words, 5000), 1);
+    ok('ttml: word-synced lyrics are read: words, syllables, background vocals, line-only timing, time formats, languages without spaces');
+
+    const ts = F.makeWav(p('lyr', 'karaoke.wav'));
+    const old = Date.now() / 1000 - 3600;
+    fs.writeFileSync(p('lyr', 'karaoke.lrc'), '[00:01.00]line timed\n'); fs.utimesSync(p('lyr', 'karaoke.lrc'), old, old);
+    fs.writeFileSync(p('lyr', 'karaoke.ttml'), xml);
+    l = Lyrics.loadLyrics(ts);
+    assert.deepStrictEqual([l.source, l.synced, l.wordSynced, path.basename(l.file), l.lines[0].words.length], ['sidecar', true, true, 'karaoke.ttml', 2], 'a newer .ttml wins over an older .lrc');
+    const fresh = Date.now() / 1000 + 5;
+    fs.utimesSync(p('lyr', 'karaoke.lrc'), fresh, fresh);
+    l = Lyrics.loadLyrics(ts);
+    assert.deepStrictEqual([path.basename(l.file), l.wordSynced], ['karaoke.lrc', false], 'an .lrc saved later (say, by the editor) is shown instead');
+    fs.utimesSync(p('lyr', 'karaoke.ttml'), fresh, fresh);
+    assert.strictEqual(path.basename(Lyrics.loadLyrics(ts).file), 'karaoke.ttml', 'same age: the word-synced one');
+    fs.writeFileSync(p('lyr', 'karaoke.ttml'), '<tt><body>broken, no lines'); fs.utimesSync(p('lyr', 'karaoke.ttml'), fresh + 9, fresh + 9);
+    assert.strictEqual(path.basename(Lyrics.loadLyrics(ts).file), 'karaoke.lrc', 'a .ttml without timed lines falls back to the .lrc');
+    assert.deepStrictEqual(Lyrics.findSidecars(ts).map((f) => path.basename(f)), ['karaoke.ttml', 'karaoke.lrc']);
+    const enh = F.makeWav(p('lyr', 'enhanced.wav'));
+    fs.writeFileSync(p('lyr', 'enhanced.lrc'), '[00:01.00]<00:01.00>one <00:01.50>two <00:02.00>\n');
+    assert.strictEqual(Lyrics.loadLyrics(enh).wordSynced, true, 'enhanced LRC counts as word-synced');
+    ok('lyrics: a .ttml next to the song is read with its word times; the newer of .ttml and .lrc wins; a broken .ttml falls back');
+
+    // what Lyrics Maker writes, Music Player reads (the two tools are separate apps, so this checks the file format between them)
+    const lmPlan = path.join(__dirname, '..', '..', 'lyrics-maker', 'src', 'plan.js');
+    if (fs.existsSync(lmPlan)) {
+      const LM = require(lmPlan);
+      const made = [{ start: 1.25, end: 3, text: 'Hold on to me', words: [{ text: 'Hold', start: 1.25, end: 1.6 }, { text: 'on', start: 1.6, end: 1.9 }, { text: 'to', start: 1.95, end: 2.1 }, { text: 'me', start: 2.1, end: 2.9 }] }, { start: 4, text: 'Tom & "Jerry"' }, { start: 6, end: 8, text: '你好' }];
+      const read = TTML.parse(LM.formatTtml(made, { language: 'en', duration: 10 }));
+      const want = LM.timedLines(made, { duration: 10 });
+      assert.deepStrictEqual(read.lines.map((x) => x.text), want.map((x) => x.text));
+      read.lines.forEach((x, i) => { assert.strictEqual(x.t, Math.round(want[i].start * 1000)); assert.deepStrictEqual(x.words.map((w) => [w.text, w.t, w.end]), want[i].words.map((w) => [w.text, Math.round(w.start * 1000), Math.round(w.end * 1000)])); });
+      ok('ttml: the files Lyrics Maker writes are read back exactly, word for word');
+    } else console.log('  --  (skipped: Lyrics Maker is not next to this tool)');
   }
 
   // ---- playlists -------------------------------------------------------------------------------------------------

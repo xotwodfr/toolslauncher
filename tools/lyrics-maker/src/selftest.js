@@ -60,7 +60,7 @@ async function run({ getWin } = {}) {
       const errors = [];
       win.webContents.on('console-message', (_e, level, msg) => { if (level >= 2) errors.push(msg); });
       const waitFor = async (expr, ms = 180000) => { const end = Date.now() + ms; for (;;) { if (await js(expr)) return; if (Date.now() > end) throw new Error('timed out: ' + expr); await sleep(150); } };
-      await step('the window opens the song, makes lyrics, and saves a .lrc file through the window', async () => {
+      await step('the window opens the song, makes lyrics, and saves .lrc and word-synced .ttml files through the window', async () => {
         await waitFor('!!window.__app');
         const opened = await js(`window.lm.openSong(${JSON.stringify(clip)}).then((r) => { if (r.ok) void window.__app.loadSong(r); return r.ok ? 'ok' : r.error; })`);
         if (opened !== 'ok') throw new Error('could not open: ' + opened);
@@ -71,13 +71,19 @@ async function run({ getWin } = {}) {
         const n = await js('window.__app.S.lines.length');
         if (speech && n < 1) throw new Error('no lines were made');
         if (speech) {
-          const out = path.join(dir, 'saved.lrc');
           const { dialog } = require('electron');
-          dialog.showSaveDialog = async () => ({ canceled: false, filePath: out });
+          const lrc = path.join(dir, 'saved.lrc'); const ttml = path.join(dir, 'saved.ttml');
+          dialog.showSaveDialog = async () => ({ canceled: false, filePath: lrc });
           const r = await js('window.lm.save(window.__app.S.song.id, "lrc", window.__app.S.lines.map((l) => ({ start: l.start, text: l.text })))');
           if (!r.ok) throw new Error('save failed: ' + r.error);
-          const parsed = P.parseLrc(fs.readFileSync(out, 'utf8'));
+          const parsed = P.parseLrc(fs.readFileSync(lrc, 'utf8'));
           if (parsed.length !== n || Math.abs(parsed[0].start - 1) > 0.6) throw new Error('saved file does not match: ' + JSON.stringify(parsed));
+          dialog.showSaveDialog = async () => ({ canceled: false, filePath: ttml });
+          const r2 = await js('window.lm.save(window.__app.S.song.id, "ttml", window.__app.S.lines.map((l) => ({ start: l.start, text: l.text, words: window.__app.ensureWords(l).map((w) => ({ text: w.text, start: w.start, end: w.end })) })), "en")');
+          if (!r2.ok) throw new Error('TTML save failed: ' + r2.error);
+          const t = P.parseTtml(fs.readFileSync(ttml, 'utf8'));
+          const words = await js('window.__app.S.lines.reduce((n, l) => n + l.words.length, 0)');
+          if (t.length !== n || t.reduce((k, l) => k + l.words.length, 0) !== words) throw new Error('saved TTML does not match: ' + JSON.stringify(t).slice(0, 300));
         }
         if (errors.length) throw new Error('console errors: ' + errors.join(' | '));
         return `${n} line(s)`;

@@ -1,8 +1,8 @@
 {
   "name": "lyrics-maker",
   "productName": "Lyrics Maker",
-  "version": "0.1.0",
-  "description": "Write the lyrics of a song with their timing (.lrc) from the audio itself. Offline (Whisper).",
+  "version": "0.2.0",
+  "description": "Write the lyrics of a song with the time of every word (word-synced .ttml, also .lrc) from the audio itself. Offline (Whisper).",
   "main": "src/main.js",
   "license": "MIT",
   "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },

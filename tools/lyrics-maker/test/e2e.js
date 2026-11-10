@@ -1,7 +1,7 @@
 'use strict';
 // End-to-end test: runs inside Electron (`npm run e2e`). Drives the REAL window with real mouse and keyboard input and the REAL
-// Whisper model on a SPOKEN test clip (made with the voices that ship with Windows; elsewhere this test is skipped) whose words
-// and timing are known, then reads the saved files back and compares them with what the window showed.
+// Whisper model on a SPOKEN test clip (made with the voices that ship with Windows, or espeak-ng; without either this test is
+// skipped) whose words and timing are known, then reads the saved files back and compares them with what the window showed.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -54,9 +54,11 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, engineLoaded }) =
   const S = (expr) => js(`window.__app.S.${expr}`);
   const lines = () => js('window.__app.S.lines.map((l) => ({ start: l.start, text: l.text }))');
   const rowCount = () => js('document.querySelectorAll("#lines .line").length');
+  const fullLines = () => js('window.__app.S.lines.map((l) => ({ start: l.start, text: l.text, words: (l.words || []).map((w) => ({ text: w.text, start: w.start, end: w.end, est: !!w.est })) }))');
+  const chipTexts = (i) => js(`[...document.querySelectorAll("#lines .line:nth-child(${i + 1}) .w")].map((c) => c.firstChild.textContent)`);
 
   if (!SP.available()) {
-    results.push({ name: 'the window test needs the Windows speech voices to make a spoken test clip', ok: true, detail: 'skipped on this system' });
+    results.push({ name: 'the window test needs the Windows speech voices or espeak-ng to make a spoken test clip', ok: true, detail: 'skipped on this system' });
     fs.writeFileSync(outFile, JSON.stringify({ ok: true, results, notes }, null, 2));
     app.exit(0);
     return;
@@ -123,6 +125,29 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, engineLoaded }) =
       assert(/English \(detected\)/.test(await js('document.getElementById("status").textContent')), 'language shown: ' + (await js('document.getElementById("status").textContent')));
       notes.wer = Number(wer.toFixed(3));
       await shot('3-made');
+    });
+
+    await step('every line shows its words, each with the time it is sung (none guessed), and the words light up one by one as the song plays', async () => {
+      const got = await fullLines();
+      for (let i = 0; i < got.length; i++) {
+        eq(await chipTexts(i), got[i].text.split(' '), `the words of line ${i + 1}`);
+        assert(got[i].words.every((w) => !w.est), 'no guessed times after making');
+        got[i].words.forEach((w, k) => { assert(w.end >= w.start, 'ends after it starts'); if (k) assert(w.start >= got[i].words[k - 1].start, 'in order'); });
+      }
+      const walked = got.flatMap((l) => l.words).find((w) => /walked/i.test(w.text));
+      assert(walked.start > at[1] && walked.start < at[1] + 1.2, `"walked" is sung just after 13 s: ${walked.start}`);
+      notes.walked = walked.start;
+      const i = got.findIndex((l) => /walked/.test(l.text));
+      const w4 = got[i].words[Math.min(3, got[i].words.length - 1)];
+      await js(`(() => { const p = document.getElementById("player"); p.currentTime = ${w4.start + 0.02}; return p.play(); })()`);
+      await waitFor(`document.querySelector("#lines .line:nth-child(${i + 1}).now .w.now")`, 3000, 'a word lit up');
+      const lit = await js(`(() => { const cs = [...document.querySelectorAll("#lines .line:nth-child(${i + 1}) .w")]; return { now: cs.findIndex((c) => c.classList.contains("now")), sung: cs.filter((c) => c.classList.contains("sung")).length }; })()`);
+      assert(lit.now >= Math.min(3, got[i].words.length - 1) && lit.sung >= lit.now, 'the word being sung and the ones before it: ' + JSON.stringify(lit));
+      await sleep(700);
+      const later = await js(`[...document.querySelectorAll("#lines .line:nth-child(${i + 1}) .w")].findIndex((c) => c.classList.contains("now"))`);
+      assert(later >= lit.now, 'the highlight moves on as the song plays');
+      await js('document.getElementById("player").pause()');
+      await shot('3b-karaoke');
     });
 
     await step('▶ on a line (real click) plays the song from that line, the playing line is highlighted, and Space (real key) pauses', async () => {
@@ -193,13 +218,130 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, engineLoaded }) =
       void before;
     });
 
+    await step('fixing single words: clicking a word (real click) jumps to it, arrow keys pick the next word, S stamps it at the playhead and [ ] nudge it; a retyped line keeps or re-times its words', async () => {
+      const i = (await lines()).findIndex((l) => /walked/.test(l.text));
+      const before = (await fullLines())[i];
+      await click(`#lines .line:nth-child(${i + 1}) .w:nth-child(2)`);
+      eq(await js('window.__app.S.selWord'), 1, 'the second word is selected');
+      near(await js('document.getElementById("player").currentTime'), before.words[1].start, 0.05, 'the song jumped to the word');
+      assert(await js(`!!document.querySelector("#lines .line:nth-child(${i + 1}) .w.sel small")`), 'the selected line shows each word\'s time');
+      await key('Right');
+      eq(await js('window.__app.S.selWord'), 2, 'Right arrow picks the next word');
+      const t = Math.round((before.words[2].start + 0.3) * 100) / 100;
+      await js(`document.getElementById("player").currentTime = ${t}`);
+      await sleep(150);
+      await key('s', [], 's');
+      let now = (await fullLines())[i];
+      near(now.words[2].start, t, 0.011, 'S stamped the word at the playhead');
+      near(now.words[1].end, t, 0.011, 'the word before now ends there');
+      eq(now.start, before.start, 'the line itself did not move');
+      await key(']', [], ']'); await key(']', [], ']'); await key('[', [], '[');
+      now = (await fullLines())[i];
+      near(now.words[2].start, t + 0.05, 0.011, '] ] [ moved it 0.05 s later');
+      // retype one word: the times stay; add a word: the line's time is shared out again (guessed, in italics)
+      const field = `#lines .line:nth-child(${i + 1}) .text`;
+      const words = now.text.split(' ');
+      await click(field); await key('a', ['control']); await typeText(['We', 'strolled', ...words.slice(2)].join(' ')); await key('Tab');
+      now = (await fullLines())[i];
+      eq(now.words[1].text, 'strolled', 'the retyped word'); near(now.words[1].start, before.words[1].start, 0.011, 'kept its time'); assert(!now.words[1].est, 'not guessed');
+      await click(field); await key('a', ['control']); await typeText(['We', 'strolled', 'slowly', ...words.slice(2)].join(' ')); await key('Tab');
+      now = (await fullLines())[i];
+      eq(now.words.length, words.length + 1, 'one more word');
+      assert(now.words.every((w) => w.est), 'the words are now guessed');
+      eq(await js(`document.querySelectorAll("#lines .line:nth-child(${i + 1}) .w.est").length`), words.length + 1, 'and shown in italics');
+    });
+
+    await step('Tap words (real click, then W on every word): each tap times the next word at the playhead, running on into the next line; Esc stops', async () => {
+      const i = (await lines()).findIndex((l) => /strolled/.test(l.text));
+      await click(`#lines .line:nth-child(${i + 1}) .text`);
+      await js('document.activeElement.blur()');
+      await click('#tap');
+      eq(await js('document.getElementById("tap").getAttribute("aria-pressed")'), 'true', 'tapping is on');
+      eq(await js('document.getElementById("tapHint").hidden'), false, 'with a hint');
+      await waitFor('!document.getElementById("player").paused', 3000, 'it starts playing');
+      const n = (await fullLines())[i].words.length;
+      const taps = [];
+      for (let k = 0; k < n + 2; k++) {
+        await sleep(160);
+        taps.push(await js('document.getElementById("player").currentTime'));
+        await key('w', [], 'w');
+      }
+      await key('Escape');
+      eq(await js('window.__app.S.tap'), null, 'Esc stops tapping');
+      await js('document.getElementById("player").pause()');
+      const all = await fullLines();
+      const line = all[i]; const next = all[i + 1];
+      line.words.forEach((w, k) => { near(w.start, taps[k], 0.12, `word ${k + 1} was timed by its tap`); assert(!w.est, 'no longer guessed'); });
+      near(line.start, line.words[0].start, 0.011, 'the line starts with its first tapped word');
+      near(next.words[0].start, taps[n], 0.12, 'the taps ran on into the next line'); near(next.start, next.words[0].start, 0.011, 'which moved to its first word');
+      near(next.words[1].start, taps[n + 1], 0.12, 'second word of the next line');
+      await shot('4b-tapped');
+    });
+
     await step('Undo all edits (real click) brings back the lyrics exactly as they were made', async () => {
       await click('#revert');
       const back = await lines();
-      const made = await js('window.__app.S.made');
+      const made = await js('window.__app.S.made.map((l) => ({ start: l.start, text: l.text }))');
       eq(back, made, 'lines');
+      eq((await fullLines()).map((l) => l.words.map((w) => [w.text, w.start])), await js('window.__app.S.made.map((l) => l.words.map((w) => [w.text, w.start]))'), 'and their word times');
       eq(await js('document.getElementById("revert").disabled'), true, 'nothing left to undo');
       assert(!/edited/.test(await js('document.getElementById("status").textContent')), 'status no longer says edited');
+    });
+
+    await step('Save word-synced lyrics (real click): the .ttml file is valid XML with a <span> for every word, holds exactly the words and times shown, and Ctrl+S saves it again (old file kept as .bak)', async () => {
+      const ttmlPath = path.join(dir, 'Test Song.ttml');
+      saveTo = ttmlPath;
+      const shown = (await fullLines()).filter((l) => l.text.trim());
+      await click('#saveTtml');
+      await waitFor('/Saved Test Song\\.ttml/.test(document.getElementById("result").textContent)', 10000, 'saved');
+      assert(fs.existsSync(ttmlPath) && !fs.existsSync(ttmlPath + '.part'), 'file written, no half-written file');
+      const raw = fs.readFileSync(ttmlPath, 'utf8');
+      assert(raw.startsWith('<?xml version="1.0" encoding="UTF-8"?>'), 'an XML document, without a byte-order mark');
+      const check = await js(`(() => { const d = new DOMParser().parseFromString(${JSON.stringify(raw)}, 'application/xml'); if (d.getElementsByTagName('parsererror').length) return { error: d.getElementsByTagName('parsererror')[0].textContent }; const ns = 'http://www.w3.org/ns/ttml'; return { root: d.documentElement.localName, ns: d.documentElement.namespaceURI, lang: d.documentElement.getAttribute('xml:lang'), ps: d.getElementsByTagNameNS(ns, 'p').length, spans: [...d.getElementsByTagNameNS(ns, 'span')].map((s) => s.textContent) }; })()`);
+      assert(!check.error, 'the browser reads it as XML: ' + check.error);
+      eq([check.root, check.ns, check.lang], ['tt', 'http://www.w3.org/ns/ttml', 'en'], 'a TTML root with the language');
+      eq(check.ps, shown.length, 'one <p> per line');
+      eq(check.spans, shown.flatMap((l) => l.words.map((w) => w.text)), 'one <span> per word, in order');
+      const parsed = P.parseTtml(raw);
+      eq(parsed.map((l) => l.text), shown.map((l) => l.text), 'the lines');
+      parsed.forEach((l, i) => { near(l.start, shown[i].start, 0.011, 'line ' + i); l.words.forEach((w, k) => near(w.start, shown[i].words[k].start, 0.011, `word ${k} of line ${i}`)); });
+      assert(!fs.existsSync(ttmlPath + '.bak'), 'nothing to back up the first time');
+      await click('#lines .line:nth-child(1) .text'); await key('a', ['control']); await typeText('Word synced edit'); await key('Tab');
+      await key('s', ['control']);
+      await waitFor('/kept as Test Song\\.ttml\\.bak/.test(document.getElementById("result").textContent)', 10000, 'Ctrl+S saved the TTML again, with a backup');
+      eq(fs.readFileSync(ttmlPath + '.bak', 'utf8'), raw, 'the old file is kept byte for byte');
+      assert(fs.readFileSync(ttmlPath, 'utf8').includes('>Word</span> <span') && fs.readFileSync(ttmlPath, 'utf8').includes('>edit</span>'), 'the new file has the edit');
+      await shot('5a-saved-ttml');
+    });
+
+    await step('Load lyrics file… (real click): a saved .ttml comes back with every word time; an .lrc comes back with line times and guessed words', async () => {
+      const ttmlPath = path.join(dir, 'Test Song.ttml');
+      const want = P.parseTtml(fs.readFileSync(ttmlPath, 'utf8'));
+      openReturn = ttmlPath;
+      await click('#load');
+      await waitFor('/loaded from Test Song\\.ttml/.test(document.getElementById("status").textContent)', 8000, 'loaded');
+      const got = await fullLines();
+      eq(got.map((l) => l.text), want.map((l) => l.text), 'the lines');
+      got.forEach((l, i) => l.words.forEach((w, k) => { near(w.start, want[i].words[k].start, 0.011, `word ${k} of line ${i}`); assert(!w.est, 'real word times'); }));
+      eq(await js('document.getElementById("revert").disabled'), true, 'loaded lyrics are not "edited"');
+      const lrc = path.join(dir, 'Other.lrc');
+      fs.writeFileSync(lrc, '\uFEFF[ar:Someone]\r\n[00:02.00]First line here\r\n[00:06.50]And a second one\r\n');
+      openReturn = lrc;
+      await click('#load');
+      await waitFor('/loaded from Other\\.lrc/.test(document.getElementById("status").textContent)', 8000, 'lrc loaded');
+      const l2 = await fullLines();
+      eq(l2.map((l) => [l.start, l.text]), [[2, 'First line here'], [6.5, 'And a second one']], 'lines from the .lrc');
+      assert(l2.every((l) => l.words.length === l.text.split(' ').length && l.words.every((w) => w.est)), 'words guessed from the line times');
+      near(l2[0].words[0].start, 2, 0.011, 'the first word starts with its line'); assert(l2[0].words[2].end <= 6.5 + 1e-9, 'and the line ends before the next');
+      fs.writeFileSync(path.join(dir, 'junk.lrc'), 'just some text');
+      openReturn = path.join(dir, 'junk.lrc');
+      await click('#load');
+      await waitFor('/No timed lines/.test(document.getElementById("toast").textContent)', 8000, 'a file without times is refused');
+      eq((await lines()).length, 2, 'and the lyrics stay');
+      // back to the made lyrics for the next steps
+      openReturn = ttmlPath; await click('#load');
+      await waitFor('/loaded from Test Song\\.ttml/.test(document.getElementById("status").textContent)', 8000, 'reloaded');
+      openReturn = song;
     });
 
     await step('Save timed lyrics… (real click): the .lrc file holds exactly the lines shown, in order, with the carry done right; saving again keeps the old file as .bak', async () => {
@@ -227,7 +369,7 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, engineLoaded }) =
       await shot('5-saved');
     });
 
-    await step('Save as plain text (real click) writes only the words; a save can never land on the song itself (the extension is always .lrc or .txt)', async () => {
+    await step('Save as plain text (real click) writes only the words; a save can never land on the song itself (the extension is always .ttml, .lrc or .txt)', async () => {
       saveTo = path.join(dir, 'Test Song.txt');
       await click('#saveTxt');
       await waitFor('/Saved Test Song\\.txt/.test(document.getElementById("result").textContent)', 10000, 'text saved');

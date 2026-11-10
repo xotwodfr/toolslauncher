@@ -54,8 +54,8 @@ async function openSong(p) {
     if (duration > P.MAX_SECONDS) throw new P.UserError(`This song is ${P.formatDuration(duration)} long. Lyrics Maker handles songs up to ${P.formatDuration(P.MAX_SECONDS)}.`);
     const id = nextId++;
     songs.set(id, { path: p, name: path.basename(p), duration });
-    const lrc = p.replace(/\.[^.\\/]+$/, '') + '.lrc';
-    return { ok: true, id, name: path.basename(p), duration, url: `lyrics://s/${id}`, estimate: P.estimateSeconds(duration), existingLrc: fs.existsSync(lrc) };
+    const stem = p.replace(/\.[^.\\/]+$/, '');
+    return { ok: true, id, name: path.basename(p), duration, url: `lyrics://s/${id}`, estimate: P.estimateSeconds(duration), existingTtml: fs.existsSync(stem + '.ttml'), existingLrc: fs.existsSync(stem + '.lrc') };
   } catch (e) { return { ok: false, name: path.basename(p), error: cleanError(e) }; }
 }
 const registered = (id) => { const s = songs.get(Number(id)); if (!s) throw new P.UserError('That song is not open any more'); return s; };
@@ -130,32 +130,79 @@ ipcMain.handle('make:start', async (_e, req) => {
 ipcMain.handle('make:cancel', () => { if (job) job.abort(); });
 
 // ---- saving -----------------------------------------------------------------------------------------------------------------------
+const SAVE_KINDS = {
+  ttml: { ext: '.ttml', title: 'Save the word-synced lyrics', filter: 'Word-synced lyrics (TTML)' },
+  lrc: { ext: '.lrc', title: 'Save the timed lyrics', filter: 'Timed lyrics' },
+  txt: { ext: '.txt', title: 'Save the lyrics as text', filter: 'Text' },
+};
+const num = (x) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(0, Math.min(x, 24 * 3600)) : null);
+/** Lines from the window, checked: text, times, and (for TTML) the timed words. */
+function cleanLines(list) {
+  return (Array.isArray(list) ? list : []).filter((l) => l && typeof l.text === 'string' && num(l.start) != null).slice(0, 5000).map((l) => {
+    const line = { start: num(l.start), text: l.text.slice(0, 500) };
+    if (num(l.end) != null) line.end = num(l.end);
+    if (Array.isArray(l.words)) {
+      const words = l.words.slice(0, 500).filter((w) => w && typeof w.text === 'string' && num(w.start) != null).map((w) => ({ text: w.text.slice(0, 200), start: num(w.start), end: num(w.end) != null ? num(w.end) : num(w.start) }));
+      if (words.length) line.words = words;
+    }
+    return line;
+  });
+}
+
 ipcMain.handle('lyrics:save', async (_e, req) => {
   try {
     const s = registered(req && req.id);
     const kind = req && req.kind;
-    if (kind !== 'lrc' && kind !== 'txt') throw new P.UserError('Unknown file type');
-    const lines = (Array.isArray(req.lines) ? req.lines : []).filter((l) => l && typeof l.text === 'string' && Number.isFinite(l.start)).map((l) => ({ start: Math.max(0, l.start), text: l.text.slice(0, 500) }));
+    const k = Object.prototype.hasOwnProperty.call(SAVE_KINDS, kind) ? SAVE_KINDS[kind] : null;
+    if (!k) throw new P.UserError('Unknown file type');
+    if (Array.isArray(req.lines) && req.lines.length > 5000) throw new P.UserError('Too many lines');
+    const lines = cleanLines(req.lines);
     if (!lines.some((l) => l.text.trim())) throw new P.UserError('There are no lyrics to save yet');
-    if (lines.length > 5000) throw new P.UserError('Too many lines');
-    const content = kind === 'lrc' ? P.formatLrc(lines) : P.formatPlain(lines);
-    const ext = kind === 'lrc' ? '.lrc' : '.txt';
+    const language = typeof req.language === 'string' && P.LANGUAGES[req.language] ? req.language : '';
+    const title = s.name.replace(/\.[^.]*$/, '');
+    const content = kind === 'ttml' ? P.formatTtml(lines, { language, title, duration: s.duration, spaced: language ? !NO_SPACE.has(language) : undefined })
+      : kind === 'lrc' ? P.formatLrc(lines) : P.formatPlain(lines);
+    const ext = k.ext;
     const pick = await dialog.showSaveDialog(win, {
-      title: kind === 'lrc' ? 'Save the timed lyrics' : 'Save the lyrics as text',
+      title: k.title,
       defaultPath: path.join(path.dirname(s.path), P.defaultName(s.name, ext)),
-      filters: [{ name: kind === 'lrc' ? 'Timed lyrics' : 'Text', extensions: [ext.slice(1)] }],
+      filters: [{ name: k.filter, extensions: [ext.slice(1)] }],
     });
     if (pick.canceled || !pick.filePath) return { ok: false, dialogCancelled: true };
     let out = pick.filePath;
     if (P.extOf(out) !== ext) out += ext;
-    // the extension is always .lrc or .txt, so a save can never land on a song, whatever name was typed
+    // the extension is always .ttml, .lrc or .txt, so a save can never land on a song, whatever name was typed
     let backup = null;
     if (fs.existsSync(out)) { backup = out + '.bak'; fs.copyFileSync(out, backup); }   // the file being replaced is kept as .bak
     const part = out + '.part';
-    await fs.promises.writeFile(part, '﻿' + content, 'utf8');
+    // TTML is XML, which declares its own encoding: no byte order mark there; .lrc and .txt get one so old players read them as UTF-8
+    await fs.promises.writeFile(part, (kind === 'ttml' ? '' : '\uFEFF') + content, 'utf8');
     await fs.promises.rename(part, out);
     produced.add(out);
     return { ok: true, path: out, lines: lines.filter((l) => l.text.trim()).length, backup };
+  } catch (e) { return { ok: false, error: cleanError(e) }; }
+});
+
+// Load lyrics made earlier (or by another program) to fix them: a .ttml keeps its word times, an .lrc gives lines only.
+ipcMain.handle('lyrics:load', async (_e, req) => {
+  try {
+    const s = registered(req && req.id);
+    const stem = s.path.replace(/\.[^.\\/]+$/, '');
+    const guess = ['.ttml', '.lrc'].map((x) => stem + x).find((f) => fs.existsSync(f));
+    const r = await dialog.showOpenDialog(win, {
+      title: 'Load lyrics to edit', defaultPath: guess || path.dirname(s.path), properties: ['openFile'],
+      filters: [{ name: 'Lyrics (TTML or LRC)', extensions: ['ttml', 'xml', 'lrc'] }],
+    });
+    if (r.canceled || !r.filePaths[0]) return { ok: false, dialogCancelled: true };
+    const file = r.filePaths[0];
+    const st = await fs.promises.stat(file);
+    if (st.size > 8 * 1024 * 1024) throw new P.UserError('This file is too big to be lyrics');
+    const text = await fs.promises.readFile(file, 'utf8');
+    const isTtml = /<tt[\s>]/.test(text.slice(0, 4096));
+    const lines = isTtml ? P.parseTtml(text) : P.parseLrc(text);
+    if (!lines.length) throw new P.UserError(isTtml ? 'No timed lines were found in this TTML file' : 'No timed lines were found in this file (an .lrc line starts with a time like [01:05.40])');
+    const lang = isTtml ? (/<tt[^>]*\sxml:lang\s*=\s*["']([\w-]+)["']/.exec(text) || [])[1] : null;
+    return { ok: true, name: path.basename(file), kind: isTtml ? 'ttml' : 'lrc', lines, language: lang && P.LANGUAGES[lang.split('-')[0]] ? lang.split('-')[0] : null };
   } catch (e) { return { ok: false, error: cleanError(e) }; }
 });
 ipcMain.handle('reveal', (_e, file) => { if (produced.has(file)) shell.showItemInFolder(file); });
