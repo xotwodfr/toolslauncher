@@ -64,7 +64,7 @@
     {
       "id": "music-player",
       "name": "Music Player",
-      "description": "Play a folder of music with covers, tags and synced lyrics. Gapless, equalizer, ReplayGain, playlists. Nothing is uploaded.",
+      "description": "Play a folder of music with covers, tags and synced lyrics, word by word for .ttml. Gapless, equalizer, ReplayGain, playlists. Nothing is uploaded.",
       "category": "Audio",
       "glyph": "♫",
       "accent": "#d6409f",
@@ -94,7 +94,7 @@
     {
       "id": "lyrics-maker",
       "name": "Lyrics Maker",
-      "description": "Listen to a song and write its lyrics with the time each line starts. Play it, fix any line, and save a timed .lrc file for your music player. Works offline in 99 languages; nothing is uploaded.",
+      "description": "Listen to a song and write its lyrics with the time every word is sung. Play it with the words lighting up, fix any word, and save word-synced .ttml or a timed .lrc. Works offline in 99 languages; nothing is uploaded.",
       "category": "Audio",
       "glyph": "✎",
       "accent": "#ffd166",
