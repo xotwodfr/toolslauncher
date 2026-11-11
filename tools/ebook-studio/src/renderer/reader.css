@@ -1,0 +1,36 @@
+/* The reading frame's page (a sandboxed srcdoc frame without scripts). The window sets the classes and variables on <html>. */
+html { --fs: 100%; --lh: 1.55; --font: Georgia, "Iowan Old Style", "Palatino Linotype", "Noto Serif", "Times New Roman", serif; --side: 56px; --top: 44px;
+  --bg: #111114; --fg: #e6e4df; --link: #c9a0ff; --dim: #9a978f; --mark: rgba(242, 177, 60, 0.45); font-size: var(--fs); }
+html.light { --bg: #fbfaf7; --fg: #1d1c1a; --link: #5b3cb0; --dim: #6b6862; --mark: rgba(255, 210, 60, 0.6); }
+html.sepia { --bg: #f4ecd8; --fg: #3b2f20; --link: #7a4b12; --dim: #7b6a52; --mark: rgba(214, 150, 40, 0.45); }
+html.dark { --bg: #111114; --fg: #e6e4df; }
+html.sans { --font: "Segoe UI", system-ui, "Noto Sans", "Helvetica Neue", Arial, sans-serif; }
+html.easy { --font: Verdana, "Atkinson Hyperlegible", Tahoma, "DejaVu Sans", sans-serif; }
+html.mono { --font: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace; }
+html, body { background: var(--bg); color: var(--fg); }
+body { margin: 0; font-family: var(--font); line-height: var(--lh); -webkit-font-smoothing: antialiased; overflow-wrap: break-word; }
+article.chapter { display: block; }
+p { margin: 0 0 0.85em; text-align: justify; hyphens: auto; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; break-after: avoid; text-align: left; }
+h1 { font-size: 1.7em; margin: 0.6em 0 1em; } h2 { font-size: 1.35em; } h3 { font-size: 1.15em; }
+a { color: var(--link); }
+img { max-width: 100%; height: auto; }
+img.svg-image { display: block; margin: 0 auto; }
+blockquote { margin: 1em 1.6em; font-style: italic; }
+pre { white-space: pre-wrap; font-size: 0.88em; }
+table { border-collapse: collapse; max-width: 100%; } td, th { border: 1px solid var(--dim); padding: 0.2em 0.5em; }
+hr { border: 0; text-align: center; margin: 1.5em 0; } hr::after { content: "* * *"; color: var(--dim); letter-spacing: 0.3em; }
+.missing-image { color: var(--dim); font-style: italic; }
+mark.hit { background: var(--mark); color: inherit; }
+mark.hit.current { outline: 2px solid var(--link); }
+::selection { background: rgba(201, 160, 255, 0.35); }
+
+/* scrolled */
+html.scrolled body { max-width: 40em; margin: 0 auto; padding: var(--top) 32px 60vh; }
+html.scrolled::-webkit-scrollbar { width: 10px; } html.scrolled::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.35); }
+
+/* paged: CSS columns one page wide; the window scrolls sideways a page at a time */
+html.paged { height: 100%; overflow: hidden; }
+html.paged body { height: 100vh; box-sizing: border-box; padding: var(--top) var(--side); column-width: calc(100vw - 2 * var(--side)); column-gap: calc(2 * var(--side)); column-fill: auto; }
+html.paged img { max-height: calc(100vh - 2 * var(--top)); object-fit: contain; break-inside: avoid; }
+html.paged pre, html.paged table, html.paged figure { break-inside: avoid; }

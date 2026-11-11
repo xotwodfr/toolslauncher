@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none';">
+  <title>Photo Batch Editor</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Photo Batch Editor</h1>
+      <span class="muted small tagline">one recipe · many photos</span>
+      <span class="grow"></span>
+      <label for="preset" class="plabel">Preset</label>
+      <select id="preset" aria-label="Preset"><option value="">—</option></select>
+      <button id="savePreset" class="btn small">Save as preset…</button>
+      <button id="delPreset" class="btn ghost small" hidden>Delete preset</button>
+      <span class="sepv"></span>
+      <button id="addFolder" class="btn small">Add folder…</button>
+      <button id="addFiles" class="btn small">Add photos…</button>
+    </header>
+    <form id="presetForm" class="presetform" hidden>
+      <input id="presetName" type="text" maxlength="80" placeholder="Name of the preset, e.g. Web 2048 with logo" aria-label="Preset name">
+      <button class="btn small primary" type="submit">Save</button>
+      <button class="btn small ghost" type="button" id="presetCancel">Cancel</button>
+    </form>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="body">
+      <aside class="photos" aria-label="Photos">
+        <div class="listhead"><h2>Photos</h2><span id="count" class="muted small"></span><span class="grow"></span><button id="removeSel" class="btn ghost small" hidden title="Take the selected photo out of the list (the file stays)">Remove</button><button id="clear" class="btn ghost small" hidden>Clear</button></div>
+        <div id="list" class="plist" role="listbox" aria-label="Photos to edit"></div>
+        <div id="empty" class="drop" tabindex="0" role="button" aria-label="Add photos">
+          <strong>Drop photos or a folder here</strong>
+          <span class="muted small">JPEG, PNG, WebP, AVIF, TIFF, GIF</span>
+          <span class="row"><button id="addFiles2" class="btn primary small">Add photos…</button><button id="addFolder2" class="btn small">Add folder…</button></span>
+          <p class="muted small fine">Your originals are never changed: edited copies go to a new folder.</p>
+        </div>
+      </aside>
+
+      <section class="preview" aria-label="Preview">
+        <div class="pvbar">
+          <div class="seg" role="radiogroup" aria-label="Compare">
+            <button class="mode" id="modeSide" role="radio" aria-checked="true">Side by side</button>
+            <button class="mode" id="modeSlider" role="radio" aria-checked="false">Slider</button>
+          </div>
+          <span id="pvName" class="muted small trunc"></span>
+          <span class="grow"></span>
+          <span id="pvSize" class="small pvsize"></span>
+        </div>
+        <div id="stage" class="stage side">
+          <figure class="pane"><img id="imgBefore" alt="Before"><figcaption>Before</figcaption></figure>
+          <figure class="pane"><img id="imgAfter" alt="After"><figcaption>After</figcaption></figure>
+          <div class="slider" id="slider">
+            <div class="sbox" id="sbox"><img id="sBefore" alt="Before"><div class="sclip" id="sclip"><img id="sAfter" alt="After"></div><div class="shandle" id="shandle"></div></div>
+            <input type="range" id="sRange" min="0" max="100" value="50" aria-label="Before / after divider">
+          </div>
+          <p id="pvEmpty" class="muted pvempty">Add photos, then pick one to see the recipe on it.</p>
+          <div id="pvBusy" class="pvbusy small" hidden>Updating…</div>
+        </div>
+      </section>
+
+      <aside class="recipe" aria-label="Recipe">
+        <div class="listhead"><h2>Recipe</h2><span class="muted small">top to bottom</span></div>
+        <div id="steps" class="steps"></div>
+        <div class="addstep"><select id="addStep" aria-label="Add a step"><option value="">+ Add a step…</option></select></div>
+      </aside>
+    </main>
+
+    <footer class="outbar">
+      <div class="ofield"><label for="format">Save as</label><select id="format"></select></div>
+      <div class="ofield q"><label for="quality">Quality <span id="qVal">85</span></label><input type="range" id="quality" min="40" max="100" value="85"></div>
+      <div class="ofield"><label for="metadata">Photo info</label><select id="metadata">
+        <option value="copyright">Copyright &amp; date only</option><option value="strip">Remove all</option><option value="keep">Keep all (camera, place…)</option>
+      </select></div>
+      <div class="ofield wide"><label for="pattern">File names</label><input type="text" id="pattern" spellcheck="false" aria-describedby="patHelp"><span id="patHelp" class="muted tiny">{name} {n:3} {date} {w}x{h} · e.g. <span id="patEx"></span></span></div>
+      <div class="ofield wide"><label>Save to</label><div class="outdir"><span id="outDir" class="trunc small"></span><button id="pickOut" class="btn small">Choose…</button><button id="resetOut" class="btn ghost small" hidden>Reset</button></div></div>
+      <div class="ofield check"><label class="check" title="Phones store some photos sideways with a note to turn them: this turns them for real"><input type="checkbox" id="autoOrient" checked> Turn upright</label></div>
+      <span class="grow"></span>
+      <div class="go">
+        <button id="start" class="btn primary" disabled>Edit photos</button>
+        <button id="cancel" class="btn" hidden>Cancel</button>
+      </div>
+    </footer>
+    <div class="runbar" id="runbar" hidden>
+      <div id="prog" class="progress" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="fill"></div></div>
+      <span id="runText" class="small"></span>
+      <button id="reveal" class="btn ghost small" hidden>Show in folder</button>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../recipe.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

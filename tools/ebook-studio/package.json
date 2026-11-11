@@ -1,0 +1,67 @@
+{
+  "name": "ebook-studio",
+  "productName": "Ebook Converter Reader",
+  "version": "0.1.0",
+  "description": "Read EPUB, text, Markdown and HTML books, and convert between EPUB, TXT, Markdown, HTML and PDF. Offline.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/ebook.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "htmlparser2": "^9.1.0",
+    "markdown-it": "^15.0.3"
+  },
+  "build": {
+    "appId": "com.toolslauncher.ebookstudio",
+    "productName": "Ebook Converter Reader",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "artifactName": "EbookConverterReader-${version}-${os}-${arch}.${ext}",
+    "executableName": "ebook-studio",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Office"
+    }
+  },
+  "devDependencies": {
+    "fast-xml-parser": "^5.12.0"
+  }
+}

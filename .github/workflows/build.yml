@@ -207,6 +207,35 @@ jobs:
           bash ../../scripts/ci-step.sh "File Encryptor & Hasher: npm test" npm test
           bash ../../scripts/ci-step.sh "File Encryptor & Hasher: package" npm run ${{ matrix.script }}
 
+      - name: Markdown Notes
+        working-directory: tools/markdown-notes
+        run: |
+          bash ../../scripts/ci-step.sh "Markdown Notes: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Markdown Notes: npm test" npm test
+          bash ../../scripts/ci-step.sh "Markdown Notes: package" npm run ${{ matrix.script }}
+
+      - name: Ebook Converter & Reader
+        working-directory: tools/ebook-studio
+        run: |
+          bash ../../scripts/ci-step.sh "Ebook Converter & Reader: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Ebook Converter & Reader: npm test" npm test
+          bash ../../scripts/ci-step.sh "Ebook Converter & Reader: package" npm run ${{ matrix.script }}
+
+      - name: Voice Recorder & Cleaner
+        working-directory: tools/voice-recorder
+        run: |
+          bash ../../scripts/ci-step.sh "Voice Recorder & Cleaner: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Voice Recorder & Cleaner: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
+          bash ../../scripts/ci-step.sh "Voice Recorder & Cleaner: npm test" npm test
+          bash ../../scripts/ci-step.sh "Voice Recorder & Cleaner: package" npm run ${{ matrix.script }}
+
+      - name: Photo Batch Editor
+        working-directory: tools/photo-batch-editor
+        run: |
+          bash ../../scripts/ci-step.sh "Photo Batch Editor: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Photo Batch Editor: npm test" npm test
+          bash ../../scripts/ci-step.sh "Photo Batch Editor: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release

@@ -28,6 +28,10 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **QR & Barcode Studio** | **Makes QR codes** for text, links, Wi-Fi, contacts (vCard/MeCard), email, SMS, phone, places and calendar events, with colours, rounded or dot styles and a **logo**, and **barcodes** (EAN-13, EAN-8, UPC-A, Code 128, Code 39, ITF) with check digits. Every code is **read back to check it scans**. **Reads** codes from pictures, the clipboard or the screen, several at once, and makes **batches** from a list or CSV. |
 | **Password Vault** | An **offline password manager** that keeps everything in **one encrypted file you choose** (Argon2id + AES-256-GCM), so you can back it up or sync it yourself. Entries with web addresses, notes, tags, folders, custom fields, **live 2FA codes** and password history; search, favourites and a restorable trash. A password and passphrase generator, auto-lock, a clipboard that clears itself, and import from KeePass, Bitwarden, Chrome and Firefox. |
 | **File Encryptor & Hasher** | **Encrypts files and whole folders** with a password into `.locked` files (Argon2id + streaming AES-256-GCM, so files of any size use little memory, and any cut, reordering or change is detected), and decrypts them under their original names without overwriting anything. Also **computes and checks checksums** (SHA-256, SHA-512, SHA-1, MD5, BLAKE2b): compare with a published one, check `.sha256` / `SHA256SUMS` files, or make them. |
+| **Markdown Notes** | Notes kept as **ordinary `.md` files in a folder you choose**: a folder tree, instant search, tags, `[[wiki links]]`, a live preview, pasted pictures, ticking task boxes, and **export to HTML, PDF or Word**. It saves as you type and notices when another program changes a note. |
+| **Ebook Converter & Reader** | **Reads EPUB, TXT, Markdown and HTML books** in pages or scrolling, with contents, search, text size and light, sepia and dark themes, and remembers where you stopped. **Converts** between EPUB, PDF, HTML, Markdown and text (text files are split into chapters), and gives an EPUB a new title, author or cover as a new file. |
+| **Voice Recorder & Cleaner** | Records voice memos, podcasts and narration from your microphone, **saved to disk as you speak** (an unfinished take is recovered on the next start), with a level meter, pause and markers. Then **cleans the sound**: less background noise (learned from a quiet part), no rumble, long pauses shortened, loudness evened out to −16 / −19 LUFS. A/B preview, then export as WAV, FLAC, MP3, M4A or Opus. |
+| **Photo Batch Editor** | Applies **one recipe of edits to many photos**: resize, crop to an aspect (with a smart subject-finding anchor), rotate / flip, auto-orient, auto levels, brightness / contrast / saturation / warmth, sharpen, black & white or sepia, border, **text and logo watermarks**, rounded corners. Steps run in the order you set. Live **before/after preview**, presets, rename patterns, photo info kept or stripped; originals are never touched. |
 
 <p>
   <img src="docs/screenshots/audio-tagger.png" width="32%" alt="Audio Tagger">
@@ -51,6 +55,10 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/qr-studio.png" width="32%" alt="QR and Barcode Studio: a Wi-Fi QR code for an invented café with a cup logo in the middle, checked as scanning">
   <img src="docs/screenshots/password-vault.png" width="32%" alt="Password Vault: an unlocked vault of invented entries, one showing its user name, hidden password and a live 2FA code">
   <img src="docs/screenshots/file-encryptor.png" width="32%" alt="File Encryptor and Hasher: invented files and a folder being encrypted into .locked files, with a password strength meter">
+  <img src="docs/screenshots/markdown-notes.png" width="32%" alt="Markdown Notes: a folder of invented notes, one open in the editor beside its live preview with a table and task list">
+  <img src="docs/screenshots/ebook-studio.png" width="32%" alt="Ebook Converter and Reader: a chapter of an invented book in the sepia reading theme, with the contents beside it">
+  <img src="docs/screenshots/voice-recorder.png" width="32%" alt="Voice Recorder and Cleaner: an invented spoken take on a waveform, with the clean-up switches and the A/B preview">
+  <img src="docs/screenshots/photo-batch-editor.png" width="32%" alt="Photo Batch Editor: invented landscape photos with a recipe of resize, border and watermark steps, and a before/after preview">
 </p>
 
 No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`. Lyrics Maker does the same with `.ttml` and `.lrc` files.)
@@ -176,6 +184,39 @@ No tool overwrites your original files. (Music Player never changes a song; when
 - **Decrypt.** Brings back the original file or folder, with its name and modified times, next to the `.locked` file or in a folder you choose. Nothing is overwritten: if the name is taken you get `name (2)`. Output is only renamed into place once the whole file has checked out.
 - **Optionally move originals to the Recycle Bin**, but only after each `.locked` file has been decrypted again and compared, and only if the original did not change meanwhile. The app says plainly that the Recycle Bin is not secure deletion.
 - **Checksums.** SHA-256, SHA-512, SHA-1, MD5 and BLAKE2b, several files at once on worker threads. Paste a checksum from a download page to compare (the kind is recognised from its length). Check `.sha256`, `.md5`, `SHA256SUMS` and similar files in GNU or BSD format, which reports OK, different or missing for each file. Save such a file for a folder.
+
+### Markdown Notes
+
+- **Your notes stay plain files.** Pick a folder and every note is an ordinary `.md` file in it (front matter is fine), so any editor, sync tool or backup can use them. Create, rename, move (drag in the tree, or *Move to…*) and delete notes and folders; deleting goes to the Recycle Bin.
+- **Writing.** An editor with Markdown highlighting next to a live preview (or either one alone, <kbd>Ctrl</kbd>+<kbd>E</kbd>). It saves itself as you type, writing each file safely so a crash cannot leave half a note. If another program changes the open note, it reloads; if you were typing at the same time, it asks which version to keep and never overwrites silently.
+- **Linking and finding.** `[[Other note]]` links notes (a link to a note that does not exist yet creates it), `#tags` in the text or front matter fill the tag list, and search finds notes as you type, ignoring accents. Pinned notes, recent notes and "linked from".
+- **Pictures, tasks, tables, code.** Paste or drop a picture and it is saved in an `attachments` folder next to the note with a relative link. Task boxes can be ticked in the preview. Tables, footnotes and highlighted code blocks work. A word count is shown.
+- **Safe preview, offline.** Scripts and event handlers in a note are removed and never run, and pictures from the internet are not loaded: only pictures inside your notes folder are shown.
+- **Export** a note as one self-contained HTML page, a PDF (A4 or Letter) or a Word document (headings, lists, tables, pictures, links, footnotes). Renaming a note does not yet update `[[links]]` to it in other notes.
+
+### Ebook Converter & Reader
+
+- **Reading.** Opens EPUB 2 and 3, plain text, Markdown and HTML. Turn pages with the arrow keys, <kbd>Page Up</kbd>/<kbd>Page Down</kbd> or <kbd>Space</kbd>, or switch to scrolling. Contents, search inside the book, text size, font, line spacing and light / sepia / dark colours. The library shows each book's cover, author and how far you got, and every book reopens where you stopped.
+- **Safe and offline.** Books are shown in a sandboxed frame that cannot run scripts; forms, frames and active content are removed, and pictures come only from inside the book, never from the internet. Every book gets the reader's clean layout (the book's own styles are not used).
+- **Converting.** EPUB to PDF (A4, A5, Letter or Legal), one self-contained HTML page, Markdown (pictures in a folder next to it) or plain text; and text, Markdown and HTML to EPUB 3. Text files are split into chapters at lines like "Chapter 1", "CHAPTER IV. The Storm" or "Prologue", and "Title:" / "Author:" lines fill in the details. Several files at once, with *Cancel*.
+- **Editing details.** Change the title, authors, language, publisher, description and cover of an EPUB. The result is always a NEW file; the original stays exactly as it is. Converted files never overwrite anything either ("name (2).epub").
+- **Not supported:** PDF and other formats as input, DRM-protected books and fixed-layout EPUBs. Audio, video and MathML layout are dropped (the text of formulas is kept).
+
+### Voice Recorder & Cleaner
+
+- **Record.** Pick a microphone and watch the live level meter; it flags clipping and says in plain words when you are too quiet or too loud. Pause and resume with <kbd>Space</kbd>, press <kbd>M</kbd> for a marker. A timer runs and the window shows how many hours of recording space are left. Takes go into a folder you choose (by default *Music/Voice Recordings*).
+- **Nothing is lost.** The sound is written to a WAV file on disk while you talk, and the file is kept playable every couple of seconds. If the app or the computer stops mid-take, the take is finished and listed as *recovered* the next time you start.
+- **Clean up**, each a switch: remove rumble (high-pass), reduce noise (learned from the quietest part automatically, or from a part you drag-select), shorten pauses longer than *X* s to *Y* s, even out loudness (−16 LUFS for podcasts, −19 for mono speech, −14 for streaming, −23 for broadcast), remove clicks, soften harsh "s" sounds, and trim the start and end.
+- **Listen before you save.** *Preview cleaned* renders the selected part (or 20 s from the playhead) with the real chain, and **A / B** switches between the original and the cleaned version at the same place.
+- **Export** to WAV, FLAC, MP3, M4A or Opus. Files are named from the recording date and your title, written as a `.part` first and never over an existing file. Deleting a take moves it to the Recycle Bin.
+
+### Photo Batch Editor
+
+- **Add photos or a folder** (or drop them): JPEG, PNG, WebP, AVIF, TIFF and GIF, sub-folders included. Damaged files are flagged in plain words, and phone photos stored sideways are shown upright.
+- **Build a recipe.** Steps run top to bottom in the order you set (▲ ▼), so "border then resize" really differs from "resize then border": resize (long edge, exact size, percent, *never make photos bigger*), crop to 1:1, 4:5, 3:2, 16:9, 9:16 or a custom shape (keeping the centre, an edge or the subject), rotate and flip, auto levels, brightness / contrast / saturation / warmth, sharpen, black & white or sepia, a border, a **text watermark** (size, colour, opacity, 9 positions, shadow), a **logo watermark** (PNG, width, opacity, position) and rounded corners.
+- **Preview** any photo in the list, before and after, side by side or with a slider, rendered by the real pipeline at screen size and updated as you change settings, with the final pixel size.
+- **Output:** keep the format, or save as JPEG, PNG, WebP or AVIF with a quality setting. Photo info can be removed, kept as copyright and date only, or kept in full. File names come from a pattern (`{name}`, `{n:3}`, `{date}` — when the photo was taken —, `{time}`, `{w}x{h}`); files go to a folder you choose or an `edited` folder next to each photo.
+- **Safe:** originals are never changed and nothing is overwritten (a clash becomes "name (2)"); files are written as `.part` and renamed when complete. Progress per photo, *Cancel*, several photos at once, and recipes saved as **presets**. HEIC photos are not supported.
 
 ## Install
 

@@ -200,6 +200,46 @@
       "accent": "#4fd1a5",
       "version": "0.1.0",
       "platforms": {}
+    },
+    {
+      "id": "markdown-notes",
+      "name": "Markdown Notes",
+      "description": "Notes as plain Markdown files in a folder you choose, with live preview, search, tags, wiki links and export to HTML, PDF and Word.",
+      "category": "Documents",
+      "glyph": "✎",
+      "accent": "#ffb4a2",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "ebook-studio",
+      "name": "Ebook Converter & Reader",
+      "description": "Read EPUB, text, Markdown and HTML books, convert between EPUB, PDF, HTML, Markdown and text, and edit an EPUB's title, author and cover.",
+      "category": "Documents",
+      "glyph": "❡",
+      "accent": "#c9a0ff",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "voice-recorder",
+      "name": "Voice Recorder & Cleaner",
+      "description": "Record voice memos, podcasts and narration, then clean them up: less noise and rumble, shorter pauses, even loudness. Offline.",
+      "category": "Audio",
+      "glyph": "◉",
+      "accent": "#e879f9",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "photo-batch-editor",
+      "name": "Photo Batch Editor",
+      "description": "Apply the same edits to many photos at once: resize, crop, colour, watermark, border and rounded corners, with a live before/after preview.",
+      "category": "Images",
+      "glyph": "▧",
+      "accent": "#8bd450",
+      "version": "0.1.0",
+      "platforms": {}
     }
   ]
 }

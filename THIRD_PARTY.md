@@ -8,7 +8,7 @@ components. Each downloadable package also carries the licence files its compone
 |---|---|---|---|
 | [Electron](https://github.com/electron/electron) and Chromium | all apps | MIT; Chromium and its dependencies under various open-source licences | Full notices: `LICENSES.chromium.html` in each package |
 | [adm-zip](https://github.com/cthackers/adm-zip) | Launcher | MIT | |
-| [sharp](https://github.com/lovell/sharp) | Picture Converter | Apache-2.0 | Bundles [libvips](https://github.com/libvips/libvips) (LGPL-3.0-or-later) and other native libraries; see the `@img/sharp-*` package licences |
+| [sharp](https://github.com/lovell/sharp) | Picture Converter, Photo Batch Editor | Apache-2.0 | Bundles [libvips](https://github.com/libvips/libvips) (LGPL-3.0-or-later) and other native libraries; see the `@img/sharp-*` package licences |
 | [@jsquash/jxl](https://github.com/jamsinclair/jSquash) | Picture Converter | Apache-2.0 | [libjxl](https://github.com/libjxl/libjxl) (BSD-3-Clause, with Highway under Apache-2.0) compiled to WebAssembly; used for JPEG XL. Runs in-process, no native code |
 | [wasm-feature-detect](https://github.com/GoogleChromeLabs/wasm-feature-detect) | Picture Converter | Apache-2.0 | Used by @jsquash/jxl |
 | [node-taglib-sharp](https://github.com/benrr101/node-taglib-sharp) | Audio Tagger, Music Player, Duplicate Finder, BPM & Key Finder | LGPL-2.1-or-later | Pure JavaScript; dependencies iconv-lite, os-locale, uuid (MIT) |
@@ -19,7 +19,7 @@ components. Each downloadable package also carries the licence files its compone
 | [Whisper](https://github.com/openai/whisper) "small" speech model (OpenAI), as the 8-bit ONNX "timestamped" export from [onnx-community/whisper-small_timestamped](https://huggingface.co/onnx-community/whisper-small_timestamped) | Lyrics Maker | MIT | About 250 MB (encoder, decoder, tokenizer and settings), downloaded by `npm run setup` at a pinned revision and checked against pinned SHA-256 values; bundled inside the package. The audio front end, decoding rules and word timing are code in this repository, following the published reference implementation |
 | [onnxruntime-node](https://github.com/microsoft/onnxruntime) | Stem Splitter, Background Remover, Lyrics Maker | MIT | Microsoft ONNX Runtime with its native Node binding (CPU); dependencies onnxruntime-common, adm-zip, matcher, serialize-error and a few small helpers (MIT), global-agent (BSD-3-Clause), semver (ISC) |
 | [pdf-lib](https://github.com/Hopding/pdf-lib) | PDF Toolkit | MIT | Pure JavaScript; dependencies @pdf-lib/standard-fonts, @pdf-lib/upng (MIT) and pako (MIT and Zlib) |
-| [FFmpeg](https://ffmpeg.org/) via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | Audio Converter, Video Converter, Audio Editor, Duplicate Finder, Stem Splitter, BPM & Key Finder, Lyrics Maker | **GPL-3.0-or-later** (this build is GPL: libx264, libmp3lame, libopus, libvorbis and others) | See below |
+| [FFmpeg](https://ffmpeg.org/) via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | Audio Converter, Video Converter, Audio Editor, Duplicate Finder, Stem Splitter, BPM & Key Finder, Lyrics Maker, Voice Recorder & Cleaner | **GPL-3.0-or-later** (this build is GPL: libx264, libmp3lame, libopus, libvorbis and others) | See below |
 | [exifr](https://github.com/MikeKovarik/exifr) | Batch File Renamer | MIT | Pure JavaScript; reads when a photo was taken (EXIF DateTimeOriginal) |
 | [music-metadata](https://github.com/Borewit/music-metadata) | Batch File Renamer | MIT | Pure JavaScript; reads artist, title, track and album. Dependencies strtok3, token-types, file-type, @tokenizer/token, @tokenizer/inflate, uint8array-extras, @borewit/text-codec, win-guid, content-type, media-typer, debug, ms (MIT) and ieee754 (BSD-3-Clause) |
 | [qrcode](https://github.com/soldair/node-qrcode) | QR & Barcode Studio | MIT | QR encoding (drawing is code in this repository); dependencies dijkstrajs, pngjs, yargs and its helpers (MIT / ISC) |
@@ -28,6 +28,14 @@ components. Each downloadable package also carries the licence files its compone
 | [hash-wasm](https://github.com/Daninet/hash-wasm) | Password Vault, File Encryptor & Hasher | MIT | Argon2id (and BLAKE2b in File Encryptor) from the reference C code compiled to WebAssembly; runs in-process |
 | [zxcvbn-ts](https://github.com/zxcvbn-ts/zxcvbn) (@zxcvbn-ts/core, language-common, language-en) | Password Vault, File Encryptor & Hasher | MIT | Password strength estimate, offline; dependency fastest-levenshtein (MIT) |
 | [EFF large word list](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases) | Password Vault | CC BY 3.0 US (Electronic Frontier Foundation) | `src/data/eff_large_wordlist.txt`, 7,776 words for passphrases, from the npm packages diceware-wordlist-en-eff and @wordlist/english-eff (which agree word for word); byte-identical to the EFF's eff_large_wordlist.txt, checked by SHA-256 in the tests |
+| [markdown-it](https://github.com/markdown-it/markdown-it) and [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) | Markdown Notes, Ebook Converter & Reader | MIT | Dependencies linkify-it, mdurl, uc.micro, punycode.js (MIT), entities (BSD-2-Clause), argparse (Python-2.0, only used by its command line) |
+| [htmlparser2](https://github.com/fb55/htmlparser2) | Markdown Notes, Ebook Converter & Reader | MIT | Dependencies domhandler, domutils, domelementtype, dom-serializer, entities (BSD-2-Clause); used by an allow-list sanitiser that is code in this repository |
+| [highlight.js](https://github.com/highlightjs/highlight.js) | Markdown Notes | BSD-3-Clause | Code highlighting in the preview and exports |
+| [docx](https://github.com/dolanmiu/docx) | Markdown Notes | MIT | Word export; dependencies fflate, nanoid (MIT) |
+| [CodeMirror 6](https://codemirror.net) (@codemirror/*, @lezer/*, style-mod, w3c-keyname, crelt, @marijn/find-cluster-break) | Markdown Notes | MIT | The editor, bundled into `src/renderer/vendor/editor.js` with esbuild (MIT, build time only) |
+| [fflate](https://github.com/101arrowz/fflate) | Ebook Converter & Reader | MIT | Pure JavaScript zip; reads and writes EPUB files |
+| [@img/sharp-wasm32](https://github.com/lovell/sharp) | Photo Batch Editor | Apache-2.0 AND LGPL-3.0-or-later AND MIT | sharp and libvips compiled to WebAssembly; used inside the app on Linux, where the native sharp clashes with Electron's own GLib when drawing; needs [@emnapi/runtime](https://github.com/toyobayashi/emnapi) (MIT) and tslib (0BSD) |
+| [exif-reader](https://github.com/devongovett/exif-reader) | Photo Batch Editor | MIT | Pure JavaScript; reads the copyright, artist and date of a photo to keep them, and for `{date}` |
 
 Music Player's playback uses the audio decoders built into Electron / Chromium (MP3, FLAC, Ogg Vorbis, Opus, AAC, WAV); it bundles no extra codecs. Its LRC and TTML lyrics, M3U playlist and library code is code in this repository.
 
@@ -40,6 +48,10 @@ Text & File Diff has no runtime dependencies: its diff (Myers and patience), pat
 Disk Space Visualizer has no runtime dependencies: its scanner and squarified treemap are code in this repository.
 
 QR & Barcode Studio's tests use [resvg-js](https://github.com/yisibl/resvg-js) (MPL-2.0, never shipped) to turn the SVG codes into pixels before reading them back.
+
+Markdown Notes' tests use fast-xml-parser and fflate (MIT, never shipped) to check the Word files it writes.
+
+Ebook Converter & Reader's tests use fast-xml-parser (MIT, never shipped) as an independent strict XML check of the EPUBs it writes.
 
 Test-only tools (never shipped in a package): [sharp](https://github.com/lovell/sharp) (Apache-2.0) and [exifr](https://github.com/MikeKovarik/exifr) (MIT) in Photo Privacy Cleaner's tests, and [pdf.js](https://github.com/mozilla/pdf.js) / pdfjs-dist (Apache-2.0) in PDF Toolkit's tests, used to check our output with independent implementations.
 

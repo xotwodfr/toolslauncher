@@ -1,0 +1,69 @@
+{
+  "name": "photo-batch-editor",
+  "productName": "Photo Batch Editor",
+  "version": "0.1.0",
+  "description": "Apply the same edits to many photos at once - resize, crop, adjust, watermark, borders - with a live preview. Offline.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/photo.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "@img/sharp-wasm32": "0.35.5",
+    "exif-reader": "^2.0.2",
+    "sharp": "^0.35.5"
+  },
+  "build": {
+    "appId": "com.toolslauncher.photobatcheditor",
+    "productName": "Photo Batch Editor",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/@emnapi/**"
+    ],
+    "artifactName": "PhotoBatchEditor-${version}-${os}-${arch}.${ext}",
+    "executableName": "photo-batch-editor",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Graphics"
+    }
+  }
+}
