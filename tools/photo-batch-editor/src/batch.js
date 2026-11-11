@@ -14,9 +14,11 @@ const P = require('./pipeline');
  */
 function freePath(dir, base, ext, taken = new Set(), protect = new Set()) {
   const key = (p) => (process.platform === 'win32' || process.platform === 'darwin' ? p.toLowerCase() : p);
+  // compare the protected paths the same way (resolved, and without case where the file system ignores it), whatever form the caller gave
+  const prot = new Set([...protect].map((x) => key(path.resolve(String(x)))));
   for (let i = 1; i < 100000; i++) {
     const p = path.join(dir, `${base}${i > 1 ? ` (${i})` : ''}.${ext}`);
-    if (taken.has(key(p)) || protect.has(key(path.resolve(p))) || fs.existsSync(p) || fs.existsSync(p + '.part')) continue;
+    if (taken.has(key(p)) || prot.has(key(path.resolve(p))) || fs.existsSync(p) || fs.existsSync(p + '.part')) continue;
     taken.add(key(p));
     return p;
   }
