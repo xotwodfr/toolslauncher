@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; worker-src 'self'; img-src 'self' data:;">
+  <title>Text &amp; File Diff</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Text &amp; File Diff</h1>
+      <span class="muted small tagline">texts · files · folders</span>
+      <div class="tabs" role="tablist" aria-label="What to compare">
+        <button role="tab" id="tabText" aria-selected="true" aria-controls="textMode">Texts &amp; files</button>
+        <button role="tab" id="tabFolders" aria-selected="false" aria-controls="folderMode">Folders</button>
+      </div>
+      <span class="grow"></span>
+      <span id="busy" class="muted small" hidden>Comparing…</span>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <!-- ============================== texts and files ============================== -->
+    <section id="textMode" class="mode-pane" role="tabpanel" aria-labelledby="tabText">
+      <div class="toolbar">
+        <div class="seg" role="radiogroup" aria-label="View">
+          <button class="mode" role="radio" data-view="side" aria-checked="true">Side by side</button>
+          <button class="mode" role="radio" data-view="unified" aria-checked="false">Unified</button>
+        </div>
+        <label class="inline">Highlight
+          <select id="inline" aria-label="Highlight inside changed lines">
+            <option value="word">Words</option><option value="char">Characters</option><option value="off">Off</option>
+          </select>
+        </label>
+        <label class="inline">Method
+          <select id="algo" aria-label="Diff method">
+            <option value="myers">Smallest (Myers)</option><option value="patience">Readable (patience)</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="igWs"> Ignore whitespace</label>
+        <label class="check"><input type="checkbox" id="igCase"> Ignore case</label>
+        <label class="check"><input type="checkbox" id="igEol" checked> Ignore line endings</label>
+        <label class="check"><input type="checkbox" id="sync" checked> Scroll together</label>
+      </div>
+
+      <div class="sides">
+        <div class="sidehead" id="headL" data-side="left">
+          <span class="label">Left</span>
+          <span class="fname trunc" id="nameL">Pasted text</span>
+          <span class="facts" id="factsL"></span>
+          <span class="grow"></span>
+          <button class="btn small" id="openL">Open…</button>
+          <button class="btn small ghost" id="clearL">Clear</button>
+        </div>
+        <div class="midhead" aria-hidden="true"></div>
+        <div class="sidehead" id="headR" data-side="right">
+          <span class="label">Right</span>
+          <span class="fname trunc" id="nameR">Pasted text</span>
+          <span class="facts" id="factsR"></span>
+          <span class="grow"></span>
+          <button class="btn small" id="openR">Open…</button>
+          <button class="btn small ghost" id="clearR">Clear</button>
+        </div>
+      </div>
+
+      <div class="work" id="work">
+        <div id="editors" class="editors">
+          <div class="edwrap" data-side="left"><textarea id="edL" class="ed" spellcheck="false" aria-label="Left text" placeholder="Paste or type the first text here, or drop a file on this side."></textarea></div>
+          <div class="edwrap" data-side="right"><textarea id="edR" class="ed" spellcheck="false" aria-label="Right text" placeholder="Paste or type the second text here, or drop a file on this side."></textarea></div>
+        </div>
+        <div id="viewer" class="viewer" hidden>
+          <div id="vSide" class="vside">
+            <div class="pane" id="paneL" tabindex="0" aria-label="Left side of the comparison"><div class="spacer"></div><div class="rows"></div></div>
+            <div class="gutter" id="gutter" aria-label="Choose a side for each change"><div class="gin"></div></div>
+            <div class="pane" id="paneR" tabindex="0" aria-label="Right side of the comparison"><div class="spacer"></div><div class="rows"></div></div>
+          </div>
+          <div id="vUni" class="vuni" hidden>
+            <div class="pane" id="paneU" tabindex="0" aria-label="Unified comparison"><div class="spacer"></div><div class="rows"></div></div>
+          </div>
+          <div id="binary" class="binary" hidden></div>
+        </div>
+      </div>
+
+      <section id="merge" class="merge" hidden aria-label="Merged result">
+        <div class="mergehead">
+          <span class="label">Merged result</span>
+          <span id="mergeInfo" class="muted small"></span>
+          <span class="grow"></span>
+          <button id="allL" class="btn small ghost">Take all left</button>
+          <button id="allR" class="btn small ghost">Take all right</button>
+          <button id="saveNew" class="btn small">Save as…</button>
+          <button id="saveL" class="btn small">Overwrite left…</button>
+          <button id="saveR" class="btn small">Overwrite right…</button>
+          <button id="closeMerge" class="btn small ghost" aria-label="Close the merged result">Close</button>
+        </div>
+        <div id="mergeNote" class="note warn" hidden>You edited the merged text, so choosing sides does not rebuild it. <button id="rebuild" class="btn small">Rebuild from choices</button></div>
+        <textarea id="merged" class="ed" spellcheck="false" aria-label="Merged text (you can edit it)"></textarea>
+      </section>
+
+      <div id="result" class="result" role="status" hidden></div>
+
+      <footer class="bar">
+        <span id="summary" class="status" aria-live="polite"></span>
+        <span class="grow"></span>
+        <span class="navs">
+          <button id="prev" class="btn small" title="Previous change (Shift+F7)" aria-label="Previous change">◀ Prev</button>
+          <span id="pos" class="muted small pos"></span>
+          <button id="next" class="btn small" title="Next change (F7)" aria-label="Next change">Next ▶</button>
+        </span>
+        <button id="edit" class="btn small">Edit texts</button>
+        <button id="mergeBtn" class="btn small">Merge…</button>
+        <button id="patch" class="btn small">Save patch…</button>
+        <button id="report" class="btn small">HTML report…</button>
+        <button id="compare" class="btn primary">Compare</button>
+      </footer>
+    </section>
+
+    <!-- ============================== folders ============================== -->
+    <section id="folderMode" class="mode-pane" role="tabpanel" aria-labelledby="tabFolders" hidden>
+      <div class="fpick">
+        <div class="fside" id="fsideL" data-side="left">
+          <span class="label">Left folder</span>
+          <span class="fpath trunc" id="fpathL">Drop a folder here or choose one</span>
+          <button class="btn small" id="fpickL">Choose…</button>
+        </div>
+        <button class="btn small ghost swap" id="fswap" title="Swap the two folders" aria-label="Swap the two folders">⇄</button>
+        <div class="fside" id="fsideR" data-side="right">
+          <span class="label">Right folder</span>
+          <span class="fpath trunc" id="fpathR">Drop a folder here or choose one</span>
+          <button class="btn small" id="fpickR">Choose…</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="seg" role="radiogroup" aria-label="Compare by">
+          <button class="mode" role="radio" data-fmode="quick" aria-checked="true" title="Files with the same size and modified time count as the same">Size and date (fast)</button>
+          <button class="mode" role="radio" data-fmode="content" aria-checked="false" title="Every file of the same size is read and compared by SHA-256">Contents (exact)</button>
+        </div>
+        <label class="inline grow">Ignore <input type="text" id="ignore" spellcheck="false" aria-label="Names or patterns to skip, separated by commas"></label>
+        <button id="fcompare" class="btn primary">Compare folders</button>
+        <button id="fcancel" class="btn" hidden>Cancel</button>
+      </div>
+      <div class="filters" id="filters" hidden>
+        <label class="check fchip different"><input type="checkbox" data-f="different" checked> Different <b id="cDifferent">0</b></label>
+        <label class="check fchip left"><input type="checkbox" data-f="left" checked> Only left <b id="cLeft">0</b></label>
+        <label class="check fchip right"><input type="checkbox" data-f="right" checked> Only right <b id="cRight">0</b></label>
+        <label class="check fchip same"><input type="checkbox" data-f="same"> Same <b id="cSame">0</b></label>
+        <label class="check fchip error"><input type="checkbox" data-f="error" checked> Problems <b id="cError">0</b></label>
+        <span class="grow"></span>
+        <button id="expandAll" class="btn small ghost">Expand all</button>
+        <button id="collapseAll" class="btn small ghost">Collapse all</button>
+      </div>
+      <div class="fwrap">
+        <div id="fempty" class="drop" tabindex="-1">
+          <strong class="big">Compare two folders</strong>
+          <span class="muted">Choose or drop a folder on each side, then press <em>Compare folders</em>.</span>
+          <p class="muted small fine">Sub-folders are included. <em>Size and date</em> is fast; <em>Contents</em> reads every file that might match and compares it exactly. You can open any pair of files in the text view, and copy files from one side to the other. A file that is replaced goes to the Recycle Bin; nothing is deleted.</p>
+        </div>
+        <div id="ftable" class="ftable" hidden>
+          <div class="fhead frow" role="row">
+            <span><input type="checkbox" id="fselAll" aria-label="Select everything shown"></span>
+            <span>Name</span><span>Left</span><span>Status</span><span>Right</span>
+          </div>
+          <div class="fscroll" id="fscroll" tabindex="0" aria-label="Files and folders"><div class="spacer"></div><div class="rows" id="frows"></div></div>
+        </div>
+        <div id="fprog" class="progress indeterminate" role="progressbar" aria-label="Comparing folders" hidden><div></div></div>
+      </div>
+      <footer class="bar">
+        <span id="fstatus" class="status" aria-live="polite"></span>
+        <span class="grow"></span>
+        <span id="fsel" class="muted small"></span>
+        <button id="fopen" class="btn small" disabled>Open in text view</button>
+        <button id="copyRL" class="btn small" disabled title="Copy the selected files from the right folder to the left one">◀ Copy to left</button>
+        <button id="copyLR" class="btn small" disabled title="Copy the selected files from the left folder to the right one">Copy to right ▶</button>
+      </footer>
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../core/textdiff.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

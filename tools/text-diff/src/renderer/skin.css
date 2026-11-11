@@ -1,0 +1,98 @@
+/* ============================================================================================
+   Tools Launcher family - shared skin. SOURCE OF TRUTH: tools/_shared/skin.css.
+   `node scripts/sync-skin.js` copies this file to src/renderer/skin.css in every tool; `npm test` fails if a copy differs.
+   It is loaded AFTER each tool's own styles.css, so it re-colours and re-shapes the tool without touching its layout.
+   Look: near-black, square corners, hairlines. Monospace capitals for labels and buttons, sans for reading text.
+   A tool keeps its own --accent (focus-adjacent highlights, progress, selection); the one filled control is the next action.
+   Every selector starts with :root so it out-ranks the tool's own rules without !important.
+   ============================================================================================ */
+:root {
+  --bg: #0b0b0d; --page: #0b0b0d; --panel: #101013; --panel-2: #17171b; --panel-3: #212127;
+  --line: #25252b; --line-strong: #3a3a42; --edge: #6f6f7a;
+  --text: #f3f3f4; --text-2: #b9b9c1; --muted: #8e8e98;
+  --ok: #4fdba0; --err: #ff7a7a; --warn: #f2b13c; --focus: #7aa8ff;
+  --fill: #f3f3f4; --fill-hover: #ffffff; --ink: #0b0b0d;
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+  color-scheme: dark;
+}
+
+/* ---- base ---------------------------------------------------------------------------------------- */
+:root body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13.5px; }
+:root :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 0; }
+:root code, :root kbd { font-family: var(--mono); border-radius: 0; background: var(--panel-2); border-color: var(--line); color: var(--text-2); }
+:root .muted { color: var(--muted); }
+:root a { color: var(--focus); }
+
+/* labels and headings: the small monospace capitals the launcher uses */
+:root h2 { font-family: var(--mono); font-size: 11.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-2); }
+:root legend, :root th { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+:root label:not(.check):not(.inline):not(.switch) { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+:root label.check, :root label.inline { font-family: var(--sans); text-transform: none; letter-spacing: 0; }
+
+/* ---- buttons ------------------------------------------------------------------------------------- */
+:root .btn {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 0;
+  background: transparent; border: 1px solid var(--line-strong); color: var(--text);
+}
+:root .btn:hover:not(:disabled) { background: var(--panel-2); border-color: #5a5a64; }
+:root .btn.primary { background: var(--fill); border-color: var(--fill); color: var(--ink); }
+:root .btn.primary:hover:not(:disabled) { background: var(--fill-hover); border-color: var(--fill-hover); filter: none; }
+:root .btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+:root .btn.ghost:hover:not(:disabled) { background: var(--panel-2); border-color: transparent; color: var(--text); }
+:root .btn.danger { background: color-mix(in srgb, var(--err) 85%, #000); border-color: transparent; color: #2a0707; }
+:root .btn.danger:hover:not(:disabled) { background: var(--err); border-color: transparent; }
+:root .btn.small { font-size: 11px; letter-spacing: 0.08em; }
+:root .btn:disabled, :root .btn[aria-disabled="true"] { opacity: 0.45; }
+:root .btn.primary:disabled, :root .btn.primary[aria-disabled="true"] { background: var(--panel-2); border-color: var(--line); color: var(--muted); opacity: 1; }
+
+/* a selected segment / mode tile is the inverse block, like the launcher's active tab */
+:root .mode[aria-checked="true"], :root .tabs button[aria-selected="true"] { background: var(--fill); border-color: var(--fill); color: var(--ink); }
+
+/* ---- form controls ------------------------------------------------------------------------------- */
+:root input[type="text"], :root input[type="number"], :root input[type="url"], :root input[type="search"], :root select, :root textarea {
+  font-family: var(--sans); font-size: 13px; letter-spacing: 0; text-transform: none; border-radius: 0;
+  background: var(--panel); border: 1px solid var(--edge); color: var(--text);
+}
+:root input:focus-visible, :root select:focus-visible, :root textarea:focus-visible { outline: none; border-color: var(--focus); }
+:root select option, :root select optgroup { background: var(--panel-2); color: var(--text); }
+:root input::placeholder, :root textarea::placeholder { color: var(--muted); font-style: normal; }
+:root input[type="color"] { border-radius: 0; background: var(--panel); border-color: var(--edge); }
+:root fieldset { border-radius: 0; border-color: var(--line-strong); }
+:root input[type="checkbox"], :root input[type="radio"], :root input[type="range"] { accent-color: var(--text); }
+
+/* ---- surfaces ------------------------------------------------------------------------------------ */
+:root .drop { border: 1px dashed var(--line-strong); border-radius: 0; background: transparent; }
+:root .drop.over { border-color: var(--focus); background: color-mix(in srgb, var(--focus) 8%, transparent); }
+:root .item, :root .group, :root .result, :root .root, :root .details, :root .notice, :root .summary, :root .banner, :root .preview, :root .note, :root .mode, :root .cover, :root .thumb {
+  border-radius: 0;
+}
+:root .item, :root .result, :root .root, :root .details, :root .notice { background: var(--panel); border-color: var(--line); }
+:root .item:hover { border-color: var(--line-strong); }
+:root .summary { background: var(--panel-2); color: var(--text-2); }
+:root .banner { background: color-mix(in srgb, var(--err) 9%, var(--panel)); border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); color: #ffc2c2; }
+:root .note.warn, :root .notice.warn { background: color-mix(in srgb, var(--warn) 8%, var(--panel)); border-color: color-mix(in srgb, var(--warn) 40%, transparent); color: #f6d9a3; }
+:root .result.ok, :root .notice.ok { border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
+:root .result.err { border-color: color-mix(in srgb, var(--err) 55%, transparent); }
+:root .sep { background: var(--line); }
+
+/* status words and small tags */
+:root .chip, :root .tag, :root .fact, :root .pill { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 0; }
+
+/* ---- progress ------------------------------------------------------------------------------------ */
+:root .progress, :root .bar2, :root progress { height: 4px; border-radius: 0; background: var(--panel-3); }
+:root .progress div, :root .bar2 i { border-radius: 0; }
+:root progress::-webkit-progress-bar { background: var(--panel-3); border-radius: 0; }
+:root progress::-webkit-progress-value { border-radius: 0; }
+
+/* ---- dialogs, toasts ----------------------------------------------------------------------------- */
+:root dialog, :root .dlg, :root .pop, :root .menu { border-radius: 0; background: var(--panel-2); border-color: var(--line-strong); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); }
+:root dialog::backdrop, :root .dlg::backdrop { background: rgba(5, 5, 7, 0.72); }
+:root .toast { border-radius: 0; background: var(--panel-3); border-color: var(--line-strong); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); }
+:root .toast.err { border-color: var(--err); }
+
+/* ---- scrollbars ---------------------------------------------------------------------------------- */
+:root ::-webkit-scrollbar { width: 10px; height: 10px; }
+:root ::-webkit-scrollbar-track, :root ::-webkit-scrollbar-corner { background: transparent; }
+:root ::-webkit-scrollbar-thumb { background: #34343b; border-radius: 0; border: 2px solid transparent; background-clip: content-box; }
+:root ::-webkit-scrollbar-thumb:hover { background: #4a4a53; }

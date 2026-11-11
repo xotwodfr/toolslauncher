@@ -53,6 +53,10 @@
     'ocr': '<svg viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>',
     // a film frame with a play triangle
     'video-converter': '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M10 9.2v5.6l4.8-2.8z"/><path d="M3.5 8.5H6M3.5 15.5H6M18 8.5h2.5M18 15.5h2.5"/></svg>',
+    // two pages side by side, with lines that do not match
+    'text-diff': '<svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="7.5" height="16" rx="1.5"/><rect x="13" y="4" width="7.5" height="16" rx="1.5"/><path d="M5.8 8h3M5.8 11h3M5.8 14h1.6M15.3 11h3M15.3 14h3"/></svg>',
+    // a name field with a text cursor in it
+    'file-renamer': '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M6.5 12h5M15 9.5v5M13.8 9.5h2.4M13.8 14.5h2.4"/></svg>',
   };
   const icon = (name, cls = 'ico') => { const s = document.createElement('span'); s.className = cls; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name] || ''; return s; };
 

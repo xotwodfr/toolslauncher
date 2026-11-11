@@ -22,6 +22,8 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **BPM & Key Finder** | Finds the **tempo and musical key** of songs, a folder at a time, with no internet and no model. See BPM and key (with the Camelot name) and how sure each is, fix a tempo with **÷2 / ×2** or a key from a list, then **write them into the tags** (BPM and Initial Key; musical, Camelot or Open Key names), backed up and verified like Audio Tagger. Also exports a CSV. |
 | **Background Remover** | Cuts the subject out of a picture, offline (the ISNet model). Keep it **transparent** or put it on a **colour**, a **blurred copy** of the picture or **another picture**, tune the edge, and fix mistakes with an **erase / restore brush** (zoom and pan, undo). Saves PNG, WebP or JPEG at the original size; the original is never changed. |
 | **Video Converter** | Convert to MP4 (H.264), WebM (VP9) or animated GIF. Cap the resolution and frame rate, pick a quality or **aim for a file size** (two-pass, so it lands on the target), trim, drop the sound, strip location metadata. Shows progress and speed, with Cancel. |
+| **Text & File Diff** | Compares two texts, two files or two folders. Shows the changes side by side or unified, with the changed words highlighted. You can build a merged version change by change, save a patch or an HTML report, and copy files between folders. |
+| **Batch File Renamer** | Renames many files or folders at once with a stack of rules: find & replace (also regex), insert, remove, case, numbering, dates (also the photo's EXIF date), audio tags, extension, spaces, accents. Shows every new name first, blocks clashes and names Windows can't use, and can undo any batch. |
 
 <p>
   <img src="docs/screenshots/audio-tagger.png" width="32%" alt="Audio Tagger">
@@ -39,6 +41,8 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/lyrics-maker.png" width="32%" alt="Lyrics Maker: the lines of an invented, spoken song with the time of every word, the word being sung highlighted">
   <img src="docs/screenshots/bpm-key-finder.png" width="32%" alt="BPM and Key Finder: eight invented songs with tempo, key, how sure each result is, and what was written to the tags">
   <img src="docs/screenshots/background-remover.png" width="32%" alt="Background Remover: an invented potted plant cut out, on a transparent background, with the brush tools">
+  <img src="docs/screenshots/text-diff.png" width="32%" alt="Text and File Diff: two versions of an invented script side by side with the changed words highlighted, and the merged result below">
+  <img src="docs/screenshots/file-renamer.png" width="32%" alt="Batch File Renamer: invented holiday photos renamed by the date they were taken, with one screenshot flagged because it has no photo date">
 </p>
 
 No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`. Lyrics Maker does the same with `.ttml` and `.lrc` files.)
@@ -117,6 +121,21 @@ No tool overwrites your original files. (Music Player never changes a song; when
 - **Tags are read-only here.** *Edit tags in Audio Tagger* opens the song in [Audio Tagger](#tools) if you have installed it from the launcher.
 - **Keys:** <kbd>Space</kbd> play/pause, <kbd>N</kbd> / <kbd>P</kbd> next / previous, <kbd>←</kbd> <kbd>→</kbd> seek 5 s (<kbd>Shift</kbd> 30 s), <kbd>Ctrl</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> volume, <kbd>M</kbd> mute, <kbd>S</kbd> shuffle, <kbd>R</kbd> repeat, <kbd>L</kbd> lyrics, <kbd>Q</kbd> queue, <kbd>/</kbd> search. In a list: <kbd>Enter</kbd> plays, <kbd>Delete</kbd> removes (queue and playlists), <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> reorders. The keyboard media keys work too.
 - **Gapless:** the next song is loaded in advance and started 25 ms before the current one ends. Measured with the end-to-end test: no silence and no overlap between two WAV files over 40 consecutive hand-overs. MP3 and AAC files only play gaplessly as far as their own encoder-delay information allows.
+
+### Text & File Diff
+
+- **Texts, files and folders.** Paste into two boxes or open (or drop) two files. The view is side by side or unified, with line numbers, highlights for the changed words or characters, jumping between changes (<kbd>F7</kbd> / <kbd>Shift</kbd>+<kbd>F7</kbd>), and both sides scrolling together. Big files (100,000 lines and more) are compared in the background and only the visible lines are drawn.
+- **Knows what a file is.** It reads UTF-8 (with or without BOM) and UTF-16 LE/BE, and shows the line endings (LF, CRLF, mixed). Whitespace, letter case and line endings can be ignored. Other files are compared by SHA-256 and shown as "binary files differ / are identical".
+- **Merge.** For each change, pick the left or the right version. You can edit the result, then save it as a new file or overwrite one side. Overwriting asks first and keeps the old file as `.bak`. Files are written through a `.part` file and keep their encoding.
+- **Export.** A unified `.patch` (always made from the exact texts, so it applies back cleanly) and a self-contained HTML report.
+- **Folders.** Compares two folders with their sub-folders, either quickly by size and date or exactly by content (SHA-256). Each file is marked same, different, only left or only right. Ignore patterns skip things like `node_modules` and `.git`. Double-click a pair to open it in the text view. You can copy chosen files left→right or right→left; a file that gets replaced goes to the Recycle Bin, and nothing is ever deleted.
+
+### Batch File Renamer
+
+- **Rules you can stack.** Find & replace (plain text or regular expressions with `$1` groups, first or every match, case options), insert text, remove characters (a range, first/last N, digits, symbols), change case (lower, UPPER, Title, Sentence, camelCase, kebab-case, snake_case), numbering (start, step, digits, position, restart per folder), a date (modified, created, or when the photo was taken, from EXIF) with your own format, audio tags (`{track} - {artist} - {title}`…), the extension, extra spaces, and accents. Turn rules on and off and reorder them; save a set of rules as a preset.
+- **See it before it happens.** Every file shows its current and new name, updated as you type. Problems are marked on the row: two files getting the same name, a name already taken in the folder, characters or names Windows can't use (CON, PRN…, trailing dots), names that are too long. *Rename* stays off until they are fixed, or let it add (2), (3)….
+- **Careful renaming.** Swaps (a→b, b→a), chains and case-only changes (photo.JPG → photo.jpg on Windows) go through temporary names. Files inside a renamed folder are handled first. If something fails half way, everything is put back.
+- **Undo, also later.** Every batch is written to a journal before the first rename. *History* lists the last batches, also after a restart. Undo first checks that each file is still where it was left, and can undo only the files that are. An interrupted batch is detected the next time the app starts and can be put back.
 
 ## Install
 

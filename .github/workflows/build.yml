@@ -165,6 +165,20 @@ jobs:
           bash ../../scripts/ci-step.sh "Lyrics Maker: package" npm run ${{ matrix.script }}
 
 
+      - name: Text & File Diff
+        working-directory: tools/text-diff
+        run: |
+          bash ../../scripts/ci-step.sh "Text & File Diff: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Text & File Diff: npm test" npm test
+          bash ../../scripts/ci-step.sh "Text & File Diff: package" npm run ${{ matrix.script }}
+
+      - name: Batch File Renamer
+        working-directory: tools/file-renamer
+        run: |
+          bash ../../scripts/ci-step.sh "Batch File Renamer: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Batch File Renamer: npm test" npm test
+          bash ../../scripts/ci-step.sh "Batch File Renamer: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release

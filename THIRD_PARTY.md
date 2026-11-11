@@ -20,12 +20,16 @@ components. Each downloadable package also carries the licence files its compone
 | [onnxruntime-node](https://github.com/microsoft/onnxruntime) | Stem Splitter, Background Remover, Lyrics Maker | MIT | Microsoft ONNX Runtime with its native Node binding (CPU); dependencies onnxruntime-common, adm-zip, matcher, serialize-error and a few small helpers (MIT), global-agent (BSD-3-Clause), semver (ISC) |
 | [pdf-lib](https://github.com/Hopding/pdf-lib) | PDF Toolkit | MIT | Pure JavaScript; dependencies @pdf-lib/standard-fonts, @pdf-lib/upng (MIT) and pako (MIT and Zlib) |
 | [FFmpeg](https://ffmpeg.org/) via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | Audio Converter, Video Converter, Audio Editor, Duplicate Finder, Stem Splitter, BPM & Key Finder, Lyrics Maker | **GPL-3.0-or-later** (this build is GPL: libx264, libmp3lame, libopus, libvorbis and others) | See below |
+| [exifr](https://github.com/MikeKovarik/exifr) | Batch File Renamer | MIT | Pure JavaScript; reads when a photo was taken (EXIF DateTimeOriginal) |
+| [music-metadata](https://github.com/Borewit/music-metadata) | Batch File Renamer | MIT | Pure JavaScript; reads artist, title, track and album. Dependencies strtok3, token-types, file-type, @tokenizer/token, @tokenizer/inflate, uint8array-extras, @borewit/text-codec, win-guid, content-type, media-typer, debug, ms (MIT) and ieee754 (BSD-3-Clause) |
 
 Music Player's playback uses the audio decoders built into Electron / Chromium (MP3, FLAC, Ogg Vorbis, Opus, AAC, WAV); it bundles no extra codecs. Its LRC and TTML lyrics, M3U playlist and library code is code in this repository.
 
 Photo Privacy Cleaner has no runtime dependencies: its JPEG, PNG and WebP handling is code in this repository. BPM & Key Finder's tempo and key detection (and its FFT) is code in this repository too, with no models or analysis libraries.
 
 Lyrics Maker's tests make spoken test clips with the speech voices that come with Windows; nothing from them is shipped.
+
+Text & File Diff has no runtime dependencies: its diff (Myers and patience), patch, merge and folder comparison are code in this repository. Its tests use [jsdiff](https://github.com/kpdecker/jsdiff) (BSD-3-Clause, never shipped) to check that the diffs are minimal and that exported patches apply back.
 
 Test-only tools (never shipped in a package): [sharp](https://github.com/lovell/sharp) (Apache-2.0) and [exifr](https://github.com/MikeKovarik/exifr) (MIT) in Photo Privacy Cleaner's tests, and [pdf.js](https://github.com/mozilla/pdf.js) / pdfjs-dist (Apache-2.0) in PDF Toolkit's tests, used to check our output with independent implementations.
 

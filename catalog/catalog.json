@@ -140,6 +140,26 @@
       "accent": "#9d86f5",
       "version": "0.1.0",
       "platforms": {}
+    },
+    {
+      "id": "text-diff",
+      "name": "Text & File Diff",
+      "description": "Compare texts, files and folders side by side, merge changes, and save patches or HTML reports. Offline.",
+      "category": "Documents",
+      "glyph": "≠",
+      "accent": "#8fa8ff",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "file-renamer",
+      "name": "Batch File Renamer",
+      "description": "Rename many files at once with stacked rules, a live preview, clash checks and undo for every batch.",
+      "category": "Files",
+      "glyph": "✎",
+      "accent": "#cfd8dc",
+      "version": "0.1.0",
+      "platforms": {}
     }
   ]
 }
