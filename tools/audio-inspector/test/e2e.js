@@ -61,7 +61,7 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, shell }) => {
       padded: path.join(src, 'Padded 24-bit.wav'), lossy: path.join(src, 'Plain.mp3'), broken: path.join(src, 'Broken.flac'),
     };
     ffm(['-i', wav, F.real]); ffm(['-i', mp3, '-sample_fmt', 's16', F.fake]);
-    ffm(['-i', wav, '-af', 'aresample=96000:resampler=soxr:precision=28', '-sample_fmt', 's32', F.up]);
+    ffm(['-i', wav, '-af', G.upsampleFilter(ff, 96000), '-sample_fmt', 's32', F.up]);
     ffm(['-i', wav, '-c:a', 'pcm_s24le', F.padded]); fs.copyFileSync(mp3, F.lossy); fs.writeFileSync(F.broken, Buffer.alloc(9000, 1));
     ffm(['-i', wav, path.join(lib, 'Track 01 名前.flac')]); ffm(['-i', mp3, '-sample_fmt', 's16', path.join(sub, 'Track 02.flac')]);
     fs.writeFileSync(path.join(sub, 'cover.jpg'), 'not audio'); fs.writeFileSync(path.join(lib, 'notes.txt'), 'hello');

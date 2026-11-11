@@ -180,7 +180,7 @@ test('verdict: pink noise (-3 dB per octave, quiet at the top) is still "Real lo
 
 test('verdict: a 96 kHz file made from 44.1 kHz is "Upsampled from 44.1 kHz"; from 48 kHz says so; real 96 kHz noise is "Real high resolution"', async () => {
   const m = material();
-  const up = file('upsampled 96k.flac'); ffmpeg(['-i', m.noise, '-af', 'aresample=96000:resampler=soxr:precision=28', '-sample_fmt', 's32', up]);
+  const up = file('upsampled 96k.flac'); ffmpeg(['-i', m.noise, '-af', G.upsampleFilter(ff, 96000), '-sample_fmt', 's32', up]);
   const r = await inspect(up);
   assert.strictEqual(r.verdict.kind, 'upsampled', JSON.stringify(r.verdict));
   assert.strictEqual(r.verdict.title, 'Upsampled from 44.1 kHz'); assert(/This 96 kHz file has nothing above 2[12]\.\d kHz/.test(r.verdict.explain), r.verdict.explain);
@@ -188,7 +188,7 @@ test('verdict: a 96 kHz file made from 44.1 kHz is "Upsampled from 44.1 kHz"; fr
   const up2 = file('upsampled swr.wav'); ffmpeg(['-i', m.noise, '-ar', '96000', '-c:a', 'pcm_s24le', up2]);
   assert.strictEqual((await inspect(up2)).verdict.kind, 'upsampled');
   const n48 = 48000 * 6; const src48 = G.writeWav(file('n48.wav'), [G.white(n48, 0.18, 31), G.white(n48, 0.18, 32)], 48000, 24);
-  const up48 = file('from48.flac'); ffmpeg(['-i', src48, '-af', 'aresample=96000:resampler=soxr:precision=28', '-sample_fmt', 's32', up48]);
+  const up48 = file('from48.flac'); ffmpeg(['-i', src48, '-af', G.upsampleFilter(ff, 96000), '-sample_fmt', 's32', up48]);
   assert.strictEqual((await inspect(up48)).verdict.title, 'Upsampled from 48 kHz');
   const n96 = 96000 * 6; const real96 = G.writeWav(file('real96.wav'), [G.white(n96, 0.18, 41), G.white(n96, 0.18, 42)], 96000, 24);
   const r96 = await inspect(real96);

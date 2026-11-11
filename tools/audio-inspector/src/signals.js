@@ -87,4 +87,19 @@ function writeWav(file, channels, rate, bits = 16) {
   return file;
 }
 
-module.exports = { rng, white, pink, sine, song, writeWav };
+/**
+ * The ffmpeg filter that upsamples to `rate` for test material: the SoX resampler when this ffmpeg build has it (Linux),
+ * else ffmpeg's own resampler at high quality (the Windows build has no libsoxr). Both leave nothing above the old
+ * Nyquist frequency, which is what the "upsampled" verdict looks for. AI_TEST_NO_SOXR=1 forces the second one.
+ */
+let soxr = null;
+function upsampleFilter(ffmpeg, rate) {
+  if (soxr === null) {
+    const { spawnSync } = require('child_process');
+    const r = spawnSync(ffmpeg, ['-hide_banner', '-buildconf'], { encoding: 'utf8', windowsHide: true });
+    soxr = !process.env.AI_TEST_NO_SOXR && r.status === 0 && /--enable-libsoxr/.test(r.stdout + r.stderr);
+  }
+  return soxr ? `aresample=${rate}:resampler=soxr:precision=28` : `aresample=${rate}:resampler=swr:filter_size=64:cutoff=0.97`;
+}
+
+module.exports = { upsampleFilter, rng, white, pink, sine, song, writeWav };

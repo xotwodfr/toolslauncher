@@ -34,7 +34,7 @@ exports.run = async ({ app, getWin, outDir, dialog }) => {
     const out = (name) => path.join(lib, name);
     ffm(['-i', master, out('Aster Vale - Paper Lanterns.flac')]);
     ffm(['-i', mp3, '-sample_fmt', 's16', out('Nova Harbor - Slow Orbit.flac')]);
-    ffm(['-i', master, '-af', 'aresample=96000:resampler=soxr:precision=28', '-sample_fmt', 's32', out('The Quiet Lines - Glass Avenue (24-96).flac')]);
+    ffm(['-i', master, '-af', G.upsampleFilter(ff, 96000), '-sample_fmt', 's32', out('The Quiet Lines - Glass Avenue (24-96).flac')]);
     ffm(['-i', master, '-b:a', '320k', out('Kite Season - Neon Fields.mp3')]);
     ffm(['-i', master, '-c:a', 'pcm_s24le', out('Marlow & Pine - Halfway to Gold (24-bit).wav')]);
     ffm(['-i', hot, out('Aster Vale - Morning Static (loud master).flac')]);
