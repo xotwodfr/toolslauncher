@@ -94,7 +94,7 @@
     {
       "id": "lyrics-maker",
       "name": "Lyrics Maker",
-      "description": "Listen to a song and write its lyrics with the time every word is sung. Play it with the words lighting up, fix any word, and save word-synced .ttml or a timed .lrc. Works offline in 99 languages; nothing is uploaded.",
+      "description": "Time a song's lyrics word by word: paste them, or let it listen for the words. Play with the words lighting up, fix any word, save word-synced .ttml or .lrc. Offline, 99 languages.",
       "category": "Audio",
       "glyph": "✎",
       "accent": "#ffd166",

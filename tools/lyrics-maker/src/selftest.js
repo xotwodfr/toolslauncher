@@ -27,6 +27,11 @@ async function run({ getWin } = {}) {
       if (r.status !== 0) throw new Error('ffmpeg did not start');
       return /ffmpeg version [^\s]+/.exec(r.stdout)[0];
     });
+    await step('the vocal separation model (experimental "Isolate vocals first") is bundled', async () => {
+      const V = require('./vocals');
+      if (V.missing()) throw new Error('missing: ' + V.modelPath());
+      return (fs.statSync(V.modelPath()).size / 1048576).toFixed(0) + ' MB';
+    });
     await step('the speech model files are bundled', async () => {
       const bad = [];
       for (const f of E.MODEL_FILES) { const p = path.join(E.modelDir(), f); if (!fs.existsSync(p) || fs.statSync(p).size < MIN_BYTES[f]) bad.push(f); }

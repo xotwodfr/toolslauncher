@@ -448,6 +448,28 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, engineLoaded }) =
       assert((await rowCount()) >= 3, 'lyrics made');
     });
 
+    await step('experimental "Isolate vocals first" (real click): the vocals are separated first, with their own progress, then the lyrics are made from them', async () => {
+      const V = require('../src/vocals');
+      if (V.missing()) return 'skipped: the vocal separation model is not downloaded (npm run setup)';
+      await js('(() => { const t = document.getElementById("lyricsIn"); t.value = ""; t.dispatchEvent(new Event("input")); })()');
+      eq(await js('document.getElementById("isolate").disabled'), false, 'the switch can be used');
+      await click('#isolate');
+      eq(await js('document.getElementById("isolate").checked'), true, 'ticked');
+      assert(/vocal separation/.test(await js('document.getElementById("makeNote").textContent')), 'the time estimate includes the separation');
+      await click('#make');
+      await waitFor('window.__app.S.working', 4000, 'working');
+      await waitFor('/Separating the vocals|Starting the vocal separation/.test(document.getElementById("phase").textContent)', 30000, 'the separation phase is shown');
+      await waitFor('/Separating the vocals… [1-9]/.test(document.getElementById("phase").textContent)', 120000, 'its progress moves');
+      await waitFor('!window.__app.S.working', 600000, 'finished');
+      const got = await lines();
+      const wer = SP.wordErrorRate(SP.SENTENCES.slice(0, 3).join(' '), got.map((l) => l.text).join(' '));
+      assert(wer <= 0.2, `made from the separated vocals (word error rate ${wer.toFixed(2)})`);
+      notes.isolatedWer = Number(wer.toFixed(3));
+      await click('#isolate');
+      eq(await js('document.getElementById("isolate").checked'), false, 'switched off again');
+      return undefined;
+    });
+
     await step('the accurate model: choosing it asks for the one-time download (real clicks); it downloads with progress, is checked, makes lyrics, and can be removed', async () => {
       const turbo = path.join(__dirname, '..', 'models', 'turbo');
       if (!fs.existsSync(path.join(turbo, 'encoder_model_int8.onnx'))) return 'skipped: the accurate model is not in models/turbo';

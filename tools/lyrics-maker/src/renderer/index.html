@@ -53,6 +53,8 @@
           <fieldset id="makeSet" disabled>
             <legend>Make</legend>
             <div class="opt"><label for="lang">Language</label><select id="lang" aria-label="Language of the lyrics"></select></div>
+            <p class="exp-head">Experimental</p>
+            <p class="muted small exp-note">Better on some songs, worse on others (tested on real songs: the standard settings time pasted lyrics best on average). Try them when a song comes out badly.</p>
             <div class="opt"><label for="model">Model</label><select id="model" aria-label="Speech model">
               <option value="standard">Standard (built in)</option><option value="accurate">Accurate (large-v3-turbo)</option></select></div>
             <div id="modelBox" class="opt col" hidden>
@@ -60,6 +62,7 @@
               <div class="row left"><button id="modelGet" class="btn small">Download (1.1 GB)</button><button id="modelCancel" class="btn ghost small" hidden>Cancel</button><button id="modelRemove" class="btn ghost small" hidden>Remove it</button></div>
               <div id="modelBar" class="progress" role="progressbar" aria-label="Download progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="modelFill"></div></div>
             </div>
+            <label class="check" title="Removes the band before listening (Demucs). Slower: about 30 to 45 s per minute of song first."><input id="isolate" type="checkbox"> Isolate vocals first</label>
             <div class="opt col"><label for="lyricsIn">Lyrics (optional)</label>
               <textarea id="lyricsIn" rows="6" spellcheck="false" placeholder="Paste the song's lyrics here, one line per row, and every word is timed to the song. Leave empty to let it listen for the words."></textarea>
               <span id="lyricsCount" class="muted small"></span></div>

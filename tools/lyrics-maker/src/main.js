@@ -8,6 +8,7 @@ const P = require('./plan');
 const A = require('./audio');
 const E = require('./engine');
 const M = require('./models');
+const V = require('./vocals');
 
 const E2E = process.argv.includes('--e2e');
 const SELFTEST = process.argv.find((a) => a.startsWith('--self-test='));
@@ -67,12 +68,13 @@ const registered = (id) => { const s = songs.get(Number(id)); if (!s) throw new 
 ipcMain.handle('engine:check', () => {
   const problems = [];
   const missing = E.missingFiles();
+  const vocalsMissing = V.missing();
   if (missing.length) problems.push('The speech model files are missing (run "npm run setup" in the tool folder).');
   try { require('onnxruntime-node'); } catch (e) { problems.push('The model runtime could not start: ' + cleanError(e).slice(0, 160)); }
   const warnings = [];
   const gb = os.totalmem() / 1073741824;
   if (gb < 6) warnings.push(`This computer has about ${gb.toFixed(1)} GB of memory. Making lyrics needs about 1.5 GB, so close other programs first; it may be slow.`);
-  return { ok: problems.length === 0, problems, warnings };
+  return { ok: problems.length === 0, problems, warnings, vocals: !vocalsMissing };
 });
 
 ipcMain.handle('song:pick', async () => {
@@ -120,13 +122,27 @@ ipcMain.handle('make:start', async (_e, req) => {
     const model = (req && req.model) || 'standard';
     if (!M.MODELS[model]) throw new P.UserError('Unknown model');
     if (!M.installed(model, modelDirs())) throw new P.UserError('The accurate model is not downloaded yet. Download it first (under Model), or choose Standard.');
+    const t0 = Date.now();
+    // experimental: separate the vocals first (Demucs) and let Whisper hear only them
+    let samples = null;
+    if (req && req.isolate) {
+      if (V.missing()) throw new P.UserError('The vocal separation model is missing (run "npm run setup" in the tool folder).');
+      await dropEngine();                                  // the two models together would need about 3 GB: one at a time
+      let lastSep = 0;
+      samples = await V.isolateVocals(s.path, {
+        signal: ac.signal,
+        onProgress: (p) => {
+          const now = Date.now(); if (now - lastSep < 200 && p.fraction < 1) return; lastSep = now;
+          send('make:progress', { fraction: p.fraction, phase: p.phase === 'load' ? 'separating-load' : 'separating', eta: p.etaSeconds == null ? null : p.etaSeconds });
+        },
+      });
+    }
     send('make:phase', { phase: engine && engineModel === model ? 'reading' : 'loading' });
     const eng = await getEngine(model);
     if (ac.signal.aborted) return { ok: false, cancelled: true };
     let last = 0;
-    const t0 = Date.now();
     const r = await E.makeLyrics(eng, s.path, {
-      language, signal: ac.signal, lyrics: lyrics.length ? lyrics : null,
+      language, signal: ac.signal, lyrics: lyrics.length ? lyrics : null, samples,
       onPhase: (phase) => send('make:phase', { phase }),
       onSegments: (segments) => send('make:lines', { lines: P.buildLines(segments, { spaced: language === 'auto' || !NO_SPACE.has(language) }) }),
       onProgress: (p) => {
@@ -139,7 +155,7 @@ ipcMain.handle('make:start', async (_e, req) => {
     // pasted lyrics: a line with few of its words heard, that the model also finds unlikely where it was put, may be misplaced
     const lines = r.lines ? r.lines.map(({ matched, confidence, ...l }) => ({ ...l, ...(matched < 0.5 && confidence < -3 ? { doubt: true } : {}) }))
       : P.buildLines(r.segments, { spaced: !NO_SPACE.has(r.language) });
-    return { ok: true, language: r.language, languageName: P.LANGUAGES[r.language] || r.language, lines, seconds: (Date.now() - t0) / 1000, ...(r.lines ? { fromLyrics: true, matched: r.matched } : {}) };
+    return { ok: true, language: r.language, languageName: P.LANGUAGES[r.language] || r.language, lines, seconds: (Date.now() - t0) / 1000, isolated: !!samples, ...(r.lines ? { fromLyrics: true, matched: r.matched } : {}) };
   } catch (e) {
     if (e && e.cancelled) return { ok: false, cancelled: true };
     return { ok: false, error: cleanError(e) };

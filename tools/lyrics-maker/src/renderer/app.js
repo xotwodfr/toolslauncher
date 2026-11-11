@@ -10,6 +10,7 @@
   };
   const LANG_KEY = 'lyricsmaker.language';
   const MODEL_KEY = 'lyricsmaker.model';
+  const ISOLATE_KEY = 'lyricsmaker.isolate';
   const round2 = (x) => Math.round(x * 100) / 100;
 
   const S = {
@@ -82,6 +83,7 @@
     $('modelBar').hidden = !dl;
     if (dl) { const pct = Math.round((dl.done / dl.total) * 100); $('modelFill').style.width = pct + '%'; $('modelBar').setAttribute('aria-valuenow', String(pct)); }
     $('make').disabled = needsModel;
+    $('isolate').disabled = S.working || !S.vocalsAvailable;
     $('load').disabled = !has || S.working;
     $('tap').setAttribute('aria-pressed', S.tap ? 'true' : 'false');
     $('tap').textContent = S.tap ? 'Stop tapping (Esc)' : 'Tap words (W)';
@@ -249,6 +251,7 @@
   const etaText = (s) => (s == null ? '' : `about ${P.formatDuration(Math.max(1, s))} left`);
   async function make() {
     if (!S.song || S.working) return;
+    const isolate = $('isolate').checked && !$('isolate').disabled;   // read before the controls are locked for the work
     if (S.edited && !window.confirm('Making the lyrics again replaces the edits you made. Continue?')) return;
     S.working = true; S.lines = []; S.made = []; S.sel = null; S.selWord = -1; S.tap = null; S.edited = false; S.detected = null; lastNow = -2;
     showResult('', '');
@@ -257,7 +260,7 @@
     renderLines();
     let res;
     const lyrics = $('lyricsIn').value;
-    try { res = await window.lm.make(S.song.id, S.language, P.pastedLines(lyrics).length ? lyrics : null, S.model); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
+    try { res = await window.lm.make(S.song.id, S.language, P.pastedLines(lyrics).length ? lyrics : null, S.model, isolate); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
     S.working = false;
     if (res.ok) {
       S.lines = res.lines.map((l) => newLine(l.start, l.text, l.words, l.end, l.doubt));
@@ -408,8 +411,9 @@
     if (!S.song) return;
     const r = S.song;
     const have = [r.existingTtml && '.ttml', r.existingLrc && '.lrc'].filter(Boolean);
-    const est = r.estimate * (S.model === 'accurate' ? 2 : 1);
-    $('makeNote').textContent = `Takes about ${P.formatDuration(est)} on this computer${S.model === 'accurate' ? ' with the accurate model' : ''}.` + (have.length ? ` This song already has lyrics next to it (${have.join(' and ')}): load them to fix them, or make new ones. Saving over a file keeps the old one as .bak.` : '');
+    const iso = $('isolate').checked && S.vocalsAvailable;
+    const est = r.estimate * (S.model === 'accurate' ? 2 : 1) + (iso ? r.duration * 0.75 + 15 : 0);
+    $('makeNote').textContent = `Takes about ${P.formatDuration(est)} on this computer${S.model === 'accurate' ? ' with the accurate model' : ''}${iso ? (S.model === 'accurate' ? ' and' : ' with') + ' vocal separation' : ''}.` + (have.length ? ` This song already has lyrics next to it (${have.join(' and ')}): load them to fix them, or make new ones. Saving over a file keeps the old one as .bak.` : '');
   }
 
   // ---- wiring ------------------------------------------------------------------------------------------------------------------------------
@@ -423,6 +427,8 @@
     lang.value = S.language;
     lang.addEventListener('change', () => { S.language = lang.value; try { localStorage.setItem(LANG_KEY, S.language); } catch { /* fine */ } });
     $('lyricsIn').addEventListener('input', syncControls);
+    try { $('isolate').checked = localStorage.getItem(ISOLATE_KEY) === '1'; } catch { /* fine */ }
+    $('isolate').addEventListener('change', () => { try { localStorage.setItem(ISOLATE_KEY, $('isolate').checked ? '1' : '0'); } catch { /* fine */ } updateEstimate(); });
     $('model').addEventListener('change', () => { S.model = $('model').value === 'accurate' ? 'accurate' : 'standard'; try { localStorage.setItem(MODEL_KEY, S.model); } catch { /* fine */ } updateEstimate(); syncControls(); });
     $('modelGet').addEventListener('click', downloadModel);
     $('modelCancel').addEventListener('click', () => window.lm.cancelModel());
@@ -494,7 +500,7 @@
       if (!S.working) return;
       const pct = Math.round(p.fraction * 100);
       $('bar').classList.remove('indeterminate'); $('fill').style.width = pct + '%'; $('bar').setAttribute('aria-valuenow', String(pct));
-      $('phase').textContent = p.phase === 'timing' ? `Timing your lyrics… ${pct}%` : `Listening… ${pct}%`;
+      $('phase').textContent = p.phase === 'timing' ? `Timing your lyrics… ${pct}%` : p.phase === 'separating-load' ? 'Starting the vocal separation…' : p.phase === 'separating' ? `Separating the vocals… ${pct}%` : `Listening… ${pct}%`;
       $('eta').textContent = etaText(p.eta);
     });
     window.lm.onLines((p) => { if (S.working) appendLines(p.lines); });
@@ -504,6 +510,7 @@
     syncControls();
     try {
       const e = await window.lm.engine();
+      S.vocalsAvailable = !!e.vocals; syncControls();
       if (!e.ok) { $('engineWarn').textContent = e.problems.join(' '); $('engineWarn').hidden = false; $('open').disabled = true; $('open2').disabled = true; }
       else if (e.warnings && e.warnings.length) { $('engineWarn').textContent = e.warnings.join(' '); $('engineWarn').hidden = false; }
     } catch { /* ignore */ }
