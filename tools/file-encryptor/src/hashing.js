@@ -112,10 +112,14 @@ function parseChecksums(text, fileName = '') {
 const needsEscape = (name) => /[\\\n\r]/.test(name);
 const escapeGnu = (name) => name.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
 
-/** Writes a checksum file: [{ name, hex }] -> text. format 'gnu' (sha256sum style, binary marker) or 'bsd'. */
+/**
+ * Writes a checksum file: [{ name, hex }] -> text. format 'gnu' (sha256sum style, binary marker) or 'bsd'.
+ * Names are written exactly as given (callers pass "/"-separated paths); a backslash is part of the name and is escaped,
+ * the same on every system, so a file written on Windows reads back the same on Linux and the other way round.
+ */
 function formatChecksums(items, alg, format = 'gnu') {
   return items.map(({ name, hex }) => {
-    const n = name.split(path.sep).join('/');
+    const n = String(name);
     if (format === 'bsd') return `${needsEscape(n) ? '\\' : ''}${ALGS[alg].bsd} (${needsEscape(n) ? escapeGnu(n) : n}) = ${hex}`;
     return `${needsEscape(n) ? '\\' : ''}${hex} *${needsEscape(n) ? escapeGnu(n) : n}`;
   }).join('\n') + '\n';

@@ -276,7 +276,7 @@ ipcMain.handle('sums:save', async (_e, o) => {
   const dir = path.dirname(r.filePath);
   const lines = list.map((it) => {
     const rel = path.relative(dir, it.path);
-    return { name: !rel.startsWith('..') && !path.isAbsolute(rel) ? rel.split(path.sep).join('/') : it.path, hex: it.digests[o.alg] };
+    return { name: (!rel.startsWith('..') && !path.isAbsolute(rel) ? rel : it.path).split(path.sep).join('/'), hex: it.digests[o.alg] };
   }).filter((l) => path.resolve(dir, l.name) !== path.resolve(r.filePath));
   const part = r.filePath + '.part';
   await fs.promises.writeFile(part, H.formatChecksums(lines, o.alg, o.format), { flag: 'w' });
