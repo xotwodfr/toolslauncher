@@ -106,13 +106,14 @@
     line.words = P.timeWords(line, end, spaced(line)).map((w, k) => ({ text: w.text, start: round2(w.start), end: round2(w.end), ...((same ? old[k].est : true) ? { est: true } : {}) }));
     return line.words;
   }
-  const newLine = (start, text, words, end) => {
-    const l = { uid: S.uid++, start: round2(start), text, ...(Number.isFinite(end) ? { end } : {}) };
+  const newLine = (start, text, words, end, doubt) => {
+    const l = { uid: S.uid++, start: round2(start), text, ...(Number.isFinite(end) ? { end } : {}), ...(doubt ? { doubt: true } : {}) };
     if (Array.isArray(words) && words.length) l.words = copyWords(words);
     return l;
   };
   /** Move a line to start at `t`, taking its words along. */
   function moveLine(line, t) {
+    delete line.doubt;                                   // the user has timed it by hand
     const d = round2(t) - line.start;
     line.start = round2(t);
     if (Number.isFinite(line.end)) line.end = round2(Math.max(line.start, line.end + d));
@@ -150,18 +151,19 @@
     const go = el('button', { type: 'button', class: 'go', 'aria-label': `Play from line ${n}`, title: 'Play from here' }, '▶');
     const del = el('button', { type: 'button', class: 'del', 'aria-label': `Delete line ${n}`, title: 'Delete this line' }, '×');
     const words = el('div', { class: 'words', 'aria-label': `Words of line ${n}, each with its own time` });
-    const row = el('div', { class: 'line' + (S.sel === line ? ' sel' : ''), 'data-uid': String(line.uid) }, go, time, text, del, words);
+    const row = el('div', { class: 'line' + (S.sel === line ? ' sel' : '') + (line.doubt ? ' doubt' : ''), 'data-uid': String(line.uid), ...(line.doubt ? { title: 'Check this line: few of its words were clearly heard, so its timing is less sure' } : {}) }, go, time, text, del, words);
     renderWords(words, line);
     if (S.working) { time.disabled = true; text.disabled = true; go.disabled = true; del.disabled = true; }
     const select = () => { if (S.sel !== line || S.selWord !== -1) selectLine(line); };   // working on the text or time of a line means the whole line
     time.addEventListener('focus', select); text.addEventListener('focus', select);
     row.addEventListener('mousedown', (e) => { if (!e.target.classList.contains('w')) select(); });
     text.addEventListener('input', () => { line.text = text.value; markEdited(); });
+    const checked = () => { if (line.doubt) { delete line.doubt; row.classList.remove('doubt'); row.removeAttribute('title'); } };   // the user has looked at it
     text.addEventListener('change', () => { ensureWords(line); renderWords(words, line); });   // words that no longer match are timed again
     time.addEventListener('change', () => {
       const t = P.parseTime(time.value);
       if (t == null) { time.value = P.formatTime(line.start); toast('Type a time like 1:05.30 (minutes:seconds)', true); return; }
-      moveLine(line, t); markEdited(); sortLines(); renderLines(line, 'time');
+      moveLine(line, t); checked(); markEdited(); sortLines(); renderLines(line, 'time');
     });
     go.addEventListener('click', () => playFrom(line.start));
     del.addEventListener('click', () => {
@@ -258,7 +260,7 @@
     try { res = await window.lm.make(S.song.id, S.language, P.pastedLines(lyrics).length ? lyrics : null, S.model); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
     S.working = false;
     if (res.ok) {
-      S.lines = res.lines.map((l) => newLine(l.start, l.text, l.words, l.end));
+      S.lines = res.lines.map((l) => newLine(l.start, l.text, l.words, l.end, l.doubt));
       S.made = S.lines.map(snapshot);
       S.langCode = res.language || null;
       S.detected = res.languageName + (S.language === 'auto' ? ' (detected)' : '');
@@ -266,7 +268,8 @@
       if (!S.lines.length) toast('No words were found in this song. If it has singing, try choosing its language instead of detecting it.', true);
       else if (res.fromLyrics) {
         const pct = Math.round((res.matched || 0) * 100);
-        toast(pct >= 60 ? `Timed your ${S.lines.length} lines. ${pct}% of the words were clearly heard.` : `Timed your ${S.lines.length} lines, but only ${pct}% of the words were clearly heard: check the timing, or try "Isolate vocals".`, pct < 60);
+        const doubts = S.lines.filter((l) => l.doubt).length;
+        toast(`Timed your ${S.lines.length} lines. ${pct}% of the words were clearly heard.` + (doubts ? ` ${doubts} line${doubts === 1 ? ' is' : 's are'} marked to check.` : ''), pct < 60);
       }
     } else {
       renderLines();
@@ -291,6 +294,7 @@
     const words = ensureWords(line);
     const w = words[k];
     if (!w) return;
+    delete line.doubt;
     t = round2(Math.max(0, t));
     const len = Math.max(0.1, w.end - w.start);
     w.start = t; delete w.est;

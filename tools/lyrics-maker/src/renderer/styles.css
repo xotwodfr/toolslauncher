@@ -56,6 +56,8 @@ body.dragging .drop { border-color: var(--accent); background: rgba(255, 209, 10
 .line.now .words .w.now small { color: var(--on-accent); }
 .line.sel { background: rgba(255, 255, 255, .035); border-left-color: var(--line-strong); }
 .line.now { background: rgba(255, 209, 102, .09); border-left-color: var(--accent); }
+.line.doubt { border-left-color: var(--warn); }
+.line.doubt input.time { color: var(--warn); }
 .line input { width: 100%; padding: 6px 8px; font: inherit; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 0; }
 .line input:hover { border-color: var(--line); }
 .line input:focus { border-color: var(--accent); background: var(--bg); outline: none; }

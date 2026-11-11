@@ -349,6 +349,27 @@ test('matching: pasted words line up with heard words despite misheard, missing 
   const none = W.estimateTimes(Int32Array.from([-1, -1]), [], 60); assert.deepStrictEqual(Array.from(none), [0, 30], 'nothing heard: spread over the song');
 });
 
+test('decoding: a decoder stuck repeating itself is caught (and cut after one repeat); a song repeating a word or phrase a few times is not', () => {
+  assert.strictEqual(W.loopCut([1, 2, 3, 4, 5, 5, 5, 5, 5, 5]), 6, '"ah ah ah ah ah ah": keep the start and one repeat');
+  assert.strictEqual(W.loopCut([1, 7, 8, 7, 8, 7, 8, 7, 8]), 5, 'a two-token phrase four times');
+  assert.strictEqual(W.loopCut([1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]), 6, 'a longer phrase, from where it started');
+  assert.strictEqual(W.loopCut([9, 9, 9, 9, 9]), -1, 'five times "la" is a song, not a loop');
+  assert.strictEqual(W.loopCut([4, 5, 4, 5, 4, 5]), -1, 'a phrase three times is a song');
+  assert.strictEqual(W.loopCut([1, 2, 3, 4]), -1);
+  assert.deepStrictEqual(W.TEMPERATURES.slice(0, 1), [0], 'the first try is always the most likely text');
+});
+
+test('matching: letter by letter, words written together or apart still line up ("lalala" / "la la la"), and common mishearings too', () => {
+  const n = (s) => s.split(' ').map(W.normWord);
+  assert.deepStrictEqual(Array.from(W.matchLetters(n('lalalala la la lala back when you and i'), n('la la la la la la la la back when you and i'))).slice(4), [8, 9, 10, 11, 12], 'the words after "lalala" are matched in place');
+  assert(W.matchLetters(n('lalalala la la lala'), n('la la la la la la la la'))[0] === 0, '"lalalala" is heard as "la la la la"');
+  assert.deepStrictEqual(Array.from(W.matchLetters(n("I said ooh I'm blinded by the lights"), n("I said oh I'm blind by the light"))), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepStrictEqual(Array.from(W.matchLetters(n('every day'), n('everyday'))), [0, 0], 'two pasted words, one heard word');
+  const skip = W.matchLetters(n('one two three four five six'), n('one two five six'));
+  assert.deepStrictEqual([skip[0], skip[1], skip[2], skip[3], skip[4], skip[5]], [0, 1, -1, -1, 2, 3], 'words the model did not hear stay unmatched');
+  assert.deepStrictEqual(Array.from(W.matchLetters([], n('x'))), []); assert.deepStrictEqual(Array.from(W.matchLetters(n('x'), [])), [-1]);
+});
+
 test('timing: under music, a voice coming in is found where the sound gets clearly louder (single drum hits do not count)', () => {
   const sr = 16000; const s = new Float32Array(sr * 2);
   let seed = 3; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;

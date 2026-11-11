@@ -136,7 +136,9 @@ ipcMain.handle('make:start', async (_e, req) => {
         send('make:progress', { fraction: p.fraction, elapsed: p.elapsed, phase: p.phase, eta: p.fraction > 0.12 && p.phase !== 'timing' ? (p.elapsed / p.fraction) * (1 - p.fraction) : null });
       },
     });
-    const lines = r.lines || P.buildLines(r.segments, { spaced: !NO_SPACE.has(r.language) });
+    // pasted lyrics: a line with few of its words heard, that the model also finds unlikely where it was put, may be misplaced
+    const lines = r.lines ? r.lines.map(({ matched, confidence, ...l }) => ({ ...l, ...(matched < 0.5 && confidence < -3 ? { doubt: true } : {}) }))
+      : P.buildLines(r.segments, { spaced: !NO_SPACE.has(r.language) });
     return { ok: true, language: r.language, languageName: P.LANGUAGES[r.language] || r.language, lines, seconds: (Date.now() - t0) / 1000, ...(r.lines ? { fromLyrics: true, matched: r.matched } : {}) };
   } catch (e) {
     if (e && e.cancelled) return { ok: false, cancelled: true };
