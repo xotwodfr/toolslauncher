@@ -17,7 +17,8 @@ let words = null;
 function wordlist() {
   if (!words) {
     const text = fs.readFileSync(path.join(__dirname, 'data', 'eff_large_wordlist.txt'), 'utf8');
-    words = text.split('\n').filter(Boolean).map((l) => l.split('\t')[1]);
+    // "11111<tab>abacus" per line; tolerate Windows line endings and stray spaces, so a word never carries a hidden \r
+    words = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => (l.split('\t')[1] || '').trim()).filter(Boolean);
     if (words.length !== 7776) throw new Error('The word list is damaged');
   }
   return words;

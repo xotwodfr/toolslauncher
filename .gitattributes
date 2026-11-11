@@ -1,3 +1,8 @@
-* text=auto
+* text=auto eol=lf
+# Every text file is checked out with LF on every system, so Windows builds and tests see exactly the bytes that pass on
+# Linux (CRLF checkouts put a "\r" on every word of bundled word lists and changed test inputs).
+# Data whose exact bytes matter is stored as-is, never converted:
+tools/password-vault/src/data/*.txt -text
+tools/password-vault/test/fixtures/*.csv -text
 *.png binary
 *.ico binary
