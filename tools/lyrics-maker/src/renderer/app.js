@@ -9,6 +9,7 @@
     return n;
   };
   const LANG_KEY = 'lyricsmaker.language';
+  const MODEL_KEY = 'lyricsmaker.model';
   const round2 = (x) => Math.round(x * 100) / 100;
 
   const S = {
@@ -19,13 +20,16 @@
     selWord: -1,                   // the selected word of that line, or -1
     tap: null,                     // "Tap words" mode: { line, word } is the next word a tap will time
     langCode: null,                // the language of the lyrics (as made, or from a loaded TTML), written into the TTML
+    model: 'standard',             // the speech model: 'standard' (in the app) or 'accurate' (downloaded once)
+    models: [],                    // [{ id, name, installed, bytes }]
+    modelDownload: null,           // { done, total } while the accurate model is being downloaded
     edited: false,
     working: false,
     language: 'auto',
     detected: null,
     uid: 1,
   };
-  try { S.language = localStorage.getItem(LANG_KEY) || 'auto'; } catch { /* private mode: fine */ }
+  try { S.language = localStorage.getItem(LANG_KEY) || 'auto'; S.model = localStorage.getItem(MODEL_KEY) === 'accurate' ? 'accurate' : 'standard'; } catch { /* private mode: fine */ }
 
   // ---- messages ----------------------------------------------------------------------------------------------------------------
   let toastTimer = null;
@@ -64,6 +68,20 @@
     $('make').textContent = pasted ? (S.lines.length ? 'Time my lyrics again' : 'Time my lyrics') : (S.lines.length ? 'Make lyrics again' : 'Make lyrics');
     $('lyricsCount').textContent = pasted ? `${pasted} line${pasted === 1 ? '' : 's'} to time` : '';
     $('lyricsIn').disabled = S.working;
+    // the speech model: the accurate one must be downloaded once before it can be used
+    const acc = S.models.find((m) => m.id === 'accurate');
+    const needsModel = S.model === 'accurate' && !(acc && acc.installed);
+    $('model').value = S.model; $('model').disabled = S.working;
+    $('modelBox').hidden = S.model !== 'accurate';
+    const dl = S.modelDownload;
+    const gb = acc ? (acc.bytes / 1e9).toFixed(1) : '1.1';
+    $('modelInfo').textContent = needsModel
+      ? (dl ? `Downloading… ${Math.round((dl.done / dl.total) * 100)}% (${(dl.done / 1e9).toFixed(2)} of ${gb} GB)` : `Better at singing, accents and fast words, and up to about twice as slow. A one-time ${gb} GB download from Hugging Face, checked file by file; after that it works offline.`)
+      : 'Downloaded. Better at singing, accents and fast words, and up to about twice as slow.';
+    $('modelGet').hidden = !needsModel || !!dl; $('modelCancel').hidden = !dl; $('modelRemove').hidden = needsModel || S.working;
+    $('modelBar').hidden = !dl;
+    if (dl) { const pct = Math.round((dl.done / dl.total) * 100); $('modelFill').style.width = pct + '%'; $('modelBar').setAttribute('aria-valuenow', String(pct)); }
+    $('make').disabled = needsModel;
     $('load').disabled = !has || S.working;
     $('tap').setAttribute('aria-pressed', S.tap ? 'true' : 'false');
     $('tap').textContent = S.tap ? 'Stop tapping (Esc)' : 'Tap words (W)';
@@ -221,8 +239,7 @@
     const p = player();
     p.pause(); p.src = r.url; p.load();
     $('fileInfo').textContent = `${r.name} · ${P.formatDuration(r.duration)}`;
-    const have = [r.existingTtml && '.ttml', r.existingLrc && '.lrc'].filter(Boolean);
-    $('makeNote').textContent = `Takes about ${P.formatDuration(r.estimate)} on this computer.` + (have.length ? ` This song already has lyrics next to it (${have.join(' and ')}): load them to fix them, or make new ones. Saving over a file keeps the old one as .bak.` : '');
+    updateEstimate();
     showResult('', '');
     renderLines(); clock();
   }
@@ -238,7 +255,7 @@
     renderLines();
     let res;
     const lyrics = $('lyricsIn').value;
-    try { res = await window.lm.make(S.song.id, S.language, P.pastedLines(lyrics).length ? lyrics : null); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
+    try { res = await window.lm.make(S.song.id, S.language, P.pastedLines(lyrics).length ? lyrics : null, S.model); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
     S.working = false;
     if (res.ok) {
       S.lines = res.lines.map((l) => newLine(l.start, l.text, l.words, l.end));
@@ -369,6 +386,28 @@
     showResult(`Saved ${P.baseName(r.path)} (${r.lines} line${r.lines === 1 ? '' : 's'})`, 'ok', r.path, r.backup ? `The file it replaced was kept as ${P.baseName(r.backup)}.` : null);
   }
 
+  // ---- speech models -----------------------------------------------------------------------------------------------------------------------------
+  async function refreshModels() { try { S.models = await window.lm.models(); } catch { S.models = []; } syncControls(); }
+  async function downloadModel() {
+    if (S.modelDownload) return;
+    S.modelDownload = { done: 0, total: (S.models.find((m) => m.id === 'accurate') || {}).bytes || 1 };
+    syncControls();
+    const r = await window.lm.downloadModel('accurate');
+    S.modelDownload = null;
+    if (r.ok) toast('The accurate model is ready. It works offline from now on.');
+    else if (r.cancelled) toast('The download was stopped. Files that had finished are kept, so it goes on from there next time.');
+    else toast(r.error || 'The download failed', true);
+    await refreshModels();
+  }
+  /** "Takes about…": the accurate model can take up to about twice as long. */
+  function updateEstimate() {
+    if (!S.song) return;
+    const r = S.song;
+    const have = [r.existingTtml && '.ttml', r.existingLrc && '.lrc'].filter(Boolean);
+    const est = r.estimate * (S.model === 'accurate' ? 2 : 1);
+    $('makeNote').textContent = `Takes about ${P.formatDuration(est)} on this computer${S.model === 'accurate' ? ' with the accurate model' : ''}.` + (have.length ? ` This song already has lyrics next to it (${have.join(' and ')}): load them to fix them, or make new ones. Saving over a file keeps the old one as .bak.` : '');
+  }
+
   // ---- wiring ------------------------------------------------------------------------------------------------------------------------------
   async function pickSong() { try { await loadSong(await window.lm.pickSong()); } catch (e) { toast((e && e.message) || String(e), true); } }
 
@@ -380,6 +419,15 @@
     lang.value = S.language;
     lang.addEventListener('change', () => { S.language = lang.value; try { localStorage.setItem(LANG_KEY, S.language); } catch { /* fine */ } });
     $('lyricsIn').addEventListener('input', syncControls);
+    $('model').addEventListener('change', () => { S.model = $('model').value === 'accurate' ? 'accurate' : 'standard'; try { localStorage.setItem(MODEL_KEY, S.model); } catch { /* fine */ } updateEstimate(); syncControls(); });
+    $('modelGet').addEventListener('click', downloadModel);
+    $('modelCancel').addEventListener('click', () => window.lm.cancelModel());
+    $('modelRemove').addEventListener('click', async () => {
+      if (!window.confirm('Remove the accurate model from this computer? It can be downloaded again later.')) return;
+      const r = await window.lm.removeModel('accurate');
+      if (!r.ok) toast(r.error || 'Could not remove it', true); else toast('The accurate model was removed.');
+      await refreshModels();
+    });
     $('make').addEventListener('click', make);
     $('cancel').addEventListener('click', () => { $('cancel').disabled = true; $('phase').textContent = 'Stopping…'; window.lm.cancel(); });
     $('play').addEventListener('click', togglePlay);
@@ -447,6 +495,8 @@
     });
     window.lm.onLines((p) => { if (S.working) appendLines(p.lines); });
     window.lm.onOpened((r) => loadSong(r));
+    window.lm.onModelProgress((p) => { if (S.modelDownload) { S.modelDownload = { done: p.done, total: p.total }; syncControls(); } });
+    await refreshModels();
     syncControls();
     try {
       const e = await window.lm.engine();

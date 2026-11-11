@@ -268,6 +268,10 @@ function dropLoops(segments) {
   for (const s of segments) {
     const prev = out[out.length - 1];
     const norm = s.text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    // a stutter: a short segment (up to 3 words) that only repeats the last words of the one before, right after it
+    // (larger models sometimes write the end of a sentence twice); a whole line sung twice is kept
+    const words = norm.split(' ').filter(Boolean);
+    if (prev && words.length && words.length <= 3 && prev.norm !== norm && (' ' + prev.norm).endsWith(' ' + norm) && s.start - prev.end < 1) continue;
     if (prev && prev.norm === norm) run++; else run = 1;
     if (run <= 2) out.push({ ...s, norm });
   }

@@ -448,6 +448,47 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, engineLoaded }) =
       assert((await rowCount()) >= 3, 'lyrics made');
     });
 
+    await step('the accurate model: choosing it asks for the one-time download (real clicks); it downloads with progress, is checked, makes lyrics, and can be removed', async () => {
+      const turbo = path.join(__dirname, '..', 'models', 'turbo');
+      if (!fs.existsSync(path.join(turbo, 'encoder_model_int8.onnx'))) return 'skipped: the accurate model is not in models/turbo';
+      // the model files come from a local server in this test (the app fetches them from Hugging Face)
+      const http = require('http');
+      const server = http.createServer((req, res) => {
+        const f = path.join(turbo, path.basename(decodeURIComponent(req.url)));
+        if (!fs.existsSync(f)) { res.writeHead(404); res.end(); return; }
+        res.writeHead(200, { 'content-length': fs.statSync(f).size }); fs.createReadStream(f).pipe(res);
+      });
+      await new Promise((r) => server.listen(0, '127.0.0.1', r));
+      process.env.LM_MODEL_BASE = `http://127.0.0.1:${server.address().port}`;
+      try {
+        await js('(() => { const s = document.getElementById("model"); s.value = "accurate"; s.dispatchEvent(new Event("change")); })()');
+        eq(await js('document.getElementById("modelBox").hidden'), false, 'the model box opens');
+        assert(/one-time 1\.1 GB download/.test(await js('document.getElementById("modelInfo").textContent')), 'it says what the download is');
+        eq(await js('document.getElementById("make").disabled'), true, 'nothing can be made before it is downloaded');
+        await click('#modelGet');
+        await waitFor('!document.getElementById("modelBar").hidden', 5000, 'progress shown');
+        await waitFor('/Downloading… [1-9]/.test(document.getElementById("modelInfo").textContent)', 60000, 'progress moves');
+        await shot('7-model-download');
+        await waitFor('/accurate model is ready/.test(document.getElementById("toast").textContent)', 300000, 'downloaded and checked');
+        eq(await js('document.getElementById("make").disabled'), false, 'now it can be used');
+        eq(await js('document.getElementById("modelRemove").hidden'), false, 'and removed');
+        await js('(() => { const t = document.getElementById("lyricsIn"); t.value = ""; t.dispatchEvent(new Event("input")); })()');
+        await click('#make');
+        await waitFor('window.__app.S.working', 4000, 'working');
+        await waitFor('!window.__app.S.working', 300000, 'finished with the accurate model');
+        const got = await lines();
+        const wer = SP.wordErrorRate(SP.SENTENCES.slice(0, 3).join(' '), got.map((l) => l.text).join(' '));
+        assert(wer <= 0.1, `the accurate model wrote it down (word error rate ${wer.toFixed(2)})`);
+        notes.accurateWer = Number(wer.toFixed(3));
+        await click('#modelRemove');
+        await waitFor('/accurate model was removed/.test(document.getElementById("toast").textContent)', 20000, 'removed');
+        eq(await js('document.getElementById("make").disabled'), true, 'gone again: it would need downloading');
+        await js('(() => { const s = document.getElementById("model"); s.value = "standard"; s.dispatchEvent(new Event("change")); })()');
+        eq(await js('document.getElementById("make").disabled'), false, 'the standard model is always there');
+      } finally { server.close(); delete process.env.LM_MODEL_BASE; }
+      return undefined;
+    });
+
     await step('a text file and a broken audio file give clear messages and keep the current song', async () => {
       openReturn = notAudio;
       await click('#open');

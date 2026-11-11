@@ -14,6 +14,8 @@ const P = require('../src/plan');
 const A = require('../src/audio');
 const E = require('../src/engine');
 const SP = require('../src/speech');
+const M = require('../src/models');
+const http = require('http');
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
@@ -172,6 +174,9 @@ test('segments: repeated lines are trimmed (a loop of the same line is a failure
   const mk = (txt, n) => Array.from({ length: n }, (_, i) => ({ start: i, end: i + 1, text: txt }));
   assert.strictEqual(W.dropLoops(mk('Thank you.', 9)).length, 2);
   assert.strictEqual(W.dropLoops([...mk('Hey hey', 2), { start: 5, end: 6, text: 'Something else' }, ...mk('Hey hey', 2)]).length, 5);
+  const stutter = [{ start: 13, end: 17, text: 'singing songs we used to know.' }, { start: 17, end: 17.5, text: 'to know.' }, { start: 26, end: 28, text: 'Hold on.' }];
+  assert.deepStrictEqual(W.dropLoops(stutter).map((x) => x.text), ['singing songs we used to know.', 'Hold on.'], 'a repeated sentence end is a stutter');
+  assert.strictEqual(W.dropLoops([{ start: 0, end: 2, text: 'we used to know' }, { start: 5, end: 6, text: 'to know' }]).length, 2, 'an echo sung later is kept');
   assert(W.compressionRatio('la la la la la la la la la la la la la la la la la la la la la la la la') > 3.5);
   assert(W.compressionRatio('The river runs down to the sea and the morning light is warm') < 2);
   assert.strictEqual(W.compressionRatio(''), 0);
@@ -535,6 +540,98 @@ test('model: releasing in the middle of a song waits for it to stop, never crash
   const r = await fresh.transcribe(clip.samples.slice(0, 16000 * 10), { language: 'en' });
   assert(r.segments.length >= 1);
   await fresh.release();
+}));
+
+// ---- the downloadable "accurate" model ---------------------------------------------------------------------------------------------------
+test('models: the accurate model downloads file by file, every file is checked, an interrupted download goes on, a damaged one is refused, cancel leaves nothing half-written', async () => {
+  const files = { 'a.json': Buffer.from('{"x":1}'), 'big.onnx': crypto.randomBytes(3 * 1024 * 1024 + 17) };
+  let served = []; let corrupt = false; let slow = false;
+  const server = http.createServer((req, res) => {
+    const name = decodeURIComponent(req.url.slice(1)); served.push(name);
+    const body = files[name];
+    if (!body) { res.writeHead(404); res.end(); return; }
+    const out = corrupt && name === 'big.onnx' ? Buffer.concat([body.subarray(0, 100), Buffer.from([body[100] ^ 1]), body.subarray(101)]) : body;
+    res.writeHead(200, { 'content-length': out.length });
+    if (!slow) { res.end(out); return; }
+    let i = 0; const t = setInterval(() => { if (i >= out.length || res.destroyed) { clearInterval(t); res.end(); return; } res.write(out.subarray(i, i + 65536)); i += 65536; }, 20);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+  const model = { id: 'accurate', folder: 'test-model', files: Object.entries(files).map(([name, b]) => ({ name, from: name, size: b.length, sha256: sha(b) })) };
+  model.bytes = model.files.reduce((n, f) => n + f.size, 0);
+  const dirs = { bundledDir: modelDir, userDir: path.join(tmp, 'user') };
+  const dir = path.join(dirs.userDir, 'models', 'test-model');
+  const opts = (o = {}) => ({ fetch, model, urlFor: (f) => `${base}/${f.name}`, ...o });
+  try {
+    const progress = [];
+    await M.download('accurate', dirs, opts({ onProgress: (p) => progress.push(p.done) }));
+    for (const [name, b] of Object.entries(files)) assert(fs.readFileSync(path.join(dir, name)).equals(b), name + ' arrived intact');
+    assert.strictEqual(progress[progress.length - 1], model.bytes, 'progress ends at the full size');
+    assert(progress.every((x, i) => !i || x >= progress[i - 1]), 'progress only goes forward');
+    assert(JSON.parse(fs.readFileSync(path.join(dir, 'verified.json'), 'utf8')).revision, 'a record of what was checked');
+    // run again: nothing is fetched again (the files are already right)
+    served = [];
+    await M.download('accurate', dirs, opts());
+    assert.deepStrictEqual(served, [], 'files that are already right are kept');
+    // a damaged file on disk is fetched again; a damaged download is refused and nothing of it is kept
+    fs.writeFileSync(path.join(dir, 'big.onnx'), 'broken');
+    corrupt = true;
+    await assert.rejects(M.download('accurate', dirs, opts()), /did not arrive intact/);
+    assert(!fs.existsSync(path.join(dir, 'big.onnx.part')), 'no half-written file left');
+    corrupt = false;
+    served = [];
+    await M.download('accurate', dirs, opts());
+    assert.deepStrictEqual(served, ['big.onnx'], 'only the damaged file is fetched again');
+    // cancel in the middle
+    fs.rmSync(path.join(dir, 'big.onnx'));
+    slow = true;
+    const ac = new AbortController();
+    const p = M.download('accurate', dirs, opts({ signal: ac.signal }));
+    setTimeout(() => ac.abort(), 150);
+    await assert.rejects(p, (e) => e.cancelled === true || e.name === 'AbortError');
+    assert(!fs.existsSync(path.join(dir, 'big.onnx.part')) && !fs.existsSync(path.join(dir, 'big.onnx')), 'cancel leaves nothing half-written');
+    // the real list: standard is in the app; accurate is not downloaded in this test folder; remove only touches its own folder
+    const list = M.list(dirs);
+    assert.deepStrictEqual(list.map((m) => [m.id, m.bundled]), [['standard', true], ['accurate', false]]);
+    assert.strictEqual(list[0].installed, true); assert.strictEqual(list[1].installed, false);
+    assert(list[1].bytes > 1e9 && list[1].bytes < 1.2e9, 'about 1.1 GB');
+    await assert.rejects(M.remove('standard', dirs), /part of the app/);
+    assert.throws(() => M.dirFor('../evil', dirs), /Unknown model/);
+  } finally { server.close(); }
+});
+
+test('models: the pinned accurate model (if it is on this computer) has exactly the pinned sizes and SHA-256 hashes', async () => {
+  const dir = path.join(modelDir, 'turbo');
+  if (!fs.existsSync(path.join(dir, 'encoder_model_int8.onnx'))) { console.log('     (skipped: the accurate model is not in models/turbo)'); return; }
+  for (const f of M.MODELS.accurate.files) {
+    assert.strictEqual(fs.statSync(path.join(dir, f.name)).size, f.size, f.name + ' size');
+    assert.strictEqual(await M.hashFile(path.join(dir, f.name)), f.sha256, f.name + ' hash');
+  }
+  const t = W.loadAssets(dir);
+  assert.strictEqual(t.nMels, 128); assert.strictEqual(t.layers, 4); assert(t.alignmentHeads.length > 0, 'it can time words');
+  assert.notStrictEqual(t.noSpeech, 50362, 'its "no speech" token is read from its own files');
+});
+
+test('model: the accurate model (if present) writes the spoken sentences down and times pasted lyrics too (spoken test voices)', skipUnlessSpeech(async () => {
+  const dir = path.join(modelDir, 'turbo');
+  if (!fs.existsSync(path.join(dir, 'encoder_model_int8.onnx'))) { console.log('     (skipped: the accurate model is not in models/turbo)'); return; }
+  const at = [1.0, 13.0, 26.0];
+  const clip = await SP.makeClip(SP.SENTENCES.slice(0, 3).map((text, i) => ({ text, at: at[i] })), 45, path.join(tmp, 'turbo.wav'));
+  const eng = await E.createEngine({ dir });
+  try {
+    const t0 = Date.now();
+    const r = await eng.transcribe(clip.samples.slice(), { language: 'auto' });
+    const secs = (Date.now() - t0) / 1000;
+    const text = r.segments.map((x) => x.text).join(' ');
+    const wer = SP.wordErrorRate(SP.SENTENCES.slice(0, 3).join(' '), text);
+    assert.strictEqual(r.language, 'en'); assert(wer <= 0.1, `word error rate ${wer.toFixed(2)}: ${text}`);
+    near(r.segments[0].start, at[0], 0.5); assert(r.segments.some((x) => Math.abs(x.start - at[1]) < 0.6) && r.segments.some((x) => Math.abs(x.start - at[2]) < 0.6), 'sentence starts');
+    const lyrics = ['We walked all night through the empty streets,', 'singing songs we used to know.'];
+    const a = await eng.transcribe(clip.samples.slice(), { language: 'en', lyrics: ['The river runs down to the sea,', 'and the morning light is warm on the hills.', ...lyrics, 'Hold on to the little things,', 'they will carry you home.'] });
+    near(a.lines[2].start, at[1], 0.35, 'pasted lyrics timed with the accurate model');
+    console.log(`     accurate model: WER ${wer.toFixed(2)}, ${secs.toFixed(1)} s for 45 s of audio`);
+  } finally { await eng.release(); }
 }));
 
 test('model: a missing model file gives a clear message', async () => {

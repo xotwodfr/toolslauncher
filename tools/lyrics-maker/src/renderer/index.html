@@ -53,6 +53,13 @@
           <fieldset id="makeSet" disabled>
             <legend>Make</legend>
             <div class="opt"><label for="lang">Language</label><select id="lang" aria-label="Language of the lyrics"></select></div>
+            <div class="opt"><label for="model">Model</label><select id="model" aria-label="Speech model">
+              <option value="standard">Standard (built in)</option><option value="accurate">Accurate (large-v3-turbo)</option></select></div>
+            <div id="modelBox" class="opt col" hidden>
+              <p id="modelInfo" class="muted small"></p>
+              <div class="row left"><button id="modelGet" class="btn small">Download (1.1 GB)</button><button id="modelCancel" class="btn ghost small" hidden>Cancel</button><button id="modelRemove" class="btn ghost small" hidden>Remove it</button></div>
+              <div id="modelBar" class="progress" role="progressbar" aria-label="Download progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="modelFill"></div></div>
+            </div>
             <div class="opt col"><label for="lyricsIn">Lyrics (optional)</label>
               <textarea id="lyricsIn" rows="6" spellcheck="false" placeholder="Paste the song's lyrics here, one line per row, and every word is timed to the song. Leave empty to let it listen for the words."></textarea>
               <span id="lyricsCount" class="muted small"></span></div>

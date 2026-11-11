@@ -7,6 +7,7 @@ const { Readable } = require('stream');
 const P = require('./plan');
 const A = require('./audio');
 const E = require('./engine');
+const M = require('./models');
 
 const E2E = process.argv.includes('--e2e');
 const SELFTEST = process.argv.find((a) => a.startsWith('--self-test='));
@@ -21,6 +22,9 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'lyrics', privileges: { standard
 let win = null;
 let engine = null;
 let engineStarting = null;
+let engineModel = null;                // which speech model the loaded engine is
+let modelJob = null;                   // { abort } while a model is being downloaded
+const modelDirs = () => ({ bundledDir: E.modelDir(), userDir: app.getPath('userData') });
 let idleTimer = null;
 let job = null;                       // { abort } - one song at a time
 let nextId = 1;
@@ -85,12 +89,20 @@ const armIdle = () => {
   if (idleTimer.unref) idleTimer.unref();
 };
 async function dropEngine() {
-  const e = engine; engine = null; engineStarting = null;
+  const e = engine; engine = null; engineStarting = null; engineModel = null;
   if (e) { try { await e.release(); } catch { /* ignore */ } }
 }
-async function getEngine() {
+async function getEngine(model = 'standard') {
+  if ((engine || engineStarting) && engineModel !== model) await dropEngine();   // another model was asked for: let the old one go first
+  engineModel = model;
   if (engine) return engine;
-  if (!engineStarting) engineStarting = E.createEngine().then((e) => { engine = e; return e; }, (err) => { engineStarting = null; throw err; });
+  if (!engineStarting) {
+    const starting = E.createEngine({ dir: M.dirFor(model, modelDirs()) }).then((e) => {
+      if (engineStarting !== starting) { e.release().catch(() => {}); throw new Error('The speech model was changed while it was starting'); }   // let go in the meantime
+      engine = e; return e;
+    }, (err) => { if (engineStarting === starting) { engineStarting = null; engineModel = null; } throw err; });
+    engineStarting = starting;
+  }
   return engineStarting;
 }
 
@@ -105,8 +117,11 @@ ipcMain.handle('make:start', async (_e, req) => {
     const language = (req && req.language) || 'auto';
     if (language !== 'auto' && !P.LANGUAGES[language]) throw new P.UserError('Unknown language');
     const lyrics = typeof (req && req.lyrics) === 'string' ? P.pastedLines(req.lyrics) : [];   // the user's own lyrics, to be timed
-    send('make:phase', { phase: engine ? 'reading' : 'loading' });
-    const eng = await getEngine();
+    const model = (req && req.model) || 'standard';
+    if (!M.MODELS[model]) throw new P.UserError('Unknown model');
+    if (!M.installed(model, modelDirs())) throw new P.UserError('The accurate model is not downloaded yet. Download it first (under Model), or choose Standard.');
+    send('make:phase', { phase: engine && engineModel === model ? 'reading' : 'loading' });
+    const eng = await getEngine(model);
     if (ac.signal.aborted) return { ok: false, cancelled: true };
     let last = 0;
     const t0 = Date.now();
@@ -129,6 +144,40 @@ ipcMain.handle('make:start', async (_e, req) => {
   } finally { powerSaveBlocker.stop(blocker); job = null; armIdle(); }
 });
 ipcMain.handle('make:cancel', () => { if (job) job.abort(); });
+
+// ---- speech models ------------------------------------------------------------------------------------------------------------
+ipcMain.handle('models:list', () => M.list(modelDirs()));
+ipcMain.handle('models:download', async (_e, id) => {
+  if (modelJob) return { ok: false, error: 'A download is already running' };
+  if (!M.MODELS[id] || M.MODELS[id].bundled) return { ok: false, error: 'Unknown model' };
+  const ac = new AbortController();
+  modelJob = { abort: () => ac.abort() };
+  const blocker = powerSaveBlocker.start('prevent-app-suspension');
+  let last = 0;
+  try {
+    const { net } = require('electron');
+    // in the window tests, the files come from a local test server instead of the internet
+    const base = (E2E && process.env.LM_MODEL_BASE) || null;
+    await M.download(id, modelDirs(), {
+      fetch: (url, init) => net.fetch(url, init), signal: ac.signal,
+      ...(base ? { urlFor: (f) => base.replace(/\/$/, '') + '/' + f.name } : {}),
+      onProgress: (p) => { const now = Date.now(); if (now - last > 200 || p.done === p.total) { last = now; send('models:progress', { id, ...p }); } },
+    });
+    return { ok: true };
+  } catch (e) {
+    if (e && e.cancelled) return { ok: false, cancelled: true };
+    return { ok: false, error: cleanError(e) };
+  } finally { powerSaveBlocker.stop(blocker); modelJob = null; }
+});
+ipcMain.handle('models:cancel', () => { if (modelJob) modelJob.abort(); });
+ipcMain.handle('models:remove', async (_e, id) => {
+  try {
+    if (job && engineModel === id) throw new P.UserError('Wait until the lyrics are made');
+    if (engineModel === id) await dropEngine();
+    await M.remove(id, modelDirs());
+    return { ok: true };
+  } catch (e) { return { ok: false, error: cleanError(e) }; }
+});
 
 // ---- saving -----------------------------------------------------------------------------------------------------------------------
 const SAVE_KINDS = {
@@ -249,7 +298,7 @@ function registerProtocol() {
 // ---- start up ----------------------------------------------------------------------------------------------------------------------------
 const pathsFromArgs = (argv) => argv.slice(app.isPackaged ? 1 : 2).filter((a) => a && !a.startsWith('-') && path.isAbsolute(a) && P.isAudio(a));
 async function openAndSend(paths) { send('song:opened', await openSong(paths[0])); }
-function cleanUp() { if (job) job.abort(); clearTimeout(idleTimer); const e = engine; engine = null; if (e) e.release().catch(() => {}); }
+function cleanUp() { if (job) job.abort(); if (modelJob) modelJob.abort(); clearTimeout(idleTimer); const e = engine; engine = null; if (e) e.release().catch(() => {}); }
 
 const gotLock = SELFTEST || E2E ? true : app.requestSingleInstanceLock();
 if (SELFTEST) {
