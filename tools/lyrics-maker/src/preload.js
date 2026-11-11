@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('lm', {
   pathForFile: (file) => webUtils.getPathForFile(file),
   openSong: (p) => ipcRenderer.invoke('song:open', p),
   forget: (id) => ipcRenderer.invoke('song:forget', id),
-  make: (id, language) => ipcRenderer.invoke('make:start', { id, language }),
+  make: (id, language, lyrics) => ipcRenderer.invoke('make:start', { id, language, lyrics }),
   cancel: () => ipcRenderer.invoke('make:cancel'),
   save: (id, kind, lines, language) => ipcRenderer.invoke('lyrics:save', { id, kind, lines, language }),
   load: (id) => ipcRenderer.invoke('lyrics:load', { id }),

@@ -60,7 +60,10 @@
     $('timeSet').disabled = !lines; $('saveSet').disabled = !lines;
     $('revert').disabled = !S.edited || S.working;
     $('open').disabled = S.working;
-    $('make').textContent = S.lines.length ? 'Make lyrics again' : 'Make lyrics';
+    const pasted = P.pastedLines($('lyricsIn').value).length;
+    $('make').textContent = pasted ? (S.lines.length ? 'Time my lyrics again' : 'Time my lyrics') : (S.lines.length ? 'Make lyrics again' : 'Make lyrics');
+    $('lyricsCount').textContent = pasted ? `${pasted} line${pasted === 1 ? '' : 's'} to time` : '';
+    $('lyricsIn').disabled = S.working;
     $('load').disabled = !has || S.working;
     $('tap').setAttribute('aria-pressed', S.tap ? 'true' : 'false');
     $('tap').textContent = S.tap ? 'Stop tapping (Esc)' : 'Tap words (W)';
@@ -214,7 +217,7 @@
     const old = S.song;
     S.song = r; S.lines = []; S.made = []; S.sel = null; S.selWord = -1; S.tap = null; S.edited = false; S.detected = null; S.langCode = null; lastNow = -2;
     banner('');
-    if (old) window.lm.forget(old.id);
+    if (old) { window.lm.forget(old.id); $('lyricsIn').value = ''; }   // a new song: its own lyrics
     const p = player();
     p.pause(); p.src = r.url; p.load();
     $('fileInfo').textContent = `${r.name} · ${P.formatDuration(r.duration)}`;
@@ -234,7 +237,8 @@
     $('cancel').disabled = false;
     renderLines();
     let res;
-    try { res = await window.lm.make(S.song.id, S.language); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
+    const lyrics = $('lyricsIn').value;
+    try { res = await window.lm.make(S.song.id, S.language, P.pastedLines(lyrics).length ? lyrics : null); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
     S.working = false;
     if (res.ok) {
       S.lines = res.lines.map((l) => newLine(l.start, l.text, l.words, l.end));
@@ -243,6 +247,10 @@
       S.detected = res.languageName + (S.language === 'auto' ? ' (detected)' : '');
       renderLines();
       if (!S.lines.length) toast('No words were found in this song. If it has singing, try choosing its language instead of detecting it.', true);
+      else if (res.fromLyrics) {
+        const pct = Math.round((res.matched || 0) * 100);
+        toast(pct >= 60 ? `Timed your ${S.lines.length} lines. ${pct}% of the words were clearly heard.` : `Timed your ${S.lines.length} lines, but only ${pct}% of the words were clearly heard: check the timing, or try "Isolate vocals".`, pct < 60);
+      }
     } else {
       renderLines();
       if (!res.cancelled) banner(res.error || 'Something went wrong');
@@ -371,6 +379,7 @@
     for (const l of P.languageList()) lang.append(el('option', { value: l.code }, l.name));
     lang.value = S.language;
     lang.addEventListener('change', () => { S.language = lang.value; try { localStorage.setItem(LANG_KEY, S.language); } catch { /* fine */ } });
+    $('lyricsIn').addEventListener('input', syncControls);
     $('make').addEventListener('click', make);
     $('cancel').addEventListener('click', () => { $('cancel').disabled = true; $('phase').textContent = 'Stopping…'; window.lm.cancel(); });
     $('play').addEventListener('click', togglePlay);
@@ -433,7 +442,7 @@
       if (!S.working) return;
       const pct = Math.round(p.fraction * 100);
       $('bar').classList.remove('indeterminate'); $('fill').style.width = pct + '%'; $('bar').setAttribute('aria-valuenow', String(pct));
-      $('phase').textContent = `Listening… ${pct}%`;
+      $('phase').textContent = p.phase === 'timing' ? `Timing your lyrics… ${pct}%` : `Listening… ${pct}%`;
       $('eta').textContent = etaText(p.eta);
     });
     window.lm.onLines((p) => { if (S.working) appendLines(p.lines); });

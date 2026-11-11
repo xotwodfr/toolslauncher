@@ -53,6 +53,9 @@
           <fieldset id="makeSet" disabled>
             <legend>Make</legend>
             <div class="opt"><label for="lang">Language</label><select id="lang" aria-label="Language of the lyrics"></select></div>
+            <div class="opt col"><label for="lyricsIn">Lyrics (optional)</label>
+              <textarea id="lyricsIn" rows="6" spellcheck="false" placeholder="Paste the song's lyrics here, one line per row, and every word is timed to the song. Leave empty to let it listen for the words."></textarea>
+              <span id="lyricsCount" class="muted small"></span></div>
             <div class="opt"><button id="make" class="btn primary">Make lyrics</button><button id="load" class="btn small" title="Open a .ttml or .lrc file to fix its timing">Load lyrics file…</button></div>
             <p id="makeNote" class="muted small"></p>
           </fieldset>

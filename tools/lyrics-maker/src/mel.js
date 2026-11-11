@@ -22,17 +22,18 @@ const LOG_STEP = Math.log(6.4) / 27;
 const hzToMel = (f) => (f >= MIN_LOG_HZ ? MIN_LOG_MEL + Math.log(f / MIN_LOG_HZ) / LOG_STEP : f / F_SP);
 const melToHz = (m) => (m >= MIN_LOG_MEL ? MIN_LOG_HZ * Math.exp(LOG_STEP * (m - MIN_LOG_MEL)) : m * F_SP);
 
-let cache = null;
-function tables() {
-  if (cache) return cache;
+const caches = new Map();
+/** The filter bank and FFT tables for `nMels` bands (80 for Whisper small, 128 for large-v3). */
+function tables(nMels = N_MELS) {
+  if (caches.has(nMels)) return caches.get(nMels);
   // triangular filters, area-normalised, as sparse [first bin, weights[]] per mel band
-  const edges = new Float64Array(N_MELS + 2);
+  const edges = new Float64Array(nMels + 2);
   const mMax = hzToMel(SAMPLE_RATE / 2);
-  for (let i = 0; i < N_MELS + 2; i++) edges[i] = melToHz((mMax * i) / (N_MELS + 1));
+  for (let i = 0; i < nMels + 2; i++) edges[i] = melToHz((mMax * i) / (nMels + 1));
   const fft = new Float64Array(N_BINS);
   for (let i = 0; i < N_BINS; i++) fft[i] = (i * SAMPLE_RATE) / N_FFT;
   const bands = [];
-  for (let m = 0; m < N_MELS; m++) {
+  for (let m = 0; m < nMels; m++) {
     const lo = edges[m]; const mid = edges[m + 1]; const hi = edges[m + 2];
     const enorm = 2 / (hi - lo);
     let first = -1; const w = [];
@@ -50,17 +51,19 @@ function tables() {
   const cos = new Float64Array(N_BINS * N_FFT);
   const sin = new Float64Array(N_BINS * N_FFT);
   for (let k = 0; k < N_BINS; k++) for (let n = 0; n < N_FFT; n++) { const a = (2 * Math.PI * k * n) / N_FFT; cos[k * N_FFT + n] = Math.cos(a); sin[k * N_FFT + n] = Math.sin(a); }
-  cache = { bands, window, cos, sin, edges };
-  return cache;
+  const t = { bands, window, cos, sin, edges };
+  caches.set(nMels, t);
+  return t;
 }
 
 /**
  * The log-mel input for the 30 second window of `samples` starting at sample `offset` (shorter windows are padded with silence).
  * @param {Float32Array} samples 16 kHz mono
- * @returns {Float32Array} 80 * 3000, band by band
+ * @param {number} [nMels] 80 (Whisper small) or 128 (large-v3)
+ * @returns {Float32Array} nMels * 3000, band by band
  */
-function logMel(samples, offset = 0) {
-  const { bands, window, cos, sin } = tables();
+function logMel(samples, offset = 0, nMels = N_MELS) {
+  const { bands, window, cos, sin } = tables(nMels);
   const pad = N_FFT / 2;
   // the 30 second window, silence-padded, then reflect-padded by 200 samples each side (what centre=True does)
   const win = new Float32Array(N_SAMPLES);
@@ -69,7 +72,7 @@ function logMel(samples, offset = 0) {
   const padded = new Float32Array(N_SAMPLES + 2 * pad);
   padded.set(win, pad);
   for (let i = 0; i < pad; i++) { padded[pad - 1 - i] = win[i + 1]; padded[pad + N_SAMPLES + i] = win[N_SAMPLES - 2 - i]; }
-  const mel = new Float32Array(N_MELS * N_FRAMES);
+  const mel = new Float32Array(nMels * N_FRAMES);
   const power = new Float64Array(N_BINS);
   const frame = new Float64Array(N_FFT);
   let top = -Infinity;
@@ -82,7 +85,7 @@ function logMel(samples, offset = 0) {
       for (let n = 0; n < N_FFT; n++) { const v = frame[n]; re += v * cos[row + n]; im -= v * sin[row + n]; }
       power[k] = re * re + im * im;
     }
-    for (let m = 0; m < N_MELS; m++) {
+    for (let m = 0; m < nMels; m++) {
       const b = bands[m];
       let s = 0;
       for (let j = 0; j < b.w.length; j++) s += b.w[j] * power[b.first + j];

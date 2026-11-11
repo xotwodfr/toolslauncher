@@ -104,24 +104,25 @@ ipcMain.handle('make:start', async (_e, req) => {
     const s = registered(req && req.id);
     const language = (req && req.language) || 'auto';
     if (language !== 'auto' && !P.LANGUAGES[language]) throw new P.UserError('Unknown language');
+    const lyrics = typeof (req && req.lyrics) === 'string' ? P.pastedLines(req.lyrics) : [];   // the user's own lyrics, to be timed
     send('make:phase', { phase: engine ? 'reading' : 'loading' });
     const eng = await getEngine();
     if (ac.signal.aborted) return { ok: false, cancelled: true };
     let last = 0;
     const t0 = Date.now();
     const r = await E.makeLyrics(eng, s.path, {
-      language, signal: ac.signal,
+      language, signal: ac.signal, lyrics: lyrics.length ? lyrics : null,
       onPhase: (phase) => send('make:phase', { phase }),
       onSegments: (segments) => send('make:lines', { lines: P.buildLines(segments, { spaced: language === 'auto' || !NO_SPACE.has(language) }) }),
       onProgress: (p) => {
         const now = Date.now();
         if (now - last < 150 && p.fraction < 1) return;
         last = now;
-        send('make:progress', { fraction: p.fraction, elapsed: p.elapsed, eta: p.fraction > 0.12 ? (p.elapsed / p.fraction) * (1 - p.fraction) : null });
+        send('make:progress', { fraction: p.fraction, elapsed: p.elapsed, phase: p.phase, eta: p.fraction > 0.12 && p.phase !== 'timing' ? (p.elapsed / p.fraction) * (1 - p.fraction) : null });
       },
     });
-    const lines = P.buildLines(r.segments, { spaced: !NO_SPACE.has(r.language) });
-    return { ok: true, language: r.language, languageName: P.LANGUAGES[r.language] || r.language, lines, seconds: (Date.now() - t0) / 1000 };
+    const lines = r.lines || P.buildLines(r.segments, { spaced: !NO_SPACE.has(r.language) });
+    return { ok: true, language: r.language, languageName: P.LANGUAGES[r.language] || r.language, lines, seconds: (Date.now() - t0) / 1000, ...(r.lines ? { fromLyrics: true, matched: r.matched } : {}) };
   } catch (e) {
     if (e && e.cancelled) return { ok: false, cancelled: true };
     return { ok: false, error: cleanError(e) };

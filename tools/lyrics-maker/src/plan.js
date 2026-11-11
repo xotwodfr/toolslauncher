@@ -362,6 +362,17 @@
     return out.sort((a, b) => a.start - b.start);
   }
 
+  /**
+   * The user's pasted lyrics as lines to time: one per row, blank rows dropped, and rows that are only a section heading or a
+   * note in brackets ("[Chorus]", "(x2)", "[Verse 2: Someone]") left out, since nobody sings them.
+   */
+  function pastedLines(text) {
+    return String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n')
+      .map((l) => l.replace(/\s+/g, ' ').trim())
+      .filter((l) => l && !/^[\[(][^\])]*[\])]$/.test(l) && /[\p{L}\p{N}]/u.test(l))
+      .slice(0, 2000).map((l) => l.slice(0, 300));
+  }
+
   /** Move every line (and every word in it) by `delta` seconds (never before 0). */
   const mv = (x, delta) => Math.max(0, Math.round((x + delta) * 1000) / 1000);
   const shiftLines = (lines, delta) => lines.map((l) => ({
@@ -385,6 +396,6 @@
   return {
     INPUT_EXTS, MAX_SECONDS, UserError, extOf, isAudio, baseName, LANGUAGES, languageList, formatTime, parseTime, lrcStamp, cleanText,
     buildLines, formatLrc, formatPlain, parseLrc, shiftLines, currentLine, estimateSeconds, formatDuration, defaultName,
-    splitWords, looksUnspaced, lineEnd, timeWords, timedLines, currentWord, ttmlTime, parseTtmlTime, formatTtml, parseTtml, xmlEscape,
+    pastedLines, splitWords, looksUnspaced, lineEnd, timeWords, timedLines, currentWord, ttmlTime, parseTtmlTime, formatTtml, parseTtml, xmlEscape,
   };
 }));

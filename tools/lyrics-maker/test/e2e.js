@@ -412,6 +412,30 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, engineLoaded }) =
       assert((await rowCount()) >= 3, 'the lyrics are back');
     });
 
+    await step('pasted lyrics (real Ctrl+V into the box, real click): the button says "Time my lyrics", and the result is exactly the pasted lines with every word timed', async () => {
+      const { clipboard } = require('electron');
+      const lyrics = ['[Verse 1]', 'The river runs down to the sea,', 'and the morning light is warm on the hills.', '', 'We walked all night through the empty streets,', 'singing songs we used to know.', '[Chorus]', 'Hold on to the little things,', 'they will carry you home.'];
+      clipboard.writeText(lyrics.join('\r\n'));
+      await click('#lyricsIn');
+      await key('v', ['control']);
+      await waitFor('document.getElementById("lyricsIn").value.includes("carry you home")', 3000, 'pasted');
+      eq(await js('document.getElementById("make").textContent'), 'Time my lyrics again', 'the button says what it will do');
+      eq(await js('document.getElementById("lyricsCount").textContent'), '6 lines to time', 'headings and blank rows are not counted');
+      await click('#make');
+      await waitFor('window.__app.S.working', 4000, 'working');
+      await waitFor('/Timing your lyrics/.test(document.getElementById("phase").textContent)', 120000, 'the timing phase is shown');
+      await waitFor('!window.__app.S.working', 120000, 'finished');
+      const got = await fullLines();
+      const want = lyrics.filter((l) => l && !l.startsWith('['));
+      eq(got.map((l) => l.text), want, 'the pasted lines, in order');
+      got.forEach((l, i) => { eq(l.words.map((w) => w.text), want[i].split(' '), `words of line ${i + 1}`); assert(l.words.every((w) => !w.est), 'every word has a real time'); });
+      near(got[0].start, at[0], 0.4, 'first line'); near(got[2].start, at[1], 0.4, 'third line'); near(got[4].start, at[2], 0.4, 'fifth line');
+      assert(/Timed your 6 lines/.test(await js('document.getElementById("toast").textContent')), 'says how it went: ' + await js('document.getElementById("toast").textContent'));
+      await shot('6-pasted-lyrics');
+      await js('(() => { const t = document.getElementById("lyricsIn"); t.value = ""; t.dispatchEvent(new Event("input")); })()');
+      eq(await js('document.getElementById("make").textContent'), 'Make lyrics again', 'an empty box means listening for the words again');
+    });
+
     await step('the speech model is let go when idle (memory given back), and a forced language is accepted', async () => {
       const end = Date.now() + 20000;
       while (engineLoaded() && Date.now() < end) await sleep(200);

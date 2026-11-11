@@ -308,6 +308,51 @@ test('words: a changed line keeps word times when the words still line up, and s
   assert.strictEqual(t[2].end, 12, 'the last line ends with the song');
 });
 
+test('pasted lyrics: one line per row; blank rows, section headings and notes in brackets are left out', () => {
+  assert.deepStrictEqual(P.pastedLines('[Verse 1]\r\nI said, ooh, I\'m blinded by the lights\n\n(x2)\n  No, I can\'t   sleep \n[Chorus: Someone]\n♪\n(Ooh, yeah) singing\n'),
+    ["I said, ooh, I'm blinded by the lights", "No, I can't sleep", '(Ooh, yeah) singing'], 'a sung bracket next to words is kept');
+  assert.deepStrictEqual(P.pastedLines(''), []); assert.deepStrictEqual(P.pastedLines(null), []);
+  assert.strictEqual(P.pastedLines('x\n'.repeat(3000)).length, 2000, 'a sane limit');
+});
+
+test('tokens: text is turned into exactly the tokens the model writes itself, and back', () => {
+  const t = T();
+  for (const text of [" Hello world, it's me!", " I'm blinded by the lights", ' Café 2024 — naïve', ' 你好世界', '  two  spaces', ' emoji 🎵 ok']) {
+    const ids = W.encodeText(t, text);
+    assert(ids.every((id) => Number.isInteger(id) && id < t.eot), 'plain text tokens only');
+    assert.strictEqual(Buffer.concat(ids.map((id) => t.pieces[id])).toString('utf8'), text, 'the bytes come back exactly: ' + text);
+  }
+  // the most common words are one token each, with the leading space (as the model writes them)
+  assert.deepStrictEqual(W.encodeText(t, ' the').length, 1); assert.deepStrictEqual(W.encodeText(t, ' and the').length, 2);
+});
+
+test('matching: pasted words line up with heard words despite misheard, missing and extra words, and repeated choruses', () => {
+  const norm = (s) => s.split(' ').map(W.normWord);
+  assert.strictEqual(W.normWord('Can\'t,'), 'cant'); assert.strictEqual(W.normWord('Été!'), 'ete');
+  assert(W.editSimilarity('walked', 'walk') >= 0.6 && W.editSimilarity('lights', 'fight') < 0.67 && W.editSimilarity('a', 'a') === 1);
+  const pasted = norm('I said ooh I\'m blinded by the lights No I can\'t sleep until I feel your touch I said ooh I\'m blinded by the lights');
+  const heard = norm('I said oh I\'m blind by the light no I can sleep until I feel your touch thank you I said ooh I\'m blinded by the lights');
+  const m = W.matchWords(pasted, heard);
+  assert.strictEqual(m[4], 4, '"blinded" matches "blind"'); assert.strictEqual(m[7], 7, '"lights" matches "light"');
+  assert.strictEqual(m[10], 10, '"can\'t" matches "can"');
+  assert.deepStrictEqual(Array.from(m.slice(17)), [19, 20, 21, 22, 23, 24, 25, 26], 'the repeated chorus lines up with its own repeat, after the extra words');
+  for (let i = 1; i < m.length; i++) if (m[i] >= 0 && m[i - 1] >= 0) assert(m[i] > m[i - 1], 'in order');
+  // a line the model did not hear at all gets times between its neighbours
+  const est = W.estimateTimes(Int32Array.from([0, 1, -1, -1, 2]), [10, 11, 20], 60);
+  assert.deepStrictEqual(Array.from(est).map((x) => Math.round(x * 100) / 100), [10, 11, 14, 17, 20]);
+  const before = W.estimateTimes(Int32Array.from([-1, -1, 0]), [5], 60); assert.deepStrictEqual(Array.from(before).map((x) => Math.round(x * 100) / 100), [4.3, 4.65, 5]);
+  const none = W.estimateTimes(Int32Array.from([-1, -1]), [], 60); assert.deepStrictEqual(Array.from(none), [0, 30], 'nothing heard: spread over the song');
+});
+
+test('timing: under music, a voice coming in is found where the sound gets clearly louder (single drum hits do not count)', () => {
+  const sr = 16000; const s = new Float32Array(sr * 2);
+  let seed = 3; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+  for (let i = 0; i < s.length; i++) { const t = i / sr; s[i] = 0.05 * rnd() + ((t * 4) % 1 < 0.03 ? 0.2 * rnd() : 0) + (t >= 1.2 ? 0.4 * Math.sin(2 * Math.PI * 200 * t) : 0); }
+  near(W.riseOnset(s, sr, 0, 2), 1.2, 0.1, 'the voice comes in at 1.2 s');
+  const flat = new Float32Array(sr); for (let i = 0; i < flat.length; i++) flat[i] = 0.1 * rnd();
+  assert.strictEqual(W.riseOnset(flat, sr, 0, 1), null, 'steady music alone: nothing');
+});
+
 test('ttml: word-synced lyrics are written as TTML with a <span> per word, escaped, and read back exactly', () => {
   assert.strictEqual(P.ttmlTime(0), '00:00:00.000'); assert.strictEqual(P.ttmlTime(65.4), '00:01:05.400'); assert.strictEqual(P.ttmlTime(3725.0006), '01:02:05.001'); assert.strictEqual(P.ttmlTime(59.9996), '00:01:00.000'); assert.strictEqual(P.ttmlTime(-3), '00:00:00.000');
   for (const [s, v] of [['00:01:05.400', 65.4], ['1:05.4', 65.4], ['01:02:05', 3725], ['65.4s', 65.4], ['1200ms', 1.2], ['1.5m', 90], ['0.5h', 1800], ['12.25', 12.25]]) near(P.parseTtmlTime(s), v, 1e-9, s);
@@ -437,6 +482,31 @@ test('model: spoken sentences are written down correctly, with their start times
   assert(progress.length >= 6 && progress.every((p, i) => i === 0 || p.fraction >= progress[i - 1].fraction - 1e-9), 'progress only goes forward');
   assert(progress[progress.length - 1].fraction === 1 && progress.some((p) => p.language === 'en'), 'progress ends at 1 and reports the language');
   console.log(`     starts ${seen.join(', ')} (truth ${at.join(', ')}); ${secs.toFixed(1)} s for 45 s of audio`);
+}));
+
+test('model: pasted lyrics come back exactly as pasted (lines and words), each word timed, also with music under the voice (spoken test voices)', skipUnlessSpeech(async () => {
+  const eng = await getEngine();
+  const at = [1.0, 13.0, 26.0];
+  const clip = await SP.makeClip(SP.SENTENCES.slice(0, 3).map((text, i) => ({ text, at: at[i] })), 45, path.join(tmp, 'pasted.wav'));
+  const lyrics = ['The river runs down to the sea,', 'and the morning light is warm on the hills.', 'We walked all night through the empty streets,', 'singing songs we used to know.', 'Hold on to the little things,', 'they will carry you home.'];
+  let pw = 0; for (const v of clip.samples) pw += v * v; const rms = Math.sqrt(pw / clip.samples.length);
+  let seed = 7; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+  const music = clip.samples.slice();
+  for (let i = 0; i < music.length; i++) { const t = i / 16000; const beat = (t * 2) % 1 < 0.12 ? 1 : 0.25; music[i] += rms * 0.6 * (0.5 * rnd() * beat + 0.2 * (Math.sin(2 * Math.PI * 220 * t) + Math.sin(2 * Math.PI * 277 * t) + Math.sin(2 * Math.PI * 330 * t))); }
+  for (const [what, samples] of [['clean', clip.samples], ['with music', music]]) {
+    const r = await eng.transcribe(samples.slice(), { language: 'auto', lyrics });
+    assert.strictEqual(r.language, 'en');
+    assert(r.matched > 0.9, `${what}: most words were heard (${r.matched})`);
+    assert.deepStrictEqual(r.lines.map((l) => l.text), lyrics, `${what}: the lines are the pasted ones`);
+    r.lines.forEach((l, i) => {
+      assert.deepStrictEqual(l.words.map((w) => w.text), lyrics[i].split(' '), `${what}: the words are the pasted ones`);
+      l.words.forEach((w, k) => { assert(w.end >= w.start); if (k) assert(w.start >= l.words[k - 1].end - 1e-9, 'in order, no overlap'); });
+      if (i) assert(l.start >= r.lines[i - 1].end - 1e-9, 'lines in order');
+    });
+    near(r.lines[0].start, at[0], 0.35, `${what}: first sentence starts`); near(r.lines[2].start, at[1], 0.35, `${what}: second sentence`); near(r.lines[4].start, at[2], 0.35, `${what}: third sentence`);
+    const walked = r.lines[2].words[1]; assert(walked.start > 13.0 && walked.start < 13.6, `${what}: "walked" ${walked.start}`);
+    console.log(`     ${what}: starts ${[0, 2, 4].map((i) => r.lines[i].start.toFixed(2)).join(', ')} (truth ${at.join(', ')}), ${Math.round(r.matched * 100)}% heard`);
+  }
 }));
 
 test('model: cancelling in the middle of a song stops it within seconds without crashing, and the engine keeps working', skipUnlessSpeech(async () => {
