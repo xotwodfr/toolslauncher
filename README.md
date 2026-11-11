@@ -314,7 +314,7 @@ npm run dist:linux   # AppImage + .deb (must run on Linux; CI does it)
 
 1. Bump versions: the launcher in the root `package.json` (the tag must match it), and any tool whose code changed in its own `package.json`. A tool's version going up is what makes the launcher offer **Update** on the tool's card. To ship only a tool update, still bump the launcher's patch number so the tag has a new, matching version; users on an older launcher still receive the tool update, because the catalog is separate from the launcher.
 2. Push a tag: `git tag v0.1.0 && git push origin v0.1.0`.
-3. CI builds Windows and Linux on native runners, runs all four test suites, then generates `catalog.json` **from the real package files** (download URL, SHA-256, size, launch command) and attaches the installers, the tool zips and the catalog to a GitHub release. If any platform fails to build, nothing is published.
+3. CI builds the launcher and every tool as separate jobs that run at the same time, on Windows and Linux native runners, and runs each one's tests. Then it generates `catalog.json` **from the real package files** (download URL, SHA-256, size, launch command) and attaches the installers, the tool zips and the catalog to a GitHub release. If any tool on any platform fails, nothing is published. *Actions → Build and release → Run workflow* does the same build and tests on a branch without publishing, to try a change first.
 
 | Tag | Result |
 |---|---|
