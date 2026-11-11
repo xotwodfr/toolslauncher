@@ -129,8 +129,9 @@ test('model: the plant is cut out of its busy background (outline matches the tr
     const r1 = await runner.run(tensor);
     const ms = Date.now() - t0;
     clearInterval(timer);
-    // onnxruntime's run() blocks whatever thread calls it; a run on the main thread would leave a gap as long as the run itself
-    assert(ms > 1000 && maxGap < 700, `the event loop was never blocked for long (longest gap ${maxGap} ms during a ${ms} ms run): the model runs off the main thread`);
+    // onnxruntime's run() blocks whatever thread calls it; a run on the main thread would leave a gap as long as the run itself.
+    // So the longest gap must be a small part of the run (fast machines finish in well under a second), and never long.
+    assert(ms > 200 && maxGap < Math.min(700, ms / 2), `the event loop was never blocked for long (longest gap ${maxGap} ms during a ${ms} ms run): the model runs off the main thread`);
     assert.strictEqual(r1.flat, false);
     assert.strictEqual(r1.mask.length, P.SIZE * P.SIZE);
     let lo = 1; let hi = 0; for (let i = 0; i < r1.mask.length; i++) { lo = Math.min(lo, r1.mask[i]); hi = Math.max(hi, r1.mask[i]); }
