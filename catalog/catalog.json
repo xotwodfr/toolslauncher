@@ -180,6 +180,26 @@
       "accent": "#b8f2e6",
       "version": "0.1.0",
       "platforms": {}
+    },
+    {
+      "id": "password-vault",
+      "name": "Password Vault",
+      "description": "An offline password manager: one encrypted vault file you choose, with a generator, 2FA codes, auto-lock and CSV import.",
+      "category": "Privacy",
+      "glyph": "⚿",
+      "accent": "#f2c94c",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "file-encryptor",
+      "name": "File Encryptor & Hasher",
+      "description": "Encrypt files and folders with a password, and compute, compare and verify SHA-256, SHA-512, SHA-1, MD5 and BLAKE2b checksums.",
+      "category": "Privacy",
+      "glyph": "⛨",
+      "accent": "#4fd1a5",
+      "version": "0.1.0",
+      "platforms": {}
     }
   ]
 }

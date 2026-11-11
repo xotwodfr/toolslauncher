@@ -193,6 +193,20 @@ jobs:
           bash ../../scripts/ci-step.sh "QR & Barcode Studio: npm test" npm test
           bash ../../scripts/ci-step.sh "QR & Barcode Studio: package" npm run ${{ matrix.script }}
 
+      - name: Password Vault
+        working-directory: tools/password-vault
+        run: |
+          bash ../../scripts/ci-step.sh "Password Vault: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Password Vault: npm test" npm test
+          bash ../../scripts/ci-step.sh "Password Vault: package" npm run ${{ matrix.script }}
+
+      - name: File Encryptor & Hasher
+        working-directory: tools/file-encryptor
+        run: |
+          bash ../../scripts/ci-step.sh "File Encryptor & Hasher: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "File Encryptor & Hasher: npm test" npm test
+          bash ../../scripts/ci-step.sh "File Encryptor & Hasher: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release

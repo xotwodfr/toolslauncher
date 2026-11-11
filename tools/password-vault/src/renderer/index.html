@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Password Vault</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ======================= locked / start ======================= -->
+    <section id="lockScreen" class="lockscreen">
+      <div class="lockcard">
+        <div class="brand"><span class="glyph" aria-hidden="true"></span><h1>Password Vault</h1></div>
+        <p class="muted small tagline">offline · one encrypted file · yours</p>
+
+        <div id="startPane" hidden>
+          <p class="fine">Your passwords are kept in <strong>one encrypted file</strong> that you choose. Put it wherever you like and back it up or sync it yourself; nothing is ever sent anywhere.</p>
+          <div class="stack">
+            <button id="newVault" class="btn primary" type="button">Create a new vault…</button>
+            <button id="openVault" class="btn" type="button">Open a vault file…</button>
+          </div>
+        </div>
+
+        <form id="unlockPane" hidden autocomplete="off">
+          <div class="vaultname">
+            <strong id="vaultName" class="trunc"></strong>
+            <span id="vaultFolder" class="muted small trunc"></span>
+          </div>
+          <div id="vaultProblem" class="notice warn small" role="alert" hidden></div>
+          <label for="masterPw">Master password</label>
+          <div class="pwrow">
+            <input type="password" id="masterPw" autocomplete="off" spellcheck="false">
+            <button type="button" id="masterShow" class="btn small" aria-pressed="false">Show</button>
+          </div>
+          <div id="kfRow" class="kfrow" hidden>
+            <label>Key file</label>
+            <div class="row left"><span id="kfName" class="muted small trunc">No key file chosen</span><span class="grow"></span><button type="button" id="kfPick" class="btn small">Choose…</button></div>
+          </div>
+          <p id="unlockErr" class="err small" role="alert"></p>
+          <button id="unlockBtn" class="btn primary wide" type="submit">Unlock</button>
+          <div class="row spread small">
+            <button type="button" id="openOther" class="btn ghost small">Open another…</button>
+            <button type="button" id="newVault2" class="btn ghost small">New vault…</button>
+          </div>
+        </form>
+
+        <form id="createPane" hidden autocomplete="off">
+          <h2>New vault</h2>
+          <p class="muted small fine">Pick a master password you can remember and nobody can guess: four or five random words work well. <strong>It cannot be recovered</strong>: if you forget it, the vault cannot be opened by anyone, including you.</p>
+          <label for="newPw">Master password</label>
+          <div class="pwrow">
+            <input type="password" id="newPw" autocomplete="new-password" spellcheck="false">
+            <button type="button" id="newPwShow" class="btn small" aria-pressed="false">Show</button>
+          </div>
+          <div class="meter" id="newMeter" aria-live="polite"><div class="bars"><i></i><i></i><i></i><i></i></div><span class="mlabel small muted"></span></div>
+          <label for="newPw2">Type it again</label>
+          <input type="password" id="newPw2" autocomplete="new-password" spellcheck="false">
+          <fieldset class="kfchoice">
+            <legend>Key file (optional second factor)</legend>
+            <label class="check"><input type="radio" name="newKf" value="none" checked> No key file</label>
+            <label class="check"><input type="radio" name="newKf" value="existing"> Use a file I choose</label>
+            <label class="check"><input type="radio" name="newKf" value="create"> Make a new key file</label>
+            <div class="row left"><span id="newKfName" class="muted small trunc"></span></div>
+            <p class="muted small fine">With a key file the vault opens only with the password <em>and</em> that exact file. Keep a copy of it somewhere safe: without it the vault is lost.</p>
+          </fieldset>
+          <p id="createErr" class="err small" role="alert"></p>
+          <div class="row spread">
+            <button type="button" id="createCancel" class="btn ghost">Back</button>
+            <button type="submit" id="createBtn" class="btn primary">Create vault…</button>
+          </div>
+        </form>
+
+        <p id="busy" class="muted small busy" aria-live="polite" hidden></p>
+        <p id="lockReason" class="small lockreason" role="status" hidden></p>
+      </div>
+    </section>
+
+    <!-- ======================= unlocked ======================= -->
+    <section id="vaultScreen" class="vaultscreen" hidden>
+      <header class="top">
+        <div class="brand"><span class="glyph" aria-hidden="true"></span><h1>Password Vault</h1></div>
+        <span id="openName" class="tag vaulttag trunc" title=""></span>
+        <input type="search" id="search" placeholder="Search titles, names, sites, notes, #tags" aria-label="Search the vault" spellcheck="false">
+        <span class="grow"></span>
+        <button id="newEntry" class="btn primary" type="button">New entry</button>
+        <button id="genOpen" class="btn" type="button">Generator</button>
+        <div class="menuwrap">
+          <button id="moreBtn" class="btn" type="button" aria-haspopup="menu" aria-expanded="false">Vault ▾</button>
+          <div id="moreMenu" class="menu" role="menu" hidden>
+            <button role="menuitem" type="button" id="mImport">Import CSV…</button>
+            <button role="menuitem" type="button" id="mBackup">Save encrypted backup…</button>
+            <button role="menuitem" type="button" id="mExport">Export unencrypted CSV…</button>
+            <hr>
+            <button role="menuitem" type="button" id="mMaster">Change master password…</button>
+            <button role="menuitem" type="button" id="mSettings">Settings…</button>
+            <button role="menuitem" type="button" id="mShow">Show vault file</button>
+          </div>
+        </div>
+        <button id="lockBtn" class="btn" type="button" title="Lock now (Ctrl+L)">Lock</button>
+      </header>
+
+      <div class="body">
+        <nav id="side" class="side" aria-label="Views"></nav>
+        <section class="listpane" aria-label="Entries">
+          <div class="listhead">
+            <span id="listTitle" class="ltitle trunc"></span>
+            <span class="grow"></span>
+            <select id="sort" aria-label="Sort by">
+              <option value="title">A to Z</option>
+              <option value="modified">Last changed</option>
+              <option value="created">Newest</option>
+            </select>
+          </div>
+          <ul id="rows" class="rows" role="listbox" aria-label="Entries" tabindex="0"></ul>
+          <div id="listEmpty" class="listempty muted small" hidden></div>
+          <div id="trashBar" class="trashbar" hidden><span class="muted small">Entries in the trash can be restored until you empty it.</span><button id="emptyTrash" class="btn danger small" type="button">Empty trash</button></div>
+        </section>
+        <section id="detail" class="detail" aria-label="Entry" aria-live="polite"></section>
+      </div>
+    </section>
+
+    <!-- ======================= dialogs ======================= -->
+    <dialog id="genDlg" aria-labelledby="genTitle">
+      <form method="dialog" class="dlgbody">
+        <h2 id="genTitle">Generator</h2>
+        <div class="modes" role="radiogroup" aria-label="Kind">
+          <button type="button" class="mode" role="radio" aria-checked="true" data-kind="password">Password</button>
+          <button type="button" class="mode" role="radio" aria-checked="false" data-kind="passphrase">Passphrase</button>
+        </div>
+        <output id="genOut" class="genout" aria-live="polite"></output>
+        <div class="meter" id="genMeter"><div class="bars"><i></i><i></i><i></i><i></i></div><span class="mlabel small muted"></span></div>
+        <div id="genPwOpts" class="opts">
+          <label for="genLen">Length <span id="genLenV"></span></label>
+          <input type="range" id="genLen" min="8" max="64" value="20">
+          <div class="checks">
+            <label class="check"><input type="checkbox" id="gLower" checked> a-z</label>
+            <label class="check"><input type="checkbox" id="gUpper" checked> A-Z</label>
+            <label class="check"><input type="checkbox" id="gDigits" checked> 0-9</label>
+            <label class="check"><input type="checkbox" id="gSymbols" checked> !#$%</label>
+            <label class="check"><input type="checkbox" id="gLook"> No look-alikes (I l 1 O 0)</label>
+          </div>
+        </div>
+        <div id="genPpOpts" class="opts" hidden>
+          <label for="genWords">Words <span id="genWordsV"></span></label>
+          <input type="range" id="genWords" min="4" max="12" value="6">
+          <div class="checks">
+            <label class="check">Separator <select id="gSep" aria-label="Separator"><option value="-">-</option><option value=" ">space</option><option value=".">.</option><option value="_">_</option><option value="">none</option></select></label>
+            <label class="check"><input type="checkbox" id="gCap"> Capitals</label>
+            <label class="check"><input type="checkbox" id="gNum"> Add a digit</label>
+          </div>
+          <p class="muted small">Words from the EFF large word list (7,776 words).</p>
+        </div>
+        <div class="row spread">
+          <button type="button" id="genAgain" class="btn">New one</button>
+          <span class="grow"></span>
+          <button type="button" id="genCopy" class="btn">Copy</button>
+          <button type="button" id="genUse" class="btn primary" hidden>Use it</button>
+          <button type="submit" class="btn ghost" value="close">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="setDlg" aria-labelledby="setTitle">
+      <form method="dialog" class="dlgbody">
+        <h2 id="setTitle">Settings</h2>
+        <label for="sLock">Lock the vault after it has not been used for</label>
+        <select id="sLock">
+          <option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option>
+          <option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="0">Never (not recommended)</option>
+        </select>
+        <label for="sClip">Clear copied passwords from the clipboard after</label>
+        <select id="sClip">
+          <option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option>
+        </select>
+        <label class="check"><input type="checkbox" id="sMin"> Lock when the window is minimised</label>
+        <p class="muted small fine">The vault also locks when the computer is locked or goes to sleep. Settings are stored inside the encrypted vault.</p>
+        <p id="kdfInfo" class="muted small mono"></p>
+        <div class="row spread"><span class="grow"></span><button type="button" id="setSave" class="btn primary">Save</button><button type="submit" class="btn ghost" value="close">Cancel</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="expDlg" aria-labelledby="expTitle">
+      <form method="dialog" class="dlgbody">
+        <h2 id="expTitle">Export an unencrypted CSV</h2>
+        <div class="notice warn">
+          <strong>Every password will be written in plain text.</strong> Anyone or any program that can read the file can read all your passwords, and copies can linger in backups, sync folders and the recycle bin. Only do this to move to another password manager, then delete the file.
+        </div>
+        <p class="muted small fine">The columns are Bitwarden's, which most password managers can import. Tags and password history are not included; the trash is left out. For a copy that stays protected, use <em>Save encrypted backup</em> instead.</p>
+        <label class="check"><input type="checkbox" id="expOk"> I understand the file will not be protected</label>
+        <div class="row spread"><span class="grow"></span><button type="button" id="expGo" class="btn danger" disabled>Export CSV…</button><button type="submit" class="btn ghost" value="close">Cancel</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="impDlg" aria-labelledby="impTitle">
+      <form method="dialog" class="dlgbody">
+        <h2 id="impTitle">Import</h2>
+        <p id="impSummary"></p>
+        <ul id="impSample" class="sample"></ul>
+        <p class="muted small fine">Everything goes into a new folder, so you can look through it and move or delete entries. After importing, delete the CSV file: it holds your passwords in plain text.</p>
+        <div class="row spread"><span class="grow"></span><button type="button" id="impGo" class="btn primary">Import</button><button type="submit" class="btn ghost" value="close">Cancel</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="mpDlg" aria-labelledby="mpTitle">
+      <form method="dialog" class="dlgbody" autocomplete="off">
+        <h2 id="mpTitle">Change master password</h2>
+        <label for="mpCur">Current master password</label>
+        <input type="password" id="mpCur" autocomplete="off" spellcheck="false">
+        <div id="mpCurKfRow" class="row left" hidden><span class="muted small">Current key file:</span><span id="mpCurKf" class="small trunc">none chosen</span><span class="grow"></span><button type="button" id="mpCurKfPick" class="btn small">Choose…</button></div>
+        <label for="mpNew">New master password</label>
+        <input type="password" id="mpNew" autocomplete="new-password" spellcheck="false">
+        <div class="meter" id="mpMeter"><div class="bars"><i></i><i></i><i></i><i></i></div><span class="mlabel small muted"></span></div>
+        <label for="mpNew2">Type it again</label>
+        <input type="password" id="mpNew2" autocomplete="new-password" spellcheck="false">
+        <fieldset class="kfchoice">
+          <legend>Key file afterwards</legend>
+          <label class="check"><input type="radio" name="mpKf" value="none" checked> No key file</label>
+          <label class="check"><input type="radio" name="mpKf" value="existing"> Use a file I choose</label>
+          <label class="check"><input type="radio" name="mpKf" value="create"> Make a new key file</label>
+          <div class="row left"><span id="mpKfName" class="muted small trunc"></span></div>
+        </fieldset>
+        <p id="mpErr" class="err small" role="alert"></p>
+        <div class="row spread"><span class="grow"></span><button type="button" id="mpGo" class="btn primary">Change</button><button type="submit" class="btn ghost" value="close">Cancel</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="askDlg" aria-labelledby="askTitle">
+      <form method="dialog" class="dlgbody">
+        <h2 id="askTitle"></h2>
+        <p id="askText" class="fine"></p>
+        <div class="row spread"><span class="grow"></span><button type="submit" id="askYes" class="btn danger" value="yes"></button><button type="submit" class="btn ghost" value="no">Cancel</button></div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

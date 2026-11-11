@@ -25,6 +25,9 @@ components. Each downloadable package also carries the licence files its compone
 | [qrcode](https://github.com/soldair/node-qrcode) | QR & Barcode Studio | MIT | QR encoding (drawing is code in this repository); dependencies dijkstrajs, pngjs, yargs and its helpers (MIT / ISC) |
 | [bwip-js](https://github.com/metafloor/bwip-js) | QR & Barcode Studio | MIT | Barcodes (EAN, UPC, Code 128, Code 39, ITF) as SVG, offline; includes BWIPP (MIT) |
 | [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) | QR & Barcode Studio | MIT | [ZXing-C++](https://github.com/zxing-cpp/zxing-cpp) (Apache-2.0) compiled to WebAssembly, used to read codes. The .wasm file is bundled and loaded from the app's own files, never from the CDN that is the library's default; dependencies @types/emscripten, type-fest (MIT) |
+| [hash-wasm](https://github.com/Daninet/hash-wasm) | Password Vault, File Encryptor & Hasher | MIT | Argon2id (and BLAKE2b in File Encryptor) from the reference C code compiled to WebAssembly; runs in-process |
+| [zxcvbn-ts](https://github.com/zxcvbn-ts/zxcvbn) (@zxcvbn-ts/core, language-common, language-en) | Password Vault, File Encryptor & Hasher | MIT | Password strength estimate, offline; dependency fastest-levenshtein (MIT) |
+| [EFF large word list](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases) | Password Vault | CC BY 3.0 US (Electronic Frontier Foundation) | `src/data/eff_large_wordlist.txt`, 7,776 words for passphrases, from the npm packages diceware-wordlist-en-eff and @wordlist/english-eff (which agree word for word); byte-identical to the EFF's eff_large_wordlist.txt, checked by SHA-256 in the tests |
 
 Music Player's playback uses the audio decoders built into Electron / Chromium (MP3, FLAC, Ogg Vorbis, Opus, AAC, WAV); it bundles no extra codecs. Its LRC and TTML lyrics, M3U playlist and library code is code in this repository.
 

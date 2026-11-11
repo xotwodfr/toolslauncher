@@ -26,6 +26,8 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **Batch File Renamer** | Renames many files or folders at once with a stack of rules: find & replace (also regex), insert, remove, case, numbering, dates (also the photo's EXIF date), audio tags, extension, spaces, accents. Shows every new name first, blocks clashes and names Windows can't use, and can undo any batch. |
 | **Disk Space Visualizer** | Shows **what takes up space** on a drive or in a folder: a **map of boxes** coloured by file type, a sortable folder list with the % of each folder, the **200 largest files** and a file-type summary. Go into folders, then show, open, copy the path or **move to the Recycle Bin** (system folders are refused). Exports CSV. |
 | **QR & Barcode Studio** | **Makes QR codes** for text, links, Wi-Fi, contacts (vCard/MeCard), email, SMS, phone, places and calendar events, with colours, rounded or dot styles and a **logo**, and **barcodes** (EAN-13, EAN-8, UPC-A, Code 128, Code 39, ITF) with check digits. Every code is **read back to check it scans**. **Reads** codes from pictures, the clipboard or the screen, several at once, and makes **batches** from a list or CSV. |
+| **Password Vault** | An **offline password manager** that keeps everything in **one encrypted file you choose** (Argon2id + AES-256-GCM), so you can back it up or sync it yourself. Entries with web addresses, notes, tags, folders, custom fields, **live 2FA codes** and password history; search, favourites and a restorable trash. A password and passphrase generator, auto-lock, a clipboard that clears itself, and import from KeePass, Bitwarden, Chrome and Firefox. |
+| **File Encryptor & Hasher** | **Encrypts files and whole folders** with a password into `.locked` files (Argon2id + streaming AES-256-GCM, so files of any size use little memory, and any cut, reordering or change is detected), and decrypts them under their original names without overwriting anything. Also **computes and checks checksums** (SHA-256, SHA-512, SHA-1, MD5, BLAKE2b): compare with a published one, check `.sha256` / `SHA256SUMS` files, or make them. |
 
 <p>
   <img src="docs/screenshots/audio-tagger.png" width="32%" alt="Audio Tagger">
@@ -47,6 +49,8 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/file-renamer.png" width="32%" alt="Batch File Renamer: invented holiday photos renamed by the date they were taken, with one screenshot flagged because it has no photo date">
   <img src="docs/screenshots/disk-space.png" width="32%" alt="Disk Space Visualizer: a map of boxes for an invented home folder, coloured by file type, with a disk image selected">
   <img src="docs/screenshots/qr-studio.png" width="32%" alt="QR and Barcode Studio: a Wi-Fi QR code for an invented café with a cup logo in the middle, checked as scanning">
+  <img src="docs/screenshots/password-vault.png" width="32%" alt="Password Vault: an unlocked vault of invented entries, one showing its user name, hidden password and a live 2FA code">
+  <img src="docs/screenshots/file-encryptor.png" width="32%" alt="File Encryptor and Hasher: invented files and a folder being encrypted into .locked files, with a password strength meter">
 </p>
 
 No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`. Lyrics Maker does the same with `.ttml` and `.lrc` files.)
@@ -156,6 +160,22 @@ No tool overwrites your original files. (Music Player never changes a song; when
 - **Barcodes:** EAN-13, EAN-8 and UPC-A (the check digit is added, or checked and explained when it is wrong), Code 128, Code 39 (optional check character) and ITF, with the text under the bars.
 - **Read codes** from a picture (open, drop or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>) or from the screen. Several codes per picture are outlined and numbered. Each shows what it holds: a Wi-Fi network with its password and *Copy* buttons, a contact's fields, an event, a product number with its check digit. Links are shown and never opened by themselves (*Open link…* asks first).
 - **Batch:** paste a list or open a CSV (content, and optionally a file name). It makes a folder of PNG and/or SVG files without ever replacing an existing file, and explains any line that could not be made.
+
+### Password Vault
+
+- **One file, yours.** Create a vault anywhere (a USB stick, a synced folder) and open it with your master password, plus a key file if you want a second factor. The file is encrypted with AES-256-GCM using a key made by Argon2id (64 MiB, tuned to take about half a second to a second on your computer). Every save is atomic, and the previous version is kept as `.bak`. If a sync program changed the file meanwhile, that version is kept beside it instead of being lost. The format is documented in `tools/password-vault/FORMAT.md`.
+- **Entries.** Title, user name, password, web addresses, notes, tags, folders, custom fields (hidden or not), one-time 2FA codes (paste the setup key or the `otpauth://` link; the code updates live) and the history of old passwords. Search covers everything except secrets, and `#tag` searches tags. Favourites, sorting and a trash you can restore from.
+- **Secrets stay hidden.** Passwords and hidden fields are kept out of the window until you press *Show* or *Copy*. A copied password is cleared from the clipboard after 30 seconds, but only if it is still the one you copied.
+- **Locks itself** after 5 minutes without use (you can change this), when the computer is locked or goes to sleep, and with the *Lock* button or <kbd>Ctrl</kbd>+<kbd>L</kbd>. The master password is never stored and cannot be recovered.
+- **Generator.** Random passwords (length, character sets, no look-alikes) or passphrases from the EFF word list, with the strength shown in bits. A strength meter (zxcvbn) checks passwords you type yourself.
+- **Moving in and out.** Import CSV exports from KeePass, KeePassXC, Bitwarden, Chrome/Edge and Firefox. Export an encrypted backup copy, or an unencrypted CSV in Bitwarden's columns, after a clear warning.
+
+### File Encryptor & Hasher
+
+- **Encrypt.** Drop files or folders and choose a password. Each becomes `<name>.locked`; a folder is packed into one file, sub-folders and all. The data is sealed in 64 KiB chunks with AES-256-GCM using a key from Argon2id, so a 10 GB file needs no more memory than a small one, and a file that was cut short, reordered or changed is refused. File names are inside the encrypted part. Progress and *Cancel*; a cancelled file leaves nothing behind. The format is documented in `tools/file-encryptor/FORMAT.md`.
+- **Decrypt.** Brings back the original file or folder, with its name and modified times, next to the `.locked` file or in a folder you choose. Nothing is overwritten: if the name is taken you get `name (2)`. Output is only renamed into place once the whole file has checked out.
+- **Optionally move originals to the Recycle Bin**, but only after each `.locked` file has been decrypted again and compared, and only if the original did not change meanwhile. The app says plainly that the Recycle Bin is not secure deletion.
+- **Checksums.** SHA-256, SHA-512, SHA-1, MD5 and BLAKE2b, several files at once on worker threads. Paste a checksum from a download page to compare (the kind is recognised from its length). Check `.sha256`, `.md5`, `SHA256SUMS` and similar files in GNU or BSD format, which reports OK, different or missing for each file. Save such a file for a folder.
 
 ## Install
 

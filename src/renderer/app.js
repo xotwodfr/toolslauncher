@@ -61,6 +61,10 @@
     'disk-space': '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M11 3.5v17M11 12.5h9.5M16 12.5v8M11 8h9.5"/></svg>',
     // a QR code: three corner squares and a few modules
     'qr-studio': '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 18.5v2M18.5 14h2"/></svg>',
+    // a safe door with a dial
+    'password-vault': '<svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="15" rx="2.5"/><circle cx="12" cy="11.5" r="3.4"/><path d="M12 8.1v1.2M12 13.7v1.2M8.6 11.5h1.2M14.2 11.5h1.2M6.5 19v1.5M17.5 19v1.5"/></svg>',
+    // a page with a folded corner and a padlock on it
+    'file-encryptor': '<svg viewBox="0 0 24 24"><path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/><rect x="9.5" y="13" width="6" height="5" rx="1"/><path d="M10.8 13v-1.6a1.7 1.7 0 0 1 3.4 0V13"/></svg>',
   };
   const icon = (name, cls = 'ico') => { const s = document.createElement('span'); s.className = cls; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name] || ''; return s; };
 
