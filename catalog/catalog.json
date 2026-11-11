@@ -240,6 +240,26 @@
       "accent": "#8bd450",
       "version": "0.1.0",
       "platforms": {}
+    },
+    {
+      "id": "subtitle-maker",
+      "name": "Subtitle Maker",
+      "description": "Write subtitles for a video from its speech, offline (Whisper). Edit them, save .srt/.vtt, or burn them into the video.",
+      "category": "Video",
+      "glyph": "▤",
+      "accent": "#5eb0ff",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "audio-inspector",
+      "name": "Audio Inspector",
+      "description": "See what is really inside audio files: catches fake lossless (FLAC made from MP3), upsampled and fake 24-bit files; loudness, peaks, clipping.",
+      "category": "Audio",
+      "glyph": "⌕",
+      "accent": "#ff6f61",
+      "version": "0.1.0",
+      "platforms": {}
     }
   ]
 }

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Audio Inspector</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Audio Inspector</h1>
+      <span class="muted small tagline">what is really inside</span>
+      <span class="grow"></span>
+      <button id="addFiles" class="btn">Add files…</button>
+      <button id="addFolder" class="btn">Add folder…</button>
+      <button id="saveCsv" class="btn" disabled>Save CSV…</button>
+      <button id="saveTxt" class="btn" disabled>Save report…</button>
+    </header>
+
+    <div id="engineWarn" class="banner" role="alert" hidden></div>
+
+    <main class="stage">
+      <section id="empty" class="drop" tabindex="0" role="button" aria-label="Add audio files">
+        <strong class="big">Drop audio files or a folder here</strong>
+        <span class="muted">FLAC, WAV, AIFF, ALAC, APE, WavPack, MP3, AAC, Ogg, Opus and more</span>
+        <div class="row"><button id="addFiles2" class="btn primary">Add files…</button><button id="addFolder2" class="btn">Add folder…</button></div>
+        <p class="muted small fine">Each file is listened to on this computer, offline. You get a plain answer: <strong>real lossless</strong>, <strong>fake lossless</strong> (a FLAC or WAV made from an MP3), <strong>upsampled</strong>, or <strong>can't tell</strong>; plus the true sample rate and bits, loudness, peaks, clipping and a spectrogram. Your files are only read, never changed.</p>
+      </section>
+
+      <section id="work" class="work" hidden>
+        <div class="listpane">
+          <div class="summary-bar">
+            <div id="counts" class="counts" aria-live="polite"></div>
+            <div id="progressRow" class="progressrow" hidden>
+              <div class="progress" id="bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="fill"></div></div>
+              <span id="progressText" class="muted small"></span>
+              <button id="cancel" class="btn small">Cancel</button>
+            </div>
+          </div>
+          <div id="list" class="list" role="listbox" aria-label="Files" tabindex="0"></div>
+          <div class="listfoot"><button id="clear" class="btn small ghost">Clear list</button><span class="grow"></span><span id="listNote" class="muted small"></span></div>
+        </div>
+
+        <div id="detail" class="detail" aria-live="polite">
+          <p id="pickNote" class="muted pick">Click a file to see its spectrogram and all the numbers.</p>
+          <div id="detailBody" hidden>
+            <div class="dhead">
+              <div class="dtitle"><span id="dName" class="dname"></span><span id="dFolder" class="muted small trunc"></span></div>
+            </div>
+            <div id="dVerdict" class="verdict"></div>
+            <ul id="dFlags" class="flags"></ul>
+            <div class="plots">
+              <div class="plotlabel"><span>Spectrogram</span><span class="muted small">time →, frequency ↑, brighter = louder</span></div>
+              <canvas id="spectrogram" class="spec" width="800" height="300" aria-label="Spectrogram"></canvas>
+              <div class="plotlabel"><span>Average spectrum</span><span class="muted small">the whole file: a sharp drop that never comes back means a cutoff</span></div>
+              <canvas id="spectrum" class="spec small" width="800" height="130" aria-label="Average spectrum"></canvas>
+            </div>
+            <dl id="dFacts" class="facts"></dl>
+          </div>
+        </div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../report.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

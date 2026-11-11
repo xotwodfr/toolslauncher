@@ -32,6 +32,8 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **Ebook Converter & Reader** | **Reads EPUB, TXT, Markdown and HTML books** in pages or scrolling, with contents, search, text size and light, sepia and dark themes, and remembers where you stopped. **Converts** between EPUB, PDF, HTML, Markdown and text (text files are split into chapters), and gives an EPUB a new title, author or cover as a new file. |
 | **Voice Recorder & Cleaner** | Records voice memos, podcasts and narration from your microphone, **saved to disk as you speak** (an unfinished take is recovered on the next start), with a level meter, pause and markers. Then **cleans the sound**: less background noise (learned from a quiet part), no rumble, long pauses shortened, loudness evened out to −16 / −19 LUFS. A/B preview, then export as WAV, FLAC, MP3, M4A or Opus. |
 | **Photo Batch Editor** | Applies **one recipe of edits to many photos**: resize, crop to an aspect (with a smart subject-finding anchor), rotate / flip, auto-orient, auto levels, brightness / contrast / saturation / warmth, sharpen, black & white or sepia, border, **text and logo watermarks**, rounded corners. Steps run in the order you set. Live **before/after preview**, presets, rename patterns, photo info kept or stripped; originals are never touched. |
+| **Subtitle Maker** | Listens to a video or audio file and writes **subtitles**, offline (the Whisper model, 99 languages, optional **translate to English**), following the usual rules: two lines, 42 characters, 1–7 s each, a readable speed. Watch them over the video, fix any word or time, split, merge, shift, stamp at the playhead, then save `.srt` / `.vtt` or write a new MP4 with them **burnt in** or as a **subtitle track**. The original file is never changed. |
+| **Audio Inspector** | Shows what is **really** inside audio files, a batch or a whole folder at a time: catches **fake lossless** files (a FLAC/WAV made from an MP3: "Fake lossless file … the sound stops at 16 kHz"), **upsampled** hi-res and **padded 24-bit**, with a spectrogram and the cutoff marked. Also the true format, bitrate, peak and true peak, loudness (LUFS), dynamic range, clipping, DC offset, mono-in-stereo and silence, with a CSV or text report. Files are only read, never changed. |
 
 <p>
   <img src="docs/screenshots/audio-tagger.png" width="32%" alt="Audio Tagger">
@@ -59,6 +61,8 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/ebook-studio.png" width="32%" alt="Ebook Converter and Reader: a chapter of an invented book in the sepia reading theme, with the contents beside it">
   <img src="docs/screenshots/voice-recorder.png" width="32%" alt="Voice Recorder and Cleaner: an invented spoken take on a waveform, with the clean-up switches and the A/B preview">
   <img src="docs/screenshots/photo-batch-editor.png" width="32%" alt="Photo Batch Editor: invented landscape photos with a recipe of resize, border and watermark steps, and a before/after preview">
+  <img src="docs/screenshots/subtitle-maker.png" width="32%" alt="Subtitle Maker: an invented, spoken video with its subtitles drawn over it and the list of subtitles with their times and reading speed">
+  <img src="docs/screenshots/audio-inspector.png" width="32%" alt="Audio Inspector: seven invented songs with their verdicts, one FLAC marked Fake lossless file with its spectrogram cut off at 16.6 kHz">
 </p>
 
 No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`. Lyrics Maker does the same with `.ttml` and `.lrc` files.)
@@ -217,6 +221,22 @@ No tool overwrites your original files. (Music Player never changes a song; when
 - **Preview** any photo in the list, before and after, side by side or with a slider, rendered by the real pipeline at screen size and updated as you change settings, with the final pixel size.
 - **Output:** keep the format, or save as JPEG, PNG, WebP or AVIF with a quality setting. Photo info can be removed, kept as copyright and date only, or kept in full. File names come from a pattern (`{name}`, `{n:3}`, `{date}` — when the photo was taken —, `{time}`, `{w}x{h}`); files go to a folder you choose or an `edited` folder next to each photo.
 - **Safe:** originals are never changed and nothing is overwritten (a clash becomes "name (2)"); files are written as `.part` and renamed when complete. Progress per photo, *Cancel*, several photos at once, and recipes saved as **presets**. HEIC photos are not supported.
+
+### Subtitle Maker
+
+- **Open a video or audio file** (or drop it on the window). What is said is written down offline as subtitles by the same Whisper model as [Lyrics Maker](#lyrics-maker); the language is detected or chosen, and **Translate to English** uses Whisper's own translation.
+- **Subtitles that follow the rules:** at most 2 lines of 42 characters, 1–7 s on screen, a small gap between them, cut at pauses and sentence ends. Each shows its reading speed, and a row that breaks a rule (over 20 characters per second, too long, overlapping) turns red with the reason.
+- **Edit** in the list while the current subtitle is drawn over the video: change text and times, split, merge, delete, add at the playhead, shift everything, stamp the start / end with <kbd>[</kbd> and <kbd>]</kbd>, undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+- **Save** as `.srt` or `.vtt`, or open an existing one to edit. A file you replace is kept as `.bak`.
+- **Burn into video** writes a new MP4 with the subtitles drawn into the picture (bundled DejaVu Sans, three sizes, optional dark box), with progress and *Cancel*. **Add as subtitle track** writes an MP4 with a switchable track and copies the picture as it is.
+
+### Audio Inspector
+
+- **Add files or a folder** (sub-folders included). Each file is decoded and analysed on worker threads, so the window never freezes, and gets a plain verdict: **Real lossless**, **Fake lossless file** ("This FLAC was probably made from a lossy file (MP3 ~128 kbps): the sound stops at 16.6 kHz"), **Upsampled from 44.1 kHz**, **Can't tell** (a quiet or dark recording), or **Lossy (MP3 320 kbps)**.
+- **Also caught:** 24-bit files that are really 16-bit (the lowest bits are always zero), and MP3s re-encoded at a higher bitrate from a lower one.
+- **Click a file** for a spectrogram with a frequency axis and the cutoff line, the average spectrum, and every number: format, sample rate, bits stored and used, channels, duration, stated and actual bitrate, peak, true peak, loudness and loudness range (EBU R128), DR, clipping, DC offset, mono-in-stereo, silence at the start and end.
+- **Save** the results as CSV (opens in Excel) or as a readable text report.
+- **Good to know.** The verdict looks for the steep cutoff a lossy encoder leaves. A real recording that was filtered hard below 20 kHz will look fake, and a lossy encoder that keeps the full band (some AAC at 256 kbps) is not caught.
 
 ## Install
 

@@ -73,6 +73,10 @@
     'voice-recorder': '<svg viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5M8.5 20.5h7"/></svg>',
     // a photo (hills and a sun) with a second photo stacked behind it
     'photo-batch-editor': '<svg viewBox="0 0 24 24"><rect x="6.5" y="7.5" width="14" height="12" rx="2.4"/><path d="M3.5 15.5V6.5a2 2 0 0 1 2-2h11"/><path d="M7 17.5l4-4 3 3 2.2-2.2 4 4"/><circle cx="16" cy="11" r="1.4"/></svg>',
+    // a screen with two lines of subtitles along the bottom
+    'subtitle-maker': '<svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.6"/><path d="M7 13.5h10M8.5 16.5h7"/></svg>',
+    // a magnifying glass over a waveform
+    'audio-inspector': '<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.3 15.3l5.2 5.2M7 10.5h1.2l1-2.5 1.6 5 1.2-2.5H14"/></svg>',
   };
   const icon = (name, cls = 'ico') => { const s = document.createElement('span'); s.className = cls; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name] || ''; return s; };
 

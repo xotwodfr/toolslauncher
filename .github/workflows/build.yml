@@ -236,6 +236,24 @@ jobs:
           bash ../../scripts/ci-step.sh "Photo Batch Editor: npm test" npm test
           bash ../../scripts/ci-step.sh "Photo Batch Editor: package" npm run ${{ matrix.script }}
 
+      - name: Subtitle Maker
+        working-directory: tools/subtitle-maker
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip   # CPU-only, see above
+        run: |
+          bash ../../scripts/ci-step.sh "Subtitle Maker: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Subtitle Maker: ffmpeg and model setup" npm run setup   # downloads the bundled ffmpeg and the Whisper model (~250 MB)
+          bash ../../scripts/ci-step.sh "Subtitle Maker: npm test" npm test   # runs the real model; the spoken-clip tests need espeak-ng or the Windows voices and are skipped without them
+          bash ../../scripts/ci-step.sh "Subtitle Maker: package" npm run ${{ matrix.script }}
+
+      - name: Audio Inspector
+        working-directory: tools/audio-inspector
+        run: |
+          bash ../../scripts/ci-step.sh "Audio Inspector: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Audio Inspector: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
+          bash ../../scripts/ci-step.sh "Audio Inspector: npm test" npm test
+          bash ../../scripts/ci-step.sh "Audio Inspector: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release
