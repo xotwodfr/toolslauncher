@@ -1,0 +1,36 @@
+{
+  "name": "disk-space",
+  "productName": "Disk Space Visualizer",
+  "version": "0.1.0",
+  "description": "See what takes up space on a drive or in a folder, as a map, a folder list, the largest files and file types. Offline.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/disk.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "build": {
+    "appId": "com.toolslauncher.diskspace",
+    "productName": "Disk Space Visualizer",
+    "electronVersion": "33.4.11",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["src/**/*", "package.json"],
+    "artifactName": "DiskSpaceVisualizer-${version}-${os}-${arch}.${ext}",
+    "executableName": "disk-space",
+    "win": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "category": "Utility"
+    }
+  }
+}

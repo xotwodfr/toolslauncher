@@ -57,6 +57,10 @@
     'text-diff': '<svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="7.5" height="16" rx="1.5"/><rect x="13" y="4" width="7.5" height="16" rx="1.5"/><path d="M5.8 8h3M5.8 11h3M5.8 14h1.6M15.3 11h3M15.3 14h3"/></svg>',
     // a name field with a text cursor in it
     'file-renamer': '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M6.5 12h5M15 9.5v5M13.8 9.5h2.4M13.8 14.5h2.4"/></svg>',
+    // a treemap: one big box and smaller boxes beside it
+    'disk-space': '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M11 3.5v17M11 12.5h9.5M16 12.5v8M11 8h9.5"/></svg>',
+    // a QR code: three corner squares and a few modules
+    'qr-studio': '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 18.5v2M18.5 14h2"/></svg>',
   };
   const icon = (name, cls = 'ico') => { const s = document.createElement('span'); s.className = cls; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name] || ''; return s; };
 

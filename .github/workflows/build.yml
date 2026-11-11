@@ -179,6 +179,20 @@ jobs:
           bash ../../scripts/ci-step.sh "Batch File Renamer: npm test" npm test
           bash ../../scripts/ci-step.sh "Batch File Renamer: package" npm run ${{ matrix.script }}
 
+      - name: Disk Space Visualizer
+        working-directory: tools/disk-space
+        run: |
+          bash ../../scripts/ci-step.sh "Disk Space Visualizer: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "Disk Space Visualizer: npm test" npm test
+          bash ../../scripts/ci-step.sh "Disk Space Visualizer: package" npm run ${{ matrix.script }}
+
+      - name: QR & Barcode Studio
+        working-directory: tools/qr-studio
+        run: |
+          bash ../../scripts/ci-step.sh "QR & Barcode Studio: npm ci" npm ci
+          bash ../../scripts/ci-step.sh "QR & Barcode Studio: npm test" npm test
+          bash ../../scripts/ci-step.sh "QR & Barcode Studio: package" npm run ${{ matrix.script }}
+
       - name: Collect release files into one flat folder
         run: |
           mkdir release

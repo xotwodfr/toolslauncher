@@ -24,6 +24,8 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **Video Converter** | Convert to MP4 (H.264), WebM (VP9) or animated GIF. Cap the resolution and frame rate, pick a quality or **aim for a file size** (two-pass, so it lands on the target), trim, drop the sound, strip location metadata. Shows progress and speed, with Cancel. |
 | **Text & File Diff** | Compares two texts, two files or two folders. Shows the changes side by side or unified, with the changed words highlighted. You can build a merged version change by change, save a patch or an HTML report, and copy files between folders. |
 | **Batch File Renamer** | Renames many files or folders at once with a stack of rules: find & replace (also regex), insert, remove, case, numbering, dates (also the photo's EXIF date), audio tags, extension, spaces, accents. Shows every new name first, blocks clashes and names Windows can't use, and can undo any batch. |
+| **Disk Space Visualizer** | Shows **what takes up space** on a drive or in a folder: a **map of boxes** coloured by file type, a sortable folder list with the % of each folder, the **200 largest files** and a file-type summary. Go into folders, then show, open, copy the path or **move to the Recycle Bin** (system folders are refused). Exports CSV. |
+| **QR & Barcode Studio** | **Makes QR codes** for text, links, Wi-Fi, contacts (vCard/MeCard), email, SMS, phone, places and calendar events, with colours, rounded or dot styles and a **logo**, and **barcodes** (EAN-13, EAN-8, UPC-A, Code 128, Code 39, ITF) with check digits. Every code is **read back to check it scans**. **Reads** codes from pictures, the clipboard or the screen, several at once, and makes **batches** from a list or CSV. |
 
 <p>
   <img src="docs/screenshots/audio-tagger.png" width="32%" alt="Audio Tagger">
@@ -43,6 +45,8 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/background-remover.png" width="32%" alt="Background Remover: an invented potted plant cut out, on a transparent background, with the brush tools">
   <img src="docs/screenshots/text-diff.png" width="32%" alt="Text and File Diff: two versions of an invented script side by side with the changed words highlighted, and the merged result below">
   <img src="docs/screenshots/file-renamer.png" width="32%" alt="Batch File Renamer: invented holiday photos renamed by the date they were taken, with one screenshot flagged because it has no photo date">
+  <img src="docs/screenshots/disk-space.png" width="32%" alt="Disk Space Visualizer: a map of boxes for an invented home folder, coloured by file type, with a disk image selected">
+  <img src="docs/screenshots/qr-studio.png" width="32%" alt="QR and Barcode Studio: a Wi-Fi QR code for an invented café with a cup logo in the middle, checked as scanning">
 </p>
 
 No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`. Lyrics Maker does the same with `.ttml` and `.lrc` files.)
@@ -136,6 +140,22 @@ No tool overwrites your original files. (Music Player never changes a song; when
 - **See it before it happens.** Every file shows its current and new name, updated as you type. Problems are marked on the row: two files getting the same name, a name already taken in the folder, characters or names Windows can't use (CON, PRN…, trailing dots), names that are too long. *Rename* stays off until they are fixed, or let it add (2), (3)….
 - **Careful renaming.** Swaps (a→b, b→a), chains and case-only changes (photo.JPG → photo.jpg on Windows) go through temporary names. Files inside a renamed folder are handled first. If something fails half way, everything is put back.
 - **Undo, also later.** Every batch is written to a journal before the first rename. *History* lists the last batches, also after a restart. Undo first checks that each file is still where it was left, and can undo only the files that are. An interrupted batch is detected the next time the app starts and can be put back.
+
+### Disk Space Visualizer
+
+- **Pick a drive or a folder** (or drop one on the window). The drives are listed with their free space. The scan runs in the background with live progress, a map that fills in as files are found, and *Cancel*, which keeps what was found so far. About 80,000 files take 1.5 s.
+- **Counted honestly.** It measures the space files take on the disk (not just their length). Links and junctions are never followed, so nothing is counted twice and there are no loops. A file with several hard links counts once. By default the scan stays on the chosen drive. Folders it may not read are counted and listed.
+- **Four views.** A map where each box is a file or folder sized by its space and coloured by type (video, audio, pictures, archives, code, documents, programs, other); hover for the path, click a folder's name bar to go in, and use the path bar or <kbd>Backspace</kbd> to go back. A folder list sortable by name, size or file count, with the % of the parent. The 200 largest files. A summary by type and by extension.
+- **Clean up safely.** For a selected item: *Show in folder*, *Open* (programs are never started), *Copy path*, *Rescan this folder*, and **Move to Recycle Bin**, which asks first and shows the size. Windows, Program Files, /usr, /etc, drive roots and your user folder itself are refused. Nothing is ever deleted for good.
+- **Export CSV** of the current folder, the largest files or the types.
+
+### QR & Barcode Studio
+
+- **Make a QR code** for text, a link, a Wi-Fi network, a contact (vCard 3.0 or MeCard), an email, a text message, a phone number, a place or a calendar event. Special characters are escaped the way phones expect. Choose the error correction level, margin, colours, square, rounded or dot modules, and a logo in the middle (level H is then used and the logo stays under 20 % of the code). Low contrast, inverted colours and a see-through background get a plain warning.
+- **It checks itself.** Every code you make is drawn to pixels and read back by the app's own reader, and you see "it scans and reads back exactly" or what to change. Save as PNG (any size) or SVG, or copy the picture.
+- **Barcodes:** EAN-13, EAN-8 and UPC-A (the check digit is added, or checked and explained when it is wrong), Code 128, Code 39 (optional check character) and ITF, with the text under the bars.
+- **Read codes** from a picture (open, drop or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>) or from the screen. Several codes per picture are outlined and numbered. Each shows what it holds: a Wi-Fi network with its password and *Copy* buttons, a contact's fields, an event, a product number with its check digit. Links are shown and never opened by themselves (*Open link…* asks first).
+- **Batch:** paste a list or open a CSV (content, and optionally a file name). It makes a folder of PNG and/or SVG files without ever replacing an existing file, and explains any line that could not be made.
 
 ## Install
 

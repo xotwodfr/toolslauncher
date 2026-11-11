@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data: blob:;">
+  <title>QR &amp; Barcode Studio</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>QR &amp; Barcode Studio</h1>
+      <span class="muted small tagline">make · read · batch</span>
+      <span class="grow"></span>
+      <div class="tabs" role="tablist" aria-label="What to do">
+        <button role="tab" id="tab-make" data-tab="make" aria-selected="true">Make QR</button>
+        <button role="tab" id="tab-bar" data-tab="bar" aria-selected="false">Barcodes</button>
+        <button role="tab" id="tab-read" data-tab="read" aria-selected="false">Read</button>
+        <button role="tab" id="tab-batch" data-tab="batch" aria-selected="false">Batch</button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <!-- ============ make a QR code ============ -->
+      <section id="p-make" class="split" role="tabpanel" aria-labelledby="tab-make">
+        <div class="form">
+          <h2>What goes in it</h2>
+          <div id="kinds" class="modes" role="radiogroup" aria-label="Kind of QR code"></div>
+          <div id="fields" class="fields"></div>
+
+          <h2 class="gap">Look</h2>
+          <div class="opts">
+            <label>Error correction
+              <select id="level">
+                <option value="L">L · 7 % can be damaged</option>
+                <option value="M" selected>M · 15 % (usual)</option>
+                <option value="Q">Q · 25 %</option>
+                <option value="H">H · 30 % (for logos, rough print)</option>
+              </select>
+            </label>
+            <label>Margin (modules)<input type="number" id="margin" min="0" max="20" step="1" value="4"></label>
+            <div class="optrow" role="radiogroup" aria-label="Module style">
+              <span class="lbl">Style</span>
+              <button class="mode small" role="radio" data-style="square" aria-checked="true">Square</button>
+              <button class="mode small" role="radio" data-style="rounded" aria-checked="false">Rounded</button>
+              <button class="mode small" role="radio" data-style="dots" aria-checked="false">Dots</button>
+            </div>
+            <div class="optrow">
+              <label class="inline col">Code <input type="color" id="fg" value="#000000"></label>
+              <label class="inline col">Background <input type="color" id="bg" value="#ffffff"></label>
+              <label class="check"><input type="checkbox" id="transparent"> See-through background</label>
+            </div>
+            <div class="optrow">
+              <span class="lbl">Logo</span>
+              <button id="logoPick" class="btn small">Choose a logo…</button>
+              <img id="logoPrev" class="logoprev" alt="" hidden>
+              <span id="logoName" class="muted small trunc"></span>
+              <button id="logoClear" class="btn small ghost" hidden>Remove</button>
+            </div>
+            <label id="logoSizeRow" hidden>Logo size<input type="range" id="logoScale" min="5" max="20" step="1" value="15" aria-describedby="logoSizeVal"><span id="logoSizeVal" class="muted small">15 % of the code</span></label>
+          </div>
+        </div>
+        <div class="preview">
+          <div class="pbox"><img id="qrImg" alt="QR code preview"><div id="qrEmpty" class="muted">Fill in the form and the code appears here.</div></div>
+          <div id="qrInfo" class="muted small"></div>
+          <div id="qrCheck" class="check-line" aria-live="polite"></div>
+          <ul id="qrWarn" class="warns"></ul>
+          <details class="inside"><summary>What is inside</summary><pre id="qrText"></pre></details>
+          <div class="export">
+            <label class="inline">PNG size <input type="number" id="qrSize" min="64" max="8000" step="16" value="1024"> px</label>
+            <button id="qrPng" class="btn primary">Save PNG…</button>
+            <button id="qrSvg" class="btn">Save SVG…</button>
+            <button id="qrCopy" class="btn">Copy picture</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ barcodes ============ -->
+      <section id="p-bar" class="split" role="tabpanel" aria-labelledby="tab-bar" hidden>
+        <div class="form">
+          <h2>Barcode</h2>
+          <div class="opts">
+            <label>Type
+              <select id="sym">
+                <option value="ean13">EAN-13 (shop products)</option>
+                <option value="ean8">EAN-8 (small products)</option>
+                <option value="upca">UPC-A (products in North America)</option>
+                <option value="code128">Code 128 (any text, shipping, stock)</option>
+                <option value="code39">Code 39 (capitals and digits)</option>
+                <option value="itf">ITF (digits, cartons)</option>
+              </select>
+            </label>
+            <label>What it holds<input type="text" id="barValue" value="590123412345" spellcheck="false" autocomplete="off"></label>
+            <div id="barHint" class="muted small"></div>
+            <div id="barStatus" class="small" aria-live="polite"></div>
+            <label class="check" id="barCheckRow" hidden><input type="checkbox" id="barCheck"> Add a check character</label>
+            <label class="check"><input type="checkbox" id="barText" checked> Show the text under the bars</label>
+            <label>Bar height (mm)<input type="number" id="barHeight" min="5" max="60" step="1" value="22"></label>
+            <div class="optrow">
+              <label class="inline col">Bars <input type="color" id="barFg" value="#000000"></label>
+              <label class="inline col">Background <input type="color" id="barBg" value="#ffffff"></label>
+              <label class="check"><input type="checkbox" id="barTransparent"> See-through background</label>
+            </div>
+          </div>
+        </div>
+        <div class="preview">
+          <div class="pbox wide"><img id="barImg" alt="Barcode preview"><div id="barEmpty" class="muted">Type a value and the barcode appears here.</div></div>
+          <div id="barCheckLine" class="check-line" aria-live="polite"></div>
+          <ul id="barWarn" class="warns"></ul>
+          <div class="export">
+            <label class="inline">PNG width <input type="number" id="barSize" min="64" max="8000" step="16" value="1200"> px</label>
+            <button id="barPng" class="btn primary">Save PNG…</button>
+            <button id="barSvgBtn" class="btn">Save SVG…</button>
+            <button id="barCopy" class="btn">Copy picture</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ read ============ -->
+      <section id="p-read" class="readp" role="tabpanel" aria-labelledby="tab-read" hidden>
+        <div class="readbar">
+          <button id="readOpen" class="btn primary">Open picture…</button>
+          <button id="readPaste" class="btn">Paste picture</button>
+          <button id="readScreen" class="btn">Read from screen</button>
+          <label class="check"><input type="checkbox" id="hideWin" checked> Hide this window while the screen is captured</label>
+          <span class="grow"></span>
+          <span id="readStatus" class="muted small" aria-live="polite"></span>
+        </div>
+        <div class="readbody">
+          <div id="readDrop" class="drop readstage" tabindex="0" role="button" aria-label="Open a picture to read">
+            <canvas id="readCanvas" hidden aria-label="The picture with the codes found outlined"></canvas>
+            <div id="readEmpty" class="readempty">
+              <strong class="big">Drop a picture here, or paste one with Ctrl+V</strong>
+              <span class="muted">QR codes and barcodes (EAN, UPC, Code 128, Code 39, ITF, Data Matrix and more), several per picture</span>
+              <span class="muted small">Links are shown, never opened by themselves.</span>
+            </div>
+          </div>
+          <div id="readList" class="results" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- ============ batch ============ -->
+      <section id="p-batch" class="split" role="tabpanel" aria-labelledby="tab-batch" hidden>
+        <div class="form">
+          <h2>List</h2>
+          <label for="batchText" class="visually">One code per line</label>
+          <textarea id="batchText" rows="12" spellcheck="false" placeholder="One code per line, for example&#10;https://example.org/item/1&#10;https://example.org/item/2&#10;&#10;A CSV works too: the first column is what goes in the code, an optional second column is the file name."></textarea>
+          <div class="row-l"><button id="batchOpen" class="btn small">Open CSV or text file…</button><span id="batchCount" class="muted small"></span></div>
+        </div>
+        <div class="preview">
+          <h2>Make</h2>
+          <div class="opts">
+            <label>Code type
+              <select id="batchKind">
+                <option value="qr">QR code (style and colours from Make QR)</option>
+                <option value="ean13">EAN-13</option><option value="ean8">EAN-8</option><option value="upca">UPC-A</option>
+                <option value="code128">Code 128</option><option value="code39">Code 39</option><option value="itf">ITF</option>
+              </select>
+            </label>
+            <div class="optrow" role="radiogroup" aria-label="File format">
+              <span class="lbl">Files</span>
+              <button class="mode small" role="radio" data-fmt="png" aria-checked="true">PNG</button>
+              <button class="mode small" role="radio" data-fmt="svg" aria-checked="false">SVG</button>
+              <button class="mode small" role="radio" data-fmt="both" aria-checked="false">Both</button>
+            </div>
+            <label>PNG size (px)<input type="number" id="batchSize" min="64" max="8000" step="16" value="800"></label>
+            <div class="optrow"><span class="lbl">Folder</span><button id="batchDir" class="btn small">Choose…</button><span id="batchDirName" class="muted small trunc">No folder chosen</span></div>
+          </div>
+          <div class="export left">
+            <button id="batchGo" class="btn primary" disabled>Make codes</button>
+            <button id="batchCancel" class="btn" hidden>Cancel</button>
+            <div id="batchProg" class="progress" role="progressbar" aria-label="Batch progress" aria-valuemin="0" aria-valuemax="100" hidden><div></div></div>
+          </div>
+          <div id="batchResult" class="result" role="status" hidden></div>
+          <ul id="batchErrors" class="warns"></ul>
+        </div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../codes.js"></script>
+  <script src="../payload.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -22,6 +22,9 @@ components. Each downloadable package also carries the licence files its compone
 | [FFmpeg](https://ffmpeg.org/) via [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) | Audio Converter, Video Converter, Audio Editor, Duplicate Finder, Stem Splitter, BPM & Key Finder, Lyrics Maker | **GPL-3.0-or-later** (this build is GPL: libx264, libmp3lame, libopus, libvorbis and others) | See below |
 | [exifr](https://github.com/MikeKovarik/exifr) | Batch File Renamer | MIT | Pure JavaScript; reads when a photo was taken (EXIF DateTimeOriginal) |
 | [music-metadata](https://github.com/Borewit/music-metadata) | Batch File Renamer | MIT | Pure JavaScript; reads artist, title, track and album. Dependencies strtok3, token-types, file-type, @tokenizer/token, @tokenizer/inflate, uint8array-extras, @borewit/text-codec, win-guid, content-type, media-typer, debug, ms (MIT) and ieee754 (BSD-3-Clause) |
+| [qrcode](https://github.com/soldair/node-qrcode) | QR & Barcode Studio | MIT | QR encoding (drawing is code in this repository); dependencies dijkstrajs, pngjs, yargs and its helpers (MIT / ISC) |
+| [bwip-js](https://github.com/metafloor/bwip-js) | QR & Barcode Studio | MIT | Barcodes (EAN, UPC, Code 128, Code 39, ITF) as SVG, offline; includes BWIPP (MIT) |
+| [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) | QR & Barcode Studio | MIT | [ZXing-C++](https://github.com/zxing-cpp/zxing-cpp) (Apache-2.0) compiled to WebAssembly, used to read codes. The .wasm file is bundled and loaded from the app's own files, never from the CDN that is the library's default; dependencies @types/emscripten, type-fest (MIT) |
 
 Music Player's playback uses the audio decoders built into Electron / Chromium (MP3, FLAC, Ogg Vorbis, Opus, AAC, WAV); it bundles no extra codecs. Its LRC and TTML lyrics, M3U playlist and library code is code in this repository.
 
@@ -30,6 +33,10 @@ Photo Privacy Cleaner has no runtime dependencies: its JPEG, PNG and WebP handli
 Lyrics Maker's tests make spoken test clips with the speech voices that come with Windows; nothing from them is shipped.
 
 Text & File Diff has no runtime dependencies: its diff (Myers and patience), patch, merge and folder comparison are code in this repository. Its tests use [jsdiff](https://github.com/kpdecker/jsdiff) (BSD-3-Clause, never shipped) to check that the diffs are minimal and that exported patches apply back.
+
+Disk Space Visualizer has no runtime dependencies: its scanner and squarified treemap are code in this repository.
+
+QR & Barcode Studio's tests use [resvg-js](https://github.com/yisibl/resvg-js) (MPL-2.0, never shipped) to turn the SVG codes into pixels before reading them back.
 
 Test-only tools (never shipped in a package): [sharp](https://github.com/lovell/sharp) (Apache-2.0) and [exifr](https://github.com/MikeKovarik/exifr) (MIT) in Photo Privacy Cleaner's tests, and [pdf.js](https://github.com/mozilla/pdf.js) / pdfjs-dist (Apache-2.0) in PDF Toolkit's tests, used to check our output with independent implementations.
 
