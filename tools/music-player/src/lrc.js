@@ -9,10 +9,42 @@
   const META_KEYS = { ti: 'title', ar: 'artist', al: 'album', au: 'author', by: 'by', length: 'length', offset: 'offset', re: 'tool', tool: 'tool', ve: 'version', la: 'language' };
   const TIME_TAG = /\[(\d{1,4}):(\d{1,2})(?:[.:](\d{1,3}))?\]/y;
   const META_LINE = /^\[([A-Za-z]{2,6}):(.*)\]\s*$/;
-  const WORD_TAG = /<\d{1,4}:\d{1,2}(?:[.:]\d{1,3})?>/g; // enhanced LRC <mm:ss.xx> word times: dropped, we show whole lines
+  const WORD_TAG = /<\d{1,4}:\d{1,2}(?:[.:]\d{1,3})?>/g; // enhanced LRC <mm:ss.xx> word times (kept as `words`, see wordsOf)
 
   /** "12" -> 120 ms, "123" -> 123 ms, "1" -> 100 ms (digits are a decimal fraction of a second). */
   const fractionToMs = (f) => (f ? Number((f + '00').slice(0, 3)) : 0);
+
+  /**
+   * Enhanced LRC ("<00:10.00>Hel<00:10.50>lo <00:11.00>world <00:11.60>"): the time before each piece is when it is sung. Pieces
+   * with no space between them are syllables of one word. A last tag with nothing after it is when the last word ends.
+   * @returns {{t:number,end:number,text:string}[]|null}  null when the line has no word times
+   */
+  function wordsOf(body) {
+    const re = /<(\d{1,4}):(\d{1,2})(?:[.:](\d{1,3}))?>/g;
+    const pieces = []; let m; let last = null; let pos = 0; let lead = '';
+    while ((m = re.exec(body))) {
+      const between = body.slice(pos, m.index);
+      if (last) last.text += between; else lead += between;
+      const sec = Number(m[2]);
+      const t = sec < 60 ? Number(m[1]) * 60000 + sec * 1000 + fractionToMs(m[3]) : null;
+      last = t == null ? last : { t, text: '' };
+      if (t != null) pieces.push(last);
+      pos = re.lastIndex;
+    }
+    if (!pieces.length) return null;
+    pieces[pieces.length - 1].text += body.slice(pos);
+    const words = [];
+    pieces.forEach((p, i) => {
+      const end = i + 1 < pieces.length ? pieces[i + 1].t : p.t;
+      const glued = words.length && !/^\s/.test(p.text) && !/\s$/.test(pieces[i - 1].text);
+      const text = p.text.replace(/\s+/g, ' ').trim();
+      if (!text) { if (words.length && i === pieces.length - 1) words[words.length - 1].end = Math.max(words[words.length - 1].end, p.t); return; }
+      if (glued && words.length) { const w = words[words.length - 1]; w.text += text; w.end = Math.max(w.end, end); } else words.push({ t: p.t, end: Math.max(end, p.t), text });
+    });
+    if (lead.trim() && words.length) words[0].text = lead.trim() + ' ' + words[0].text;
+    for (let i = 0; i < words.length; i++) if (words[i].end <= words[i].t) words[i].end = i + 1 < words.length ? words[i + 1].t : words[i].t + 500;
+    return words.length ? words : null;
+  }
 
   /**
    * @param {string} text
@@ -39,15 +71,19 @@
         if (sec < 60) stamps.push(Number(t[1]) * 60000 + sec * 1000 + fractionToMs(t[3]));
         pos = TIME_TAG.lastIndex;
       }
-      const body = line.slice(pos).replace(WORD_TAG, '').replace(/\s{2,}/g, ' ').trim();
-      if (stamps.length) for (const t of stamps) timed.push({ t, text: body });
+      const rest = line.slice(pos);
+      const body = rest.replace(WORD_TAG, '').replace(/\s{2,}/g, ' ').trim();
+      const words = stamps.length === 1 ? wordsOf(rest) : null;   // word times only make sense for a line sung once
+      if (stamps.length) for (const t of stamps) timed.push(words ? { t, text: body, words } : { t, text: body });
       else if (line) plain.push({ t: null, text: line });
     }
     if (!timed.length) return { lines: plain, synced: false, meta };
     let offset = 0;
     if (applyOffset && meta.offset != null && Number.isFinite(Number(meta.offset))) offset = Number(meta.offset);
     const lines = timed.map((l, i) => ({ l, i })).sort((a, b) => a.l.t - b.l.t || a.i - b.i)
-      .map(({ l }) => ({ t: Math.max(0, l.t - offset), text: l.text }));
+      .map(({ l }) => (l.words
+        ? { t: Math.max(0, l.t - offset), text: l.text, words: l.words.map((w) => ({ t: Math.max(0, w.t - offset), end: Math.max(0, w.end - offset), text: w.text })) }
+        : { t: Math.max(0, l.t - offset), text: l.text }));
     return { lines, synced: true, meta };
   }
 

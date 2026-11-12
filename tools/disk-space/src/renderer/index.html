@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Disk Space Visualizer</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Disk Space Visualizer</h1>
+      <span class="muted small tagline">what fills your drive</span>
+      <span class="grow"></span>
+      <button id="newScan" class="btn ghost" hidden>Scan something else</button>
+      <button id="pick" class="btn">Choose a folder…</button>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="stage">
+      <!-- start: the drives -->
+      <section id="start" class="start">
+        <h2>Drives</h2>
+        <div id="drives" class="drives" aria-live="polite"><span class="muted">Looking for drives…</span></div>
+        <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose a folder to scan">
+          <strong class="big">Or drop a folder here</strong>
+          <span class="row"><button id="pick2" class="btn primary">Choose a folder…</button></span>
+          <p class="muted small fine">The scan runs on this computer and only reads: nothing is changed or deleted unless you choose <em>Move to Recycle Bin</em> on an item and confirm it. Links and junctions are not followed, and files with several hard links are counted once.</p>
+        </div>
+        <label class="check"><input type="checkbox" id="oneDrive" checked> Stay on the chosen drive (do not go into other drives that are mounted inside it)</label>
+      </section>
+
+      <!-- results -->
+      <section id="results" class="results" hidden>
+        <div class="statusbar" aria-live="polite">
+          <span id="status" class="status"></span>
+          <div id="prog" class="progress busy" role="progressbar" aria-label="Scanning" hidden><div></div></div>
+          <span class="grow"></span>
+          <button id="skipped" class="btn small ghost warnish" hidden></button>
+          <button id="cancel" class="btn small" hidden>Cancel</button>
+          <button id="csv" class="btn small" hidden>Export CSV…</button>
+        </div>
+        <div id="current" class="current muted small trunc" aria-live="off"></div>
+
+        <div class="navrow">
+          <nav id="crumbs" class="crumbs" aria-label="Folder path"></nav>
+          <span class="grow"></span>
+          <div class="tabs" role="tablist" aria-label="Views">
+            <button role="tab" id="tab-map" aria-selected="true" data-view="map">Map</button>
+            <button role="tab" id="tab-tree" aria-selected="false" data-view="tree">Folders</button>
+            <button role="tab" id="tab-big" aria-selected="false" data-view="big">Largest files</button>
+            <button role="tab" id="tab-types" aria-selected="false" data-view="types">File types</button>
+          </div>
+        </div>
+
+        <div class="body">
+          <div class="view">
+            <div id="v-map" class="pane mapwrap" role="tabpanel" aria-labelledby="tab-map">
+              <canvas id="map" role="img" aria-label="Map of the folder: each box is a file or folder, sized by the space it takes"></canvas>
+              <div id="tip" class="tip" hidden></div>
+            </div>
+            <div id="v-tree" class="pane tablewrap" role="tabpanel" aria-labelledby="tab-tree" hidden>
+              <table class="grid">
+                <thead><tr>
+                  <th class="c-name"><button class="sort" data-sort="name">Name</button></th>
+                  <th class="c-size" aria-sort="descending"><button class="sort" data-sort="size">Size</button></th>
+                  <th class="c-pct">% of folder</th>
+                  <th class="c-num"><button class="sort" data-sort="files">Files</button></th>
+                  <th class="c-num"><button class="sort" data-sort="dirs">Folders</button></th>
+                </tr></thead>
+                <tbody id="treeRows"></tbody>
+              </table>
+            </div>
+            <div id="v-big" class="pane tablewrap" role="tabpanel" aria-labelledby="tab-big" hidden>
+              <table class="grid">
+                <thead><tr><th class="c-rank">#</th><th>Name</th><th>Folder</th><th class="c-type">Type</th><th class="c-size">Size</th></tr></thead>
+                <tbody id="bigRows"></tbody>
+              </table>
+            </div>
+            <div id="v-types" class="pane tablewrap" role="tabpanel" aria-labelledby="tab-types" hidden>
+              <div class="types">
+                <div>
+                  <h2 id="typesTitle">In this folder</h2>
+                  <table class="grid"><thead><tr><th>Type</th><th class="c-size">Size</th><th class="c-pct">Share</th></tr></thead><tbody id="groupRows"></tbody></table>
+                </div>
+                <div>
+                  <h2>Top extensions <span class="muted small" id="extNote"></span></h2>
+                  <table class="grid"><thead><tr><th>Extension</th><th>Type</th><th class="c-num">Files</th><th class="c-size">Size</th></tr></thead><tbody id="extRows"></tbody></table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="side">
+            <div id="sel" class="details">
+              <h2>Selected</h2>
+              <div id="selEmpty" class="muted small">Click a box on the map or a row in a list. Click a folder's name bar (or double-click) to go into it.</div>
+              <div id="selInfo" hidden>
+                <div id="selName" class="selname"></div>
+                <div id="selPath" class="selpath"></div>
+                <div id="selSize" class="selsize"></div>
+                <div id="selMeta" class="muted small"></div>
+                <div class="actions">
+                  <button id="aZoom" class="btn small">Go into folder</button>
+                  <button id="aShow" class="btn small">Show in folder</button>
+                  <button id="aOpen" class="btn small">Open</button>
+                  <button id="aCopy" class="btn small">Copy path</button>
+                  <button id="aRescan" class="btn small">Rescan this folder</button>
+                  <button id="aTrash" class="btn small danger">Move to Recycle Bin…</button>
+                </div>
+              </div>
+            </div>
+            <div class="details">
+              <h2>Colours</h2>
+              <ul id="legend" class="legend"></ul>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="skipDlg" class="dlg" aria-labelledby="skipTitle">
+      <h2 id="skipTitle">Folders that could not be read</h2>
+      <p class="muted small">Their size is not counted. Usually the system keeps them private; running as an administrator can help.</p>
+      <ul id="skipList" class="skiplist"></ul>
+      <div class="row end"><button id="skipClose" class="btn">Close</button></div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../types.js"></script>
+  <script src="../treemap.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

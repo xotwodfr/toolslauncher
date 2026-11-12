@@ -64,7 +64,7 @@
     {
       "id": "music-player",
       "name": "Music Player",
-      "description": "Play a folder of music with covers, tags and synced lyrics. Gapless, equalizer, ReplayGain, playlists. Nothing is uploaded.",
+      "description": "Play a folder of music with covers, tags and synced lyrics, word by word for .ttml. Gapless, equalizer, ReplayGain, playlists. Nothing is uploaded.",
       "category": "Audio",
       "glyph": "♫",
       "accent": "#d6409f",
@@ -94,7 +94,7 @@
     {
       "id": "lyrics-maker",
       "name": "Lyrics Maker",
-      "description": "Listen to a song and write its lyrics with the time each line starts. Play it, fix any line, and save a timed .lrc file for your music player. Works offline in 99 languages; nothing is uploaded.",
+      "description": "Time a song's lyrics word by word: paste them, or let it listen for the words. Play with the words lighting up, fix any word, save word-synced .ttml or .lrc. Offline, 99 languages.",
       "category": "Audio",
       "glyph": "✎",
       "accent": "#ffd166",
@@ -138,6 +138,126 @@
       "category": "Images",
       "glyph": "≣",
       "accent": "#9d86f5",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "text-diff",
+      "name": "Text & File Diff",
+      "description": "Compare texts, files and folders side by side, merge changes, and save patches or HTML reports. Offline.",
+      "category": "Documents",
+      "glyph": "≠",
+      "accent": "#8fa8ff",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "file-renamer",
+      "name": "Batch File Renamer",
+      "description": "Rename many files at once with stacked rules, a live preview, clash checks and undo for every batch.",
+      "category": "Files",
+      "glyph": "✎",
+      "accent": "#cfd8dc",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "disk-space",
+      "name": "Disk Space Visualizer",
+      "description": "See what fills a drive or folder: a map of boxes, a folder list, the largest files and file types. Clean up to the Recycle Bin.",
+      "category": "Files",
+      "glyph": "▦",
+      "accent": "#ff9f6e",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "qr-studio",
+      "name": "QR & Barcode Studio",
+      "description": "Make QR codes (Wi-Fi, contacts, links, events) and barcodes (EAN, UPC, Code 128), and read them from pictures or the screen.",
+      "category": "Images",
+      "glyph": "▩",
+      "accent": "#b8f2e6",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "password-vault",
+      "name": "Password Vault",
+      "description": "An offline password manager: one encrypted vault file you choose, with a generator, 2FA codes, auto-lock and CSV import.",
+      "category": "Privacy",
+      "glyph": "⚿",
+      "accent": "#f2c94c",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "file-encryptor",
+      "name": "File Encryptor & Hasher",
+      "description": "Encrypt files and folders with a password, and compute, compare and verify SHA-256, SHA-512, SHA-1, MD5 and BLAKE2b checksums.",
+      "category": "Privacy",
+      "glyph": "⛨",
+      "accent": "#4fd1a5",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "markdown-notes",
+      "name": "Markdown Notes",
+      "description": "Notes as plain Markdown files in a folder you choose, with live preview, search, tags, wiki links and export to HTML, PDF and Word.",
+      "category": "Documents",
+      "glyph": "✎",
+      "accent": "#ffb4a2",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "ebook-studio",
+      "name": "Ebook Converter & Reader",
+      "description": "Read EPUB, text, Markdown and HTML books, convert between EPUB, PDF, HTML, Markdown and text, and edit an EPUB's title, author and cover.",
+      "category": "Documents",
+      "glyph": "❡",
+      "accent": "#c9a0ff",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "voice-recorder",
+      "name": "Voice Recorder & Cleaner",
+      "description": "Record voice memos, podcasts and narration, then clean them up: less noise and rumble, shorter pauses, even loudness. Offline.",
+      "category": "Audio",
+      "glyph": "◉",
+      "accent": "#e879f9",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "photo-batch-editor",
+      "name": "Photo Batch Editor",
+      "description": "Apply the same edits to many photos at once: resize, crop, colour, watermark, border and rounded corners, with a live before/after preview.",
+      "category": "Images",
+      "glyph": "▧",
+      "accent": "#8bd450",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "subtitle-maker",
+      "name": "Subtitle Maker",
+      "description": "Write subtitles for a video from its speech, offline (Whisper). Edit them, save .srt/.vtt, or burn them into the video.",
+      "category": "Video",
+      "glyph": "▤",
+      "accent": "#5eb0ff",
+      "version": "0.1.0",
+      "platforms": {}
+    },
+    {
+      "id": "audio-inspector",
+      "name": "Audio Inspector",
+      "description": "See what is really inside audio files: catches fake lossless (FLAC made from MP3), upsampled and fake 24-bit files; loudness, peaks, clipping.",
+      "category": "Audio",
+      "glyph": "⌕",
+      "accent": "#ff6f61",
       "version": "0.1.0",
       "platforms": {}
     }

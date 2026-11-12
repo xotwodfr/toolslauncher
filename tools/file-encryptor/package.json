@@ -1,0 +1,42 @@
+{
+  "name": "file-encryptor",
+  "productName": "File Encryptor Hasher",
+  "version": "0.1.0",
+  "description": "Encrypt files and folders with a password, and compute or verify checksums. Offline.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/encryptor.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "@zxcvbn-ts/core": "^3.0.4",
+    "@zxcvbn-ts/language-common": "^3.0.4",
+    "@zxcvbn-ts/language-en": "^3.0.2",
+    "hash-wasm": "^4.12.0"
+  },
+  "build": {
+    "appId": "com.toolslauncher.fileencryptor",
+    "productName": "File Encryptor Hasher",
+    "electronVersion": "33.4.11",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["src/**/*", "package.json"],
+    "artifactName": "FileEncryptorHasher-${version}-${os}-${arch}.${ext}",
+    "executableName": "file-encryptor",
+    "win": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "category": "Utility"
+    }
+  }
+}

@@ -5,34 +5,29 @@ name: Build and release
 #   v1.2.3      -> normal release; becomes "latest", so the launcher's default catalog URL picks it up
 #   v1.2.3-rc1  -> prerelease; never "latest", so users are not affected (test it by pasting its
 #                  .../releases/download/<tag>/catalog.json URL into the launcher's Settings)
-# "Run workflow" (workflow_dispatch) builds and uploads artifacts only; it does not publish.
+# "Run workflow" (workflow_dispatch) builds, tests and uploads artifacts only; it does not publish.
+#
+# Every tool is its own job, on Windows and Linux at the same time, so a full build takes about as long as the slowest
+# tool instead of all of them one after another, and one failing tool never hides the results of the others. The
+# release job waits for every one of them, so a single failure can never publish a half catalog.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
 
+# A newer run of the same branch or tag replaces one that is still going (a tag release is never cancelled half way).
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  ONNXRUNTIME_NODE_INSTALL: skip   # onnxruntime-node would download ~hundreds of MB of CUDA libraries on Linux; the tools are CPU-only
+
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            script: dist:win
-          - os: ubuntu-22.04 # older glibc => AppImage/deb run on more distros
-            script: dist:linux
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: bash # a multi-line step must stop at the first failing command (the Windows default, pwsh, does not)
+  version:
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: '**/package-lock.json'
-
       - name: Tag must match the launcher version
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -43,145 +38,120 @@ jobs:
             exit 1
           fi
 
+  launcher:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+          - os: ubuntu-22.04 # older glibc => AppImage/deb run on more distros
+            script: dist:linux
+    name: Launcher (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash # a multi-line step must stop at the first failing command (the Windows default, pwsh, does not)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
       # scripts/ci-step.sh runs a command normally, but if it fails it also publishes the last lines of its output as an
       # error annotation, so a failed run explains itself (annotations are readable without signing in).
-      - name: Launcher - install, test, package
+      - name: Install, test, package
         run: |
           bash scripts/ci-step.sh "Launcher: npm ci" npm ci
           bash scripts/ci-step.sh "Launcher: npm test" npm test
           bash scripts/ci-step.sh "Launcher: package" npm run ${{ matrix.script }}
 
-      - name: Picture Converter
-        working-directory: tools/picture-converter
-        run: |
-          bash ../../scripts/ci-step.sh "Picture Converter: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Picture Converter: npm test" npm test
-          bash ../../scripts/ci-step.sh "Picture Converter: package" npm run ${{ matrix.script }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-${{ matrix.os }}
+          path: |
+            dist/ToolsLauncher-*
+            !dist/*.blockmap
+          if-no-files-found: error
 
-      - name: Audio Tagger
-        working-directory: tools/audio-tagger
-        run: |
-          bash ../../scripts/ci-step.sh "Audio Tagger: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Audio Tagger: npm test" npm test
-          bash ../../scripts/ci-step.sh "Audio Tagger: package" npm run ${{ matrix.script }}
+  tool:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { os: windows-latest, script: 'dist:win' }
+          - { os: ubuntu-22.04, script: 'dist:linux' }
+        # setup: what `npm run setup` fetches (ffmpeg, a model, language data), or '' when the tool needs nothing
+        tool:
+          - { id: picture-converter, name: 'Picture Converter', setup: '' }
+          - { id: audio-tagger, name: 'Audio Tagger', setup: '' }
+          - { id: audio-converter, name: 'Audio Converter', setup: 'ffmpeg setup' }
+          - { id: pdf-toolkit, name: 'PDF Toolkit', setup: '' }
+          - { id: photo-privacy, name: 'Photo Privacy Cleaner', setup: '' }
+          - { id: video-converter, name: 'Video Converter', setup: 'ffmpeg setup' }
+          - { id: music-player, name: 'Music Player', setup: '' }
+          - { id: audio-editor, name: 'Audio Editor', setup: 'ffmpeg setup' }
+          - { id: duplicate-finder, name: 'Duplicate Finder', setup: 'ffmpeg setup' }
+          - { id: ocr, name: 'Image Text Extractor', setup: 'language data' }
+          - { id: stem-splitter, name: 'Stem Splitter', setup: 'ffmpeg and model setup' }
+          - { id: bpm-key-finder, name: 'BPM & Key Finder', setup: 'ffmpeg setup' }
+          - { id: background-remover, name: 'Background Remover', setup: 'model setup' }
+          - { id: lyrics-maker, name: 'Lyrics Maker', setup: 'ffmpeg and model setup' }
+          - { id: text-diff, name: 'Text & File Diff', setup: '' }
+          - { id: file-renamer, name: 'Batch File Renamer', setup: '' }
+          - { id: disk-space, name: 'Disk Space Visualizer', setup: '' }
+          - { id: qr-studio, name: 'QR & Barcode Studio', setup: '' }
+          - { id: password-vault, name: 'Password Vault', setup: '' }
+          - { id: file-encryptor, name: 'File Encryptor & Hasher', setup: '' }
+          - { id: markdown-notes, name: 'Markdown Notes', setup: '' }
+          - { id: ebook-studio, name: 'Ebook Converter & Reader', setup: '' }
+          - { id: voice-recorder, name: 'Voice Recorder & Cleaner', setup: 'ffmpeg setup' }
+          - { id: photo-batch-editor, name: 'Photo Batch Editor', setup: '' }
+          - { id: subtitle-maker, name: 'Subtitle Maker', setup: 'ffmpeg and model setup' }
+          - { id: audio-inspector, name: 'Audio Inspector', setup: 'ffmpeg setup' }
+    name: ${{ matrix.tool.name }} (${{ matrix.platform.os }})
+    runs-on: ${{ matrix.platform.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            tools/${{ matrix.tool.id }}/package-lock.json
 
-      - name: Audio Converter
-        working-directory: tools/audio-converter
+      # the tools are built with the launcher's own copies of electron and electron-builder (../../node_modules)
+      - name: Shared build tools
         run: |
-          bash ../../scripts/ci-step.sh "Audio Converter: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Audio Converter: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
-          bash ../../scripts/ci-step.sh "Audio Converter: npm test" npm test
-          bash ../../scripts/ci-step.sh "Audio Converter: package" npm run ${{ matrix.script }}
+          bash scripts/ci-step.sh "Shared build tools: npm ci" npm ci
 
-      - name: PDF Toolkit
-        working-directory: tools/pdf-toolkit
+      - name: ${{ matrix.tool.name }}
+        working-directory: tools/${{ matrix.tool.id }}
         run: |
-          bash ../../scripts/ci-step.sh "PDF Toolkit: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "PDF Toolkit: npm test" npm test
-          bash ../../scripts/ci-step.sh "PDF Toolkit: package" npm run ${{ matrix.script }}
-
-      - name: Photo Privacy Cleaner
-        working-directory: tools/photo-privacy
-        run: |
-          bash ../../scripts/ci-step.sh "Photo Privacy Cleaner: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Photo Privacy Cleaner: npm test" npm test
-          bash ../../scripts/ci-step.sh "Photo Privacy Cleaner: package" npm run ${{ matrix.script }}
-
-      - name: Video Converter
-        working-directory: tools/video-converter
-        run: |
-          bash ../../scripts/ci-step.sh "Video Converter: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Video Converter: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
-          bash ../../scripts/ci-step.sh "Video Converter: npm test" npm test
-          bash ../../scripts/ci-step.sh "Video Converter: package" npm run ${{ matrix.script }}
-
-      - name: Music Player
-        working-directory: tools/music-player
-        run: |
-          bash ../../scripts/ci-step.sh "Music Player: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Music Player: npm test" npm test
-          bash ../../scripts/ci-step.sh "Music Player: package" npm run ${{ matrix.script }}
-
-      - name: Audio Editor
-        working-directory: tools/audio-editor
-        run: |
-          bash ../../scripts/ci-step.sh "Audio Editor: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Audio Editor: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
-          bash ../../scripts/ci-step.sh "Audio Editor: npm test" npm test
-          bash ../../scripts/ci-step.sh "Audio Editor: package" npm run ${{ matrix.script }}
-
-      - name: Duplicate Finder
-        working-directory: tools/duplicate-finder
-        run: |
-          bash ../../scripts/ci-step.sh "Duplicate Finder: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Duplicate Finder: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
-          bash ../../scripts/ci-step.sh "Duplicate Finder: npm test" npm test
-          bash ../../scripts/ci-step.sh "Duplicate Finder: package" npm run ${{ matrix.script }}
-
-      - name: Image Text Extractor
-        working-directory: tools/ocr
-        run: |
-          bash ../../scripts/ci-step.sh "Image Text Extractor: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Image Text Extractor: language data" npm run setup   # copies the bundled OCR language files
-          bash ../../scripts/ci-step.sh "Image Text Extractor: npm test" npm test
-          bash ../../scripts/ci-step.sh "Image Text Extractor: package" npm run ${{ matrix.script }}
-
-      - name: Stem Splitter
-        working-directory: tools/stem-splitter
-        env:
-          ONNXRUNTIME_NODE_INSTALL: skip   # onnxruntime-node would download ~hundreds of MB of CUDA libraries on Linux; this tool is CPU-only
-        run: |
-          bash ../../scripts/ci-step.sh "Stem Splitter: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Stem Splitter: ffmpeg and model setup" npm run setup   # downloads the bundled ffmpeg and the Demucs model (~136 MB)
-          bash ../../scripts/ci-step.sh "Stem Splitter: npm test" npm test   # includes a run of the real model
-          bash ../../scripts/ci-step.sh "Stem Splitter: package" npm run ${{ matrix.script }}
-
-      - name: BPM & Key Finder
-        working-directory: tools/bpm-key-finder
-        run: |
-          bash ../../scripts/ci-step.sh "BPM & Key Finder: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "BPM & Key Finder: ffmpeg setup" npm run setup   # downloads the bundled ffmpeg (ffmpeg-static)
-          bash ../../scripts/ci-step.sh "BPM & Key Finder: npm test" npm test
-          bash ../../scripts/ci-step.sh "BPM & Key Finder: package" npm run ${{ matrix.script }}
-
-      - name: Background Remover
-        working-directory: tools/background-remover
-        env:
-          ONNXRUNTIME_NODE_INSTALL: skip   # onnxruntime-node would download ~hundreds of MB of CUDA libraries on Linux; this tool is CPU-only
-        run: |
-          bash ../../scripts/ci-step.sh "Background Remover: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Background Remover: model setup" npm run setup   # downloads the ISNet model (~170 MB)
-          bash ../../scripts/ci-step.sh "Background Remover: npm test" npm test   # includes a run of the real model
-          bash ../../scripts/ci-step.sh "Background Remover: package" npm run ${{ matrix.script }}
-
-      - name: Lyrics Maker
-        working-directory: tools/lyrics-maker
-        env:
-          ONNXRUNTIME_NODE_INSTALL: skip   # CPU-only, see above
-        run: |
-          bash ../../scripts/ci-step.sh "Lyrics Maker: npm ci" npm ci
-          bash ../../scripts/ci-step.sh "Lyrics Maker: ffmpeg and model setup" npm run setup   # downloads the bundled ffmpeg and the Whisper model (~250 MB)
-          bash ../../scripts/ci-step.sh "Lyrics Maker: npm test" npm test   # runs the real model; the spoken-clip tests need the Windows voices and are skipped on Linux
-          bash ../../scripts/ci-step.sh "Lyrics Maker: package" npm run ${{ matrix.script }}
-
-
-      - name: Collect release files into one flat folder
-        run: |
-          mkdir release
-          find dist -maxdepth 1 -type f -name 'ToolsLauncher-*' ! -name '*.blockmap' -exec cp {} release/ \;
-          cp tools/*/dist/*-x64.zip release/
-          ls -l release
-          test "$(ls release | wc -l)" -ge 4
+          bash ../../scripts/ci-step.sh "${{ matrix.tool.name }}: npm ci" npm ci
+          if [ -n "${{ matrix.tool.setup }}" ]; then
+            bash ../../scripts/ci-step.sh "${{ matrix.tool.name }}: ${{ matrix.tool.setup }}" npm run setup
+          fi
+          bash ../../scripts/ci-step.sh "${{ matrix.tool.name }}: npm test" npm test
+          bash ../../scripts/ci-step.sh "${{ matrix.tool.name }}: package" npm run ${{ matrix.platform.script }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
-          path: release/*
+          name: tool-${{ matrix.tool.id }}-${{ matrix.platform.os }}
+          path: tools/${{ matrix.tool.id }}/dist/*-x64.zip
           if-no-files-found: error
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build # every matrix job must pass, so a broken Linux build can never publish a half catalog
+    needs: [launcher, tool] # every job must pass, so a broken build can never publish a half catalog
     runs-on: ubuntu-22.04
     permissions:
       contents: write

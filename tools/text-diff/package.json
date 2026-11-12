@@ -1,0 +1,40 @@
+{
+  "name": "text-diff",
+  "productName": "Text File Diff",
+  "version": "0.1.0",
+  "description": "Compare texts, files and folders side by side, merge changes and export patches. Offline.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/textdiff.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "diff": "^8.0.2"
+  },
+  "build": {
+    "appId": "com.toolslauncher.textdiff",
+    "productName": "Text File Diff",
+    "electronVersion": "33.4.11",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["src/**/*", "package.json"],
+    "artifactName": "TextFileDiff-${version}-${os}-${arch}.${ext}",
+    "executableName": "text-diff",
+    "win": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "category": "Development"
+    }
+  }
+}

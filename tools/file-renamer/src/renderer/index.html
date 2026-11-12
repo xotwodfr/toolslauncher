@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>Batch File Renamer</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Batch File Renamer</h1>
+      <span class="muted small tagline">rules · preview · undo</span>
+      <span class="grow"></span>
+      <button id="histBtn" class="btn ghost">History &amp; undo</button>
+      <button id="clear" class="btn ghost" hidden>Clear list</button>
+      <label class="check small" title="When you add a folder, also add the files in its sub-folders"><input type="checkbox" id="recursive"> Sub-folders</label>
+      <select id="folders" aria-label="What adding a folder does" title="What adding a folder does">
+        <option value="contents">Folders: add the files inside</option><option value="self">Folders: rename the folder itself</option>
+      </select>
+      <button id="addFolder" class="btn">Add folder…</button>
+      <button id="addFiles" class="btn">Add files…</button>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="main">
+      <aside class="rules" aria-label="Rules">
+        <div class="rhead">
+          <span class="label">Rules</span>
+          <span class="grow"></span>
+          <select id="addRule" aria-label="Add a rule">
+            <option value="">+ Add a rule…</option>
+            <option value="replace">Find &amp; replace</option>
+            <option value="insert">Insert text</option>
+            <option value="remove">Remove characters</option>
+            <option value="case">Change case</option>
+            <option value="number">Numbering</option>
+            <option value="date">Date</option>
+            <option value="tags">Audio tags</option>
+            <option value="extension">Extension</option>
+            <option value="trim">Trim spaces</option>
+            <option value="translit">Remove accents</option>
+          </select>
+        </div>
+        <div class="presets">
+          <select id="preset" aria-label="Load a preset"><option value="">Presets…</option></select>
+          <input type="text" id="presetName" placeholder="Name for this rule set" aria-label="Preset name" maxlength="80">
+          <button id="savePreset" class="btn small">Save</button>
+          <button id="delPreset" class="btn small ghost" disabled>Delete</button>
+        </div>
+        <div id="ruleList" class="rulelist"></div>
+        <p id="noRules" class="muted small hint">Add a rule to start. Rules run from top to bottom; drag them or use the arrows to change the order, and untick one to skip it. Nothing is renamed until you press <em>Rename</em>.</p>
+      </aside>
+
+      <section class="files">
+        <div class="ftool">
+          <label class="inline">Order
+            <select id="sort" aria-label="Order of the files (used by numbering)">
+              <option value="name">Name</option><option value="modified">Date modified</option><option value="size">Size</option><option value="added">Order added</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="reverse"> Reverse</label>
+          <div class="seg" role="radiogroup" aria-label="Show">
+            <button class="mode" role="radio" data-show="all" aria-checked="true">All</button>
+            <button class="mode" role="radio" data-show="changed" aria-checked="false">Changes</button>
+            <button class="mode" role="radio" data-show="problems" aria-checked="false">Problems</button>
+          </div>
+          <span class="grow"></span>
+        </div>
+        <div id="empty" class="drop" tabindex="0" role="button" aria-label="Add files">
+          <strong class="big">Drop files or folders here</strong>
+          <span class="muted">or use <em>Add files…</em> / <em>Add folder…</em></span>
+          <span class="row"><button id="addFiles2" class="btn primary">Add files…</button><button id="addFolder2" class="btn">Add folder…</button></span>
+          <p class="muted small fine">You see every new name before anything changes. Names that would clash, that Windows cannot use, or that are too long are marked, and renaming waits until they are fixed. Every batch can be undone, also after closing the app.</p>
+        </div>
+        <div id="table" class="table" hidden>
+          <div class="thead trow" role="row"><span>Current name</span><span></span><span>New name</span><span>Note</span><span></span></div>
+          <div id="scroll" class="scroll" tabindex="0" aria-label="Files and their new names"><div class="spacer"></div><div id="rows" class="rows"></div></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="result" class="result" role="status" hidden></div>
+
+    <footer class="bar">
+      <span id="summary" class="status" aria-live="polite"></span>
+      <span class="grow"></span>
+      <label class="check" title="Two files that would get the same name, or a name that is taken: add (2), (3)… to the later ones"><input type="checkbox" id="autoSuffix"> Fix clashes with (2), (3)…</label>
+      <label class="check" id="winSafeWrap" title="Treat names Windows cannot use as problems, also on this computer (useful for USB sticks and shared drives)"><input type="checkbox" id="windowsSafe" checked> Windows-safe names</label>
+      <button id="dropBad" class="btn small" hidden>Remove files with problems</button>
+      <button id="rename" class="btn primary" disabled>Rename</button>
+    </footer>
+
+    <dialog id="histDlg" class="dlg" aria-labelledby="histTitle">
+      <div class="dhead"><h2 id="histTitle">History</h2><span class="grow"></span><button id="histClose" class="btn small ghost">Close</button></div>
+      <p class="muted small">Every batch is kept here, also after the app is closed. Undo checks that each file is still where it was left before putting the old name back.</p>
+      <div id="histList" class="histlist"></div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

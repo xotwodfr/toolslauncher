@@ -242,6 +242,12 @@ input[type=range]:disabled { cursor: default; opacity: .5; }
 .lyrics p.past { color: #8a91ab; }
 .lyrics p.active { color: #fff; transform: scale(1.02); }
 .lyrics.plain p { color: #cfd3e3; font-weight: 500; }
+/* word-synced (karaoke) lyrics: in the active line, sung words are white and the word being sung fills from left to right */
+.lyrics.words p.active { color: #8a91ab; }
+.lyrics.words p .w { cursor: pointer; transition: color .12s; }
+.lyrics.words p.active .w.sung { color: #fff; }
+.lyrics.words p.active .w.singing { color: transparent; background: linear-gradient(90deg, #fff var(--p, 0%), #8a91ab var(--p, 0%)); -webkit-background-clip: text; background-clip: text; }
+.lyrics.words p .w:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .lyrics p.gap { min-height: .8em; }
 .nolyrics { margin: 8vh auto 0; max-width: 380px; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .lyrics { scroll-behavior: auto; } .lyrics p, .eqi i { transition: none; animation: none; } }

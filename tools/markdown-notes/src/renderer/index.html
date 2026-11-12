@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' notefile: data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <title>Markdown Notes</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Markdown Notes</h1>
+      <button id="folderBtn" class="btn ghost small folder" title="Choose another notes folder" hidden></button>
+      <span class="grow"></span>
+      <div id="noteTools" class="row" hidden>
+        <button id="newNote" class="btn" title="New note (Ctrl+N)">New note</button>
+        <button id="newFolder" class="btn" title="New folder">New folder</button>
+        <div class="seg" role="radiogroup" aria-label="View">
+          <button class="mode" role="radio" data-view="edit" aria-checked="false" title="Editor only (Ctrl+E switches)">Edit</button>
+          <button class="mode" role="radio" data-view="split" aria-checked="true" title="Editor and preview side by side">Split</button>
+          <button class="mode" role="radio" data-view="preview" aria-checked="false" title="Preview only">Preview</button>
+        </div>
+        <button id="exportBtn" class="btn" aria-haspopup="menu" disabled>Export ▾</button>
+      </div>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden><span id="bannerText"></span><span class="grow"></span><span id="bannerActions" class="row"></span></div>
+
+    <section id="welcome" class="welcome" hidden>
+      <div class="drop">
+        <strong class="big">Keep your notes as plain Markdown files</strong>
+        <span class="muted fine">Choose a folder for your notes (an empty one, or one that already has <code>.md</code> files). Every note is an ordinary text file in that folder, so you can open, back up or sync it with anything. Nothing leaves this computer.</span>
+        <span class="row"><button id="pickFolder" class="btn primary">Choose notes folder…</button></span>
+      </div>
+    </section>
+
+    <div id="workspace" class="workspace" hidden>
+      <aside class="side" aria-label="Notes">
+        <div class="searchbox">
+          <input id="q" type="search" placeholder="Search notes   (Ctrl+Shift+F)" aria-label="Search all notes" spellcheck="false">
+          <div id="tagFilter" class="tagfilter" hidden><span class="muted small">Tag</span> <span id="tagFilterName" class="tag"></span><button id="tagClear" class="btn ghost small" aria-label="Clear tag filter">×</button></div>
+        </div>
+        <div id="results" class="results" hidden aria-live="polite"></div>
+        <div id="browse" class="browse">
+          <section id="pinnedSec" class="sec" hidden><h2>Pinned</h2><div id="pinned" class="list"></div></section>
+          <section id="recentSec" class="sec" hidden><h2>Recent</h2><div id="recent" class="list"></div></section>
+          <section id="tagsSec" class="sec" hidden><h2>Tags</h2><div id="tags" class="chips"></div></section>
+          <section class="sec treesec">
+            <h2 id="treeHead" class="drophead" title="Drop here to move to the top of the notes folder">Notes <span id="noteCount" class="muted"></span></h2>
+            <div id="tree" class="tree" role="tree" aria-label="Notes and folders"></div>
+          </section>
+        </div>
+      </aside>
+
+      <main class="work">
+        <div id="empty" class="empty">
+          <p class="muted">Pick a note on the left, or make a new one.</p>
+          <span class="row"><button id="newNote2" class="btn primary">New note</button></span>
+          <p class="muted small fine">Tips: <kbd>[[</kbd>Note name<kbd>]]</kbd> links notes (a link to a note that does not exist yet creates it), <code>#tag</code> tags a note, and you can paste or drop pictures straight into a note.</p>
+        </div>
+        <div id="note" class="note" hidden>
+          <div class="notehead">
+            <span id="crumbs" class="crumbs trunc"></span>
+            <span class="grow"></span>
+            <button id="pinBtn" class="btn ghost small" aria-pressed="false" title="Pin this note to the top of the list">☆ Pin</button>
+            <button id="moreBtn" class="btn ghost small" aria-haspopup="menu" title="Rename, move or delete">⋯</button>
+          </div>
+          <div id="panes" class="panes split">
+            <div id="editor" class="editor" aria-label="Note text"></div>
+            <div id="previewWrap" class="previewwrap"><article id="preview" class="preview md" aria-label="Preview"></article></div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer class="status" id="statusbar" hidden>
+      <span id="saveState" class="save"></span>
+      <span id="words" class="muted"></span>
+      <span id="backlinks" class="muted trunc"></span>
+      <span class="grow"></span>
+      <span id="result" class="result" role="status" hidden></span>
+    </footer>
+  </div>
+
+  <div id="menu" class="menu" role="menu" hidden></div>
+
+  <dialog id="dlg" class="dlg" aria-labelledby="dlgTitle">
+    <form method="dialog" id="dlgForm">
+      <h2 id="dlgTitle"></h2>
+      <p id="dlgText" class="muted"></p>
+      <input id="dlgInput" type="text" spellcheck="false" hidden>
+      <select id="dlgSelect" hidden></select>
+      <p id="dlgError" class="err small" hidden></p>
+      <div class="row end">
+        <button type="button" id="dlgCancel" class="btn">Cancel</button>
+        <button type="submit" id="dlgOk" class="btn primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="vendor/editor.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

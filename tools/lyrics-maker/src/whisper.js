@@ -15,7 +15,7 @@ const MAX_TOKENS = 224;               // per 30 second window (half of the decod
 // Retry rules. The reference's values (repetition 2.4, probability -1.0, three retries) are tuned for speech; music trips them
 // constantly (a repeated hook is not a loop, a sung line is never as certain as a spoken one) and every retry costs a full decode,
 // so for songs they are loosened: only real loops and real guesses are decoded again, once, with a little randomness.
-const TEMPERATURES = [0, 0.5];
+const TEMPERATURES = [0, 0.4, 0.8];
 const COMPRESSION_THRESHOLD = 3.5;
 const LOGPROB_THRESHOLD = -1.5;
 const NO_SPEECH_THRESHOLD = 0.6;
@@ -49,21 +49,162 @@ function loadAssets(dir) {
   }
   const langs = {};
   for (const [token, id] of Object.entries(gen.lang_to_id)) langs[token.replace(/[<>|]/g, '')] = id;
+  // special tokens by name (their numbers differ between model sizes: large-v3 has one more language)
+  const added = new Map((tok.added_tokens || []).map((t) => [t.content, t.id]));
+  const noSpeech = added.get('<|nospeech|>') ?? added.get('<|nocaptions|>') ?? 50362;
   return {
     eot, sot: gen.decoder_start_token_id,
     transcribe: gen.task_to_id.transcribe,
     noTimestamps: gen.no_timestamps_token_id,
     timestampBegin: gen.no_timestamps_token_id + 1,
-    noSpeech: 50362,                               // <|nocaptions|>, the multilingual models' "no speech" token
+    noSpeech,                                      // <|nocaptions|> / <|nospeech|>, the "no speech" token
     maxInitialTimestamp: gen.max_initial_timestamp_index == null ? 50 : gen.max_initial_timestamp_index,
     suppress: Int32Array.from(gen.suppress_tokens || []),
     beginSuppress: Int32Array.from(gen.begin_suppress_tokens || []),
     alignmentHeads: gen.alignment_heads || [],
     langs, langIds: Object.values(langs),
     vocab: cfg.vocab_size, layers: cfg.decoder_layers, heads: cfg.decoder_attention_heads, dModel: cfg.d_model,
+    nMels: cfg.num_mel_bins || 80,
     pieces,
+    bpe: { vocab: tok.model.vocab, merges: tok.model.merges },
   };
 }
+
+// ---- text -> tokens (byte-level BPE, as GPT-2 and Whisper's tokenizer) -------------------------------------------------------------
+const PRE_TOKENIZE = /'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+/gu;
+/**
+ * The token ids of `text` (no special tokens), exactly as Whisper's own tokenizer makes them: split into pieces with GPT-2's
+ * pattern, each piece written as bytes in GPT-2's printable form, then merged by the merge list in rank order.
+ */
+function encodeText(T, text) {
+  if (!T.bpeTables) {
+    const dec = byteDecoder();
+    const enc = new Array(256); for (const [ch, b] of dec) enc[b] = ch;
+    const ranks = new Map();
+    T.bpe.merges.forEach((m, i) => ranks.set(Array.isArray(m) ? m.join(' ') : m, i));
+    T.bpeTables = { enc, ranks, cache: new Map() };
+  }
+  const { enc, ranks, cache } = T.bpeTables;
+  const ids = [];
+  for (const m of String(text).matchAll(PRE_TOKENIZE)) {
+    const word = Array.from(Buffer.from(m[0], 'utf8'), (b) => enc[b]).join('');
+    let pieces = cache.get(word);
+    if (!pieces) {
+      let parts = Array.from(word);
+      for (;;) {
+        let best = -1; let bestRank = Infinity;
+        for (let i = 0; i < parts.length - 1; i++) { const r = ranks.get(parts[i] + ' ' + parts[i + 1]); if (r !== undefined && r < bestRank) { bestRank = r; best = i; } }
+        if (best < 0) break;
+        const a = parts[best]; const b = parts[best + 1]; const merged = [];
+        for (let i = 0; i < parts.length; i++) {
+          if (i < parts.length - 1 && parts[i] === a && parts[i + 1] === b) { merged.push(a + b); i++; } else merged.push(parts[i]);
+        }
+        parts = merged;
+      }
+      pieces = parts.map((p) => T.bpe.vocab[p]);
+      if (cache.size < 50000) cache.set(word, pieces);
+    }
+    for (const id of pieces) if (id !== undefined) ids.push(id);
+  }
+  return ids;
+}
+
+// ---- matching pasted lyrics to what was heard ---------------------------------------------------------------------------------
+/** A word reduced to what matters when comparing: lower case, no accents, no punctuation. */
+const normWord = (w) => String(w).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+function editSimilarity(a, b) {
+  if (a === b) return 1;
+  if (!a.length || !b.length) return 0;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return 1 - prev[b.length] / Math.max(a.length, b.length);
+}
+/**
+ * Line up the pasted words with the words the model heard (both in order; either may have extra or missing words, a chorus the
+ * model skipped, a word it misheard): global alignment that rewards words that are the same or nearly the same. Returns, for
+ * every pasted word, the index of the heard word it matches, or -1.
+ */
+function matchWords(pasted, heard) {
+  const n = pasted.length; const m = heard.length;
+  const GAP = -0.4;
+  const score = new Float32Array((n + 1) * (m + 1)); const move = new Uint8Array((n + 1) * (m + 1)); // 1 diag, 2 up (skip pasted), 3 left (skip heard)
+  for (let i = 1; i <= n; i++) { score[i * (m + 1)] = i * GAP; move[i * (m + 1)] = 2; }
+  for (let j = 1; j <= m; j++) { score[j] = j * GAP; move[j] = 3; }
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const sim = editSimilarity(pasted[i - 1], heard[j - 1]);
+      const d = score[(i - 1) * (m + 1) + j - 1] + (sim >= 0.67 ? 1 + sim : -1);
+      const u = score[(i - 1) * (m + 1) + j] + GAP; const l = score[i * (m + 1) + j - 1] + GAP;
+      const k = i * (m + 1) + j;
+      if (d >= u && d >= l) { score[k] = d; move[k] = 1; } else if (u >= l) { score[k] = u; move[k] = 2; } else { score[k] = l; move[k] = 3; }
+    }
+  }
+  const out = new Int32Array(n).fill(-1);
+  for (let i = n, j = m; i > 0 || j > 0;) {
+    const mv = move[i * (m + 1) + j];
+    if (mv === 1) { if (editSimilarity(pasted[i - 1], heard[j - 1]) >= 0.67) out[i - 1] = j - 1; i--; j--; } else if (mv === 2) i--; else j--;
+  }
+  return out;
+}
+/**
+ * The same, letter by letter: the pasted text and the heard text are compared without spaces, so a word written together on one
+ * side and apart on the other ("lalala" / "la la la", "everyday" / "every day") still lines up. A pasted word counts as heard
+ * when at least half of its letters line up with heard letters; it then gets the time of the heard word its first such letter
+ * belongs to. Returns, for every pasted word, the index of that heard word, or -1.
+ * @param {string[]} pasted normalised pasted words   @param {string[]} heard normalised heard words
+ */
+function matchLetters(pasted, heard) {
+  const pc = []; const pw = []; pasted.forEach((w, i) => { for (const ch of w) { pc.push(ch); pw.push(i); } });
+  const hc = []; const hw = []; heard.forEach((w, i) => { for (const ch of w) { hc.push(ch); hw.push(i); } });
+  const n = pc.length; const m = hc.length;
+  const out = new Int32Array(pasted.length).fill(-1);
+  if (!n || !m) return out;
+  const W = m + 1;
+  const score = new Int32Array((n + 1) * W); const move = new Uint8Array((n + 1) * W);   // 1 diagonal, 2 skip a pasted letter, 3 skip a heard letter
+  for (let i = 1; i <= n; i++) { score[i * W] = -i; move[i * W] = 2; }
+  for (let j = 1; j <= m; j++) { score[j] = -j; move[j] = 3; }
+  for (let i = 1; i <= n; i++) {
+    const a = pc[i - 1]; const row = i * W; const up = (i - 1) * W;
+    for (let j = 1; j <= m; j++) {
+      const d = score[up + j - 1] + (a === hc[j - 1] ? 2 : -1); const u = score[up + j] - 1; const l = score[row + j - 1] - 1;
+      if (d >= u && d >= l) { score[row + j] = d; move[row + j] = 1; } else if (u >= l) { score[row + j] = u; move[row + j] = 2; } else { score[row + j] = l; move[row + j] = 3; }
+    }
+  }
+  const hits = new Int32Array(pasted.length); const firstHeard = new Int32Array(pasted.length).fill(-1);
+  for (let i = n, j = m; i > 0 || j > 0;) {
+    const mv = move[i * W + j];
+    if (mv === 1) { if (pc[i - 1] === hc[j - 1]) { const w = pw[i - 1]; hits[w]++; firstHeard[w] = hw[j - 1]; } i--; j--; } else if (mv === 2) i--; else j--;
+  }
+  pasted.forEach((w, i) => { if (w.length && hits[i] * 2 >= w.length && firstHeard[i] >= 0) out[i] = firstHeard[i]; });
+  // the heard words must not go backwards along the pasted text (they cannot, by construction, but be safe)
+  for (let i = 1, last = -1; i < out.length; i++) if (out[i] >= 0) { if (out[i] < last) out[i] = -1; else last = out[i]; }
+  return out;
+}
+
+/**
+ * A first guess of when each pasted word is sung: the time of the heard word it matched, and for the others a straight line
+ * between the matched words around them (or about 0.35 s per word before the first and after the last match).
+ */
+function estimateTimes(match, heardTimes, total) {
+  const n = match.length; const est = new Float64Array(n); const known = [];
+  for (let i = 0; i < n; i++) if (match[i] >= 0) known.push(i);
+  if (!known.length) { for (let i = 0; i < n; i++) est[i] = Math.min(total, (i * total) / Math.max(1, n)); return est; }
+  for (const i of known) est[i] = heardTimes[match[i]];
+  for (let i = 0; i < known[0]; i++) est[i] = Math.max(0, est[known[0]] - (known[0] - i) * 0.35);
+  for (let k = 0; k + 1 < known.length; k++) {
+    const a = known[k]; const b = known[k + 1];
+    for (let i = a + 1; i < b; i++) est[i] = est[a] + ((est[b] - est[a]) * (i - a)) / (b - a);
+  }
+  const last = known[known.length - 1];
+  for (let i = last + 1; i < n; i++) est[i] = Math.min(total, est[last] + (i - last) * 0.35);
+  for (let i = 1; i < n; i++) if (est[i] < est[i - 1]) est[i] = est[i - 1];   // never backwards
+  return est;
+}
+
 
 /** Text of the tokens (special tokens and timestamps are skipped). */
 function detokenize(T, ids) {
@@ -162,6 +303,10 @@ function dropLoops(segments) {
   for (const s of segments) {
     const prev = out[out.length - 1];
     const norm = s.text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    // a stutter: a short segment (up to 3 words) that only repeats the last words of the one before, right after it
+    // (larger models sometimes write the end of a sentence twice); a whole line sung twice is kept
+    const words = norm.split(' ').filter(Boolean);
+    if (prev && words.length && words.length <= 3 && prev.norm !== norm && (' ' + prev.norm).endsWith(' ' + norm) && s.start - prev.end < 1) continue;
     if (prev && prev.norm === norm) run++; else run = 1;
     if (run <= 2) out.push({ ...s, norm });
   }
@@ -266,6 +411,26 @@ function quietOffset(samples, sampleRate, t0, t1) {
 }
 
 /**
+ * Under music nothing is ever quiet, but a voice coming in still makes the sound clearly louder. If [t0, t1) starts with a steady
+ * stretch and then (smoothed over 100 ms, so single drum hits do not count) gets at least 2.5 times louder and stays there,
+ * the time of that rise; else null.
+ * @returns {number|null}
+ */
+function riseOnset(samples, sampleRate, t0, t1) {
+  const lv = frameLevels(samples, sampleRate, t0, t1);
+  if (lv.length < 20) return null;
+  const sm = new Float32Array(lv.length);
+  for (let i = 0; i < lv.length; i++) { let s = 0; let n = 0; for (let k = Math.max(0, i - 2); k <= Math.min(lv.length - 1, i + 2); k++) { s += lv[k]; n++; } sm[i] = s / n; }
+  const head = Array.from(sm.subarray(0, 10)).sort((a, b) => a - b);
+  const base = head[5];
+  if (!(base > 1e-4)) return null;
+  for (let i = 10; i < sm.length - 4; i++) {
+    if (sm[i] >= base * 2.5 && sm[i + 2] >= base * 2.5 && sm[i + 4] >= base * 2.5) return t0 + Math.max(0, i - 2) * 0.02;
+  }
+  return null;
+}
+
+/**
  * Pull the first and last word of a segment back when dynamic time warping stretched them over a pause.
  * @param {{text:string,start:number,end:number}[]} words  absolute times, in order
  */
@@ -276,7 +441,9 @@ function trimEdges(words, samples, sampleRate, median) {
   const first = words[0]; const last = words[words.length - 1];
   if (first.end - first.start > 0.4) {
     const onset = quietOnset(samples, sampleRate, first.start, first.end);
+    const rise = onset == null ? riseOnset(samples, sampleRate, first.start, first.end) : null;
     if (onset != null && onset > first.start) first.start = Math.min(onset, first.end - 0.05);
+    else if (rise != null && rise > first.start && first.end - rise >= 0.08) first.start = rise;
     else if (first.end - first.start > trigger) first.start = first.end - cap;
   }
   if (last.end - last.start > 0.4) {
@@ -308,6 +475,30 @@ function splitWords(T, tokens, lang) {
   return words.map((w) => ({ first: w.first, last: w.last, text: Buffer.concat(w.parts).toString('utf8').replace(/\uFFFD/g, '').trim() })).filter((w) => w.text);
 }
 
+/**
+ * Is the decoder stuck? True when the text (timestamps left out) ends with the same 1 to 8 tokens over and over: 6 times for a
+ * single token ("ah ah ah ah ah ah"), 4 times for 2 or 3, 3 times for longer pieces. A song can repeat a word or a short phrase,
+ * but not like that inside one 30 second window; the decoder can, and then repeats it until the window is full.
+ * @param {number[]} text  the text tokens so far
+ * @returns {number} how many tokens to keep (the start of the loop and one repeat), or -1 when it is not looping
+ */
+function loopCut(text) {
+  const n = text.length;
+  for (let L = 1; L <= 8; L++) {
+    const R = L === 1 ? 6 : L <= 3 ? 4 : 3;
+    if (n < L * R) continue;
+    let same = true;
+    for (let r = 1; r < R && same; r++) for (let k = 0; k < L; k++) if (text[n - 1 - k] !== text[n - 1 - k - r * L]) { same = false; break; }
+    if (same) {
+      // walk back to where the repeating started, keep that and one repeat
+      let start = n - R * L;
+      while (start - L >= 0 && text.slice(start - L, start).every((t, k) => t === text[start + k])) start -= L;
+      return start + 2 * L;
+    }
+  }
+  return -1;
+}
+
 function rngFrom(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
 
 // ---- the engine --------------------------------------------------------------------------------------------------------------------------
@@ -327,7 +518,7 @@ async function createWhisper({ ort, dir, options = {}, decoderOptions }) {
 
   async function encode(mel) {
     const t0 = Date.now();
-    const out = await encoder.run({ input_features: new ort.Tensor('float32', mel, [1, Mel.N_MELS, Mel.N_FRAMES]) });
+    const out = await encoder.run({ input_features: new ort.Tensor('float32', mel, [1, T.nMels, Mel.N_FRAMES]) });
     stats.encodeMs += Date.now() - t0;
     return out.last_hidden_state;
   }
@@ -374,6 +565,12 @@ async function createWhisper({ ort, dir, options = {}, decoderOptions }) {
     const t0 = Date.now();
     const out = await decoder.run(feeds);
     stats.alignMs += Date.now() - t0;
+    // how likely the model finds each text token here, given the audio and the text before it (row r predicts token r + 1)
+    const V = T.vocab; const logits = out.logits.data; const tokenLogprobs = new Float32Array(textTokens.length);
+    for (let k = 0; k < textTokens.length; k++) {
+      const row = 3 + k;                                              // the row of the token before text token k
+      tokenLogprobs[k] = logits[row * V + textTokens[k]] - logSumExp(logits, row * V, (row + 1) * V);
+    }
     const SRC = out['cross_attentions.0'].dims[3];                    // 1500 encoder positions, 20 ms each
     const F = Math.max(8, Math.min(SRC, Math.ceil(frames / 2)));      // only the part that is real audio
     const rowsFrom = 3;                                               // after the 3 prompt tokens: <|notimestamps|> is the first row
@@ -401,6 +598,7 @@ async function createWhisper({ ort, dir, options = {}, decoderOptions }) {
     const jt = jumpTimes(dtw(cost, nRows, F));
     const words = splitWords(T, textTokens, lang).map((w) => ({ text: w.text, first: w.first, last: w.last, start: jt[w.first], end: jt[Math.min(jt.length - 1, w.last + 1)] }))
       .filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end));
+    words.tokenLogprobs = tokenLogprobs;
     return words;
   }
 
@@ -416,7 +614,7 @@ async function createWhisper({ ort, dir, options = {}, decoderOptions }) {
       lang = bestCode;
     }
     let st = await step([T.langs[lang], T.transcribe], enc, first.past);
-    const tokens = []; let sumLogprob = 0;
+    const tokens = []; let sumLogprob = 0; const text = []; let looped = false;
     for (let n = 0; n < MAX_TOKENS; n++) {
       if (shouldStop()) throw cancelled();
       if (tick && n % 6 === 0) tick(n);
@@ -444,10 +642,22 @@ async function createWhisper({ ort, dir, options = {}, decoderOptions }) {
       sumLogprob += logits[pick] - lse;
       if (pick === T.eot) break;
       tokens.push(pick);
+      if (pick < T.timestampBegin) {
+        text.push(pick);
+        const keep = loopCut(text);
+        if (keep >= 0) {
+          // stuck: cut the tokens back to the start of the loop plus one repeat (counting text tokens only)
+          looped = true;
+          let seen = 0; let cut = tokens.length;
+          for (let i = 0; i < tokens.length; i++) if (tokens[i] < T.timestampBegin && ++seen === keep) { cut = i + 1; break; }
+          tokens.length = cut;
+          break;
+        }
+      }
       st = await step([pick], enc, st.past);
     }
-    const text = detokenize(T, tokens);
-    return { tokens, lang, noSpeech, avgLogprob: sumLogprob / (tokens.length + 1), compression: compressionRatio(text), temperature };
+    const said = detokenize(T, tokens);
+    return { tokens, lang, noSpeech, avgLogprob: sumLogprob / (tokens.length + 1), compression: compressionRatio(said), temperature, looped };
   }
 
   async function decodeWithFallback(enc, lang, rng, shouldStop, tick) {
@@ -456,9 +666,10 @@ async function createWhisper({ ort, dir, options = {}, decoderOptions }) {
       stats.attempts++;
       const r = await decodeWindow(enc, lang, temperature, rng, shouldStop, tick);
       if (!lang) lang = r.lang;                       // the language is settled by the first window and kept
-      let needs = r.compression > COMPRESSION_THRESHOLD || r.avgLogprob < LOGPROB_THRESHOLD;
-      if (r.noSpeech > NO_SPEECH_THRESHOLD) needs = false;   // silence: more randomness will not help
-      if (!best || r.avgLogprob > best.avgLogprob) best = r;
+      let needs = r.compression > COMPRESSION_THRESHOLD || r.avgLogprob < LOGPROB_THRESHOLD || r.looped;
+      if (r.noSpeech > NO_SPEECH_THRESHOLD && !r.looped) needs = false;   // silence: more randomness will not help
+      // the best attempt: one that did not get stuck beats one that did, then the likelier one
+      if (!best || (best.looped && !r.looped) || (best.looped === r.looped && r.avgLogprob > best.avgLogprob)) best = r;
       if (!needs) { best = r; break; }
     }
     return best;
@@ -486,7 +697,7 @@ async function createWhisper({ ort, dir, options = {}, decoderOptions }) {
       const win = samples.subarray(seek * Mel.HOP, Math.min(samples.length, (seek + Mel.N_FRAMES) * Mel.HOP));
       if (isSilent(win)) { seek += segFrames; continue; }
       const tm = Date.now();
-      const melInput = Mel.logMel(samples, seek * Mel.HOP);
+      const melInput = Mel.logMel(samples, seek * Mel.HOP, T.nMels);
       stats.melMs += Date.now() - tm; stats.windows++;
       const report = (within) => onProgress({ seek, contentFrames, seconds: total, fraction: Math.min(0.995, (seek + segFrames * within) / contentFrames), elapsed: (Date.now() - started) / 1000, language: lang });
       report(0.05);
@@ -523,14 +734,111 @@ async function createWhisper({ ort, dir, options = {}, decoderOptions }) {
     return { language: lang || 'en', segments: dropLoops(all) };
   }
 
+  /**
+   * Time the user's own lyrics: `lines` are the pasted lines (their words and line breaks are kept exactly), `heard` the words the
+   * model wrote down for the same audio (from transcribe). The pasted words are lined up with the heard ones to know roughly where
+   * every line is sung (also lines the model missed), then the lines are timed precisely, a stretch of audio at a time, by running
+   * the decoder over the PASTED text and warping its attention onto the audio (as for the model's own words).
+   * @param {Float32Array} samples 16 kHz mono
+   * @param {string[]} lines
+   * @param {{ language: string, heard: {text:string,start:number,end:number}[], shouldStop?: Function, onProgress?: Function }} o
+   * @returns {Promise<{ lines: {start:number,end:number,text:string,words:{text:string,start:number,end:number}[]}[], matched: number }>}
+   */
+  async function alignLyrics(samples, lines, { language, heard = [], shouldStop = () => false, onProgress = () => {} }) {
+    const total = samples.length / Mel.SAMPLE_RATE;
+    const lang = T.langs[language] ? language : 'en';
+    const spaced = !NO_SPACE_LANGUAGES.has(lang);
+    // the pasted words, each knowing its line
+    const pw = []; const lineWords = []; const lineFirst = [];
+    lines.forEach((text, li) => {
+      const words = spaced ? text.split(/\s+/).filter(Boolean) : Array.from(text.replace(/\s+/g, ''));
+      lineFirst.push(pw.length); lineWords.push(words.length);
+      for (const w of words) pw.push({ li, norm: normWord(w) });
+    });
+    const heardNorm = heard.map((w) => normWord(w.text));
+    const match = matchLetters(pw.map((w) => w.norm), heardNorm);
+    const matched = pw.length ? Array.from(match).filter((x) => x >= 0).length / pw.length : 0;
+    const est = estimateTimes(match, heard.map((w) => w.start), total);
+    const lineEst = lines.map(() => ({ start: Infinity, end: 0 }));
+    pw.forEach((w, i) => { const e = lineEst[w.li]; e.start = Math.min(e.start, est[i]); e.end = Math.max(e.end, est[i] + 0.4); });
+    const toks = lines.map((t) => encodeText(T, (spaced ? ' ' : '') + t.trim()));
+    const round = (x) => Math.round(x * 100) / 100;
+    const share = (k) => { let hit = 0; for (let q = 0; q < lineWords[k]; q++) if (match[lineFirst[k] + q] >= 0) hit++; return lineWords[k] ? hit / lineWords[k] : 0; };
+
+    /**
+     * Time lines first..last-1 in the audio from ws to we (seconds): the decoder reads the pasted text over that audio, and its
+     * attention gives each word a time. Also says how likely the model found the text there (mean log-probability per token).
+     */
+    async function timeGroup(first, last, ws, we, prevEnd, heardAt) {
+      const frames = Math.max(50, Math.round((we - ws) * 100));
+      const enc = await encode(Mel.logMel(samples, Math.round(ws * Mel.SAMPLE_RATE), T.nMels));
+      if (shouldStop()) throw cancelled();
+      const textTokens = []; const ranges = [];
+      for (let k = first; k < last; k++) { ranges.push([textTokens.length, textTokens.length + toks[k].length]); textTokens.push(...toks[k]); }
+      let words = [];
+      try { words = await alignWords(enc, lang, textTokens, frames); } catch { words = []; }
+      const lengths = words.map((w) => w.end - w.start).filter((d) => d > 0).sort((x, y) => x - y);
+      const median = Math.min(0.7, lengths.length ? lengths[lengths.length >> 1] : 0.3);
+      const lp = words.tokenLogprobs || new Float32Array(0);
+      const res = [];
+      for (let k = first; k < last; k++) {
+        const [a, b] = ranges[k - first];
+        let mine = words.filter((w) => w.first >= a && w.first < b).map((w) => ({ text: w.text, start: Math.min(total, ws + w.start), end: Math.min(total, ws + w.end) }));
+        mine = trimEdges(mine, samples, Mel.SAMPLE_RATE, median);
+        // warping stretches the stretch's first word back over the lead-in; where the model heard that word later, believe the model
+        if (k === first && heardAt != null && mine.length && mine[0].start < heardAt - 0.2) {
+          mine[0].start = Math.min(heardAt, mine[0].end > heardAt ? heardAt : mine[0].end);
+          if (mine[0].end < mine[0].start) mine[0].end = mine[0].start;
+        }
+        for (let q = 0; q < mine.length; q++) {                 // in order, never before the previous line, never overlapping
+          const lo = q ? mine[q - 1].end : prevEnd;
+          mine[q].start = Math.max(mine[q].start, lo); mine[q].end = Math.max(mine[q].end, mine[q].start);
+        }
+        const start = mine.length ? mine[0].start : Math.max(prevEnd, lineEst[k].start);
+        const end = mine.length ? Math.max(mine[mine.length - 1].end, start + 0.1) : Math.max(start + 1, lineEst[k].end);
+        const own = Array.from(lp.subarray(a, b));
+        // how sure: the share of its words matched to heard words, and the model's mean log-probability for its tokens here
+        const confidence = own.length ? own.reduce((x, y) => x + y, 0) / own.length : -Infinity;
+        res.push({ start: round(start), end: round(end), text: lines[k].trim(), words: mine.map((w) => ({ text: w.text, start: round(w.start), end: round(Math.max(w.end, w.start)) })), matched: share(k), confidence });
+        prevEnd = Math.max(prevEnd, mine.length ? mine[mine.length - 1].end : start);
+      }
+      const score = lp.length ? Array.from(lp).reduce((x, y) => x + y, 0) / lp.length : -Infinity;
+      return { lines: res, score, end: prevEnd };
+    }
+
+    // group the lines into stretches of up to ~25 s of audio (and a decoder-sized amount of text) where the matching put them
+    const out = [];
+    let prevEnd = 0; let li = 0;
+    while (li < lines.length) {
+      if (shouldStop()) throw cancelled();
+      const first = li;
+      // the first word of the stretch: where the model heard it, if it did (then a short lead-in is enough)
+      const g0 = lineFirst[li]; const heardAt = lineWords[li] && match[g0] >= 0 ? heard[match[g0]].start : null;
+      let ws = Math.max(0, Math.min(lineEst[li].start - (heardAt != null ? 0.4 : 1.5), total - 1), prevEnd - 0.3);
+      if (!Number.isFinite(ws)) ws = prevEnd;
+      let count = 0; let lastEnd = lineEst[li].end;
+      while (li < lines.length && (li === first || (Math.max(lineEst[li].end, lastEnd) - ws <= 25 && count + toks[li].length <= 200))) {
+        count += toks[li].length; lastEnd = Math.max(lastEnd, lineEst[li].end); li++;
+      }
+      const we = Math.min(total, ws + 30, Math.max(lastEnd + 2, ws + 3));
+      const g = await timeGroup(first, li, ws, we, prevEnd, heardAt);
+      out.push(...g.lines); prevEnd = g.end;
+      onProgress({ fraction: li / lines.length });
+    }
+
+    onProgress({ fraction: 1 });
+    return { lines: out, matched };
+  }
+
   return {
-    tokens: T, stats, encode, step, decodeWindow, alignWords, transcribe,
+    tokens: T, stats, encode, step, decodeWindow, alignWords, transcribe, alignLyrics,
     async release() { try { await encoder.release(); } catch { /* ignore */ } try { await decoder.release(); } catch { /* ignore */ } },
   };
 }
 
 module.exports = {
   TIME_PRECISION, MAX_TOKENS, TEMPERATURES, cancelled,
-  loadAssets, detokenize, applyRules, parseSegments, compressionRatio, isSilent, dropLoops, createWhisper, logSumExp,
-  medianFilter, dtw, jumpTimes, splitWords, quietOnset, quietOffset, trimEdges,
+  loadAssets, detokenize, applyRules, loopCut, parseSegments, compressionRatio, isSilent, dropLoops, createWhisper, logSumExp,
+  medianFilter, dtw, jumpTimes, splitWords, quietOnset, quietOffset, riseOnset, trimEdges,
+  encodeText, normWord, editSimilarity, matchWords, matchLetters, estimateTimes,
 };

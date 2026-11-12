@@ -1,6 +1,7 @@
 'use strict';
 // Pure helpers shared by the main process, the tests and the window (loaded with <script> there): turning the recogniser's
-// segments and word times into lyric lines, writing and reading .lrc files, time formats, the language list, and estimates.
+// segments and word times into lyric lines (each keeping the time of every word), writing and reading word-synced .ttml files and
+// .lrc files, time formats, the language list, and estimates.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.Plan = factory();
@@ -76,11 +77,19 @@
   function buildLines(segments, { maxChars = 44, pause = 0.9, softChars = 24, spaced = true } = {}) {
     const lines = [];
     const join = (parts) => parts.join(spaced ? ' ' : '');
-    const push = (parts, start, end) => {
+    const r2 = (x) => Math.round(x * 100) / 100;
+    const push = (parts, start, end, words) => {
       const text = cleanText(join(parts));
-      if (text) lines.push({ start: Math.round(start * 100) / 100, end: Math.round(Math.max(end, start) * 100) / 100, text });
+      if (!text) return;
+      const line = { start: r2(start), end: r2(Math.max(end, start)), text };
+      if (words) {
+        // keep the words that are still there once music symbols and labels are cleaned away, each with its own time
+        const kept = words.map((w) => ({ text: cleanText(w.text), start: r2(w.start), end: r2(Math.max(w.end, w.start)) })).filter((w) => w.text);
+        if (kept.length && join(kept.map((w) => w.text)) === text) line.words = kept;
+      }
+      lines.push(line);
     };
-    const flush = (cur) => { if (cur.length) push(cur.map((x) => x.text), cur[0].start, cur[cur.length - 1].end); };
+    const flush = (cur) => { if (cur.length) push(cur.map((x) => x.text), cur[0].start, cur[cur.length - 1].end, cur); };
     for (const seg of segments) {
       const words = (seg.words || []).filter((w) => w && w.text);
       if (!words.length) { push([seg.text], seg.start, seg.end); continue; }
@@ -106,8 +115,95 @@
       flush(cur);
     }
     // lines never start before the previous one, and never overlap it
-    for (let i = 1; i < lines.length; i++) if (lines[i].start < lines[i - 1].start) lines[i].start = lines[i - 1].start;
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].start < lines[i - 1].start) {
+        lines[i].start = lines[i - 1].start;
+        if (lines[i].end < lines[i].start) lines[i].end = lines[i].start;
+        if (lines[i].words) for (const w of lines[i].words) { w.start = Math.max(w.start, lines[i].start); w.end = Math.max(w.end, w.start); }
+      }
+    }
     return lines;
+  }
+
+  // ---- words ------------------------------------------------------------------------------------------------------------------
+  /** The words of a line's text: split at spaces, or one character at a time for languages written without spaces. */
+  function splitWords(text, spaced = true) {
+    const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    if (!t) return [];
+    if (spaced) return t.split(' ');
+    return Array.from(t).filter((c) => c !== ' ');
+  }
+  /** Is this text written without spaces between words (Chinese, Japanese, Thai...)? A guess from the characters used. */
+  const looksUnspaced = (text) => /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\u0e00-\u0e7f\u0e80-\u0eff\u1000-\u109f\u1780-\u17ff]/.test(String(text)) && !/\s/.test(String(text).trim());
+
+  /** Where line i ends: its own end if it has one, otherwise when the next line starts (and never more than 8 s after it starts). */
+  function lineEnd(lines, i, duration) {
+    const l = lines[i];
+    const next = i + 1 < lines.length ? lines[i + 1].start : Infinity;
+    let end = Number.isFinite(l.end) && l.end > l.start ? l.end : Math.min(next, l.start + 8);
+    if (l.words && l.words.length) end = Math.max(end, l.words[l.words.length - 1].end);
+    end = Math.min(end, next > l.start ? next : end);
+    if (Number.isFinite(duration) && duration > l.start) end = Math.min(end, duration);
+    if (!(end > l.start)) end = Math.min(l.start + 2, next > l.start ? next : l.start + 2);
+    return Math.round(end * 1000) / 1000;
+  }
+
+  /**
+   * Give every word of a line a time. Words that still match the line's text keep the times they had; when the text was changed
+   * so the words no longer match, the line's time is shared out over its words by their length (longer words get longer).
+   * @returns {{text:string,start:number,end:number}[]}
+   */
+  function timeWords(line, end, spaced = true) {
+    const texts = splitWords(line.text, spaced);
+    if (!texts.length) return [];
+    const start = line.start;
+    const old = Array.isArray(line.words) ? line.words : [];
+    if (old.length === texts.length) {
+      return texts.map((text, i) => ({ text, start: old[i].start, end: old[i].end }));
+    }
+    const from = old.length ? Math.max(start, Math.min(old[0].start, end)) : start;
+    const to = Math.max(from + 0.05 * texts.length, end);
+    const weight = texts.map((t) => Math.max(1, Array.from(t).length) + 1);
+    const total = weight.reduce((a, b) => a + b, 0);
+    let t = from;
+    return texts.map((text, i) => { const d = ((to - from) * weight[i]) / total; const w = { text, start: t, end: t + d }; t += d; return w; });
+  }
+
+  /**
+   * Lines ready to write as word-synced lyrics: sorted, empty lines dropped, each with an end and with timed words that never go
+   * backwards, never overlap, and stay inside their line.
+   */
+  function timedLines(lines, { spaced, duration } = {}) {
+    const r3 = (x) => Math.round(x * 1000) / 1000;
+    const list = lines.filter((l) => l && String(l.text).trim() !== '' && Number.isFinite(l.start))
+      .map((l, i) => ({ ...l, text: String(l.text).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim(), start: Math.max(0, l.start), i }))
+      .sort((a, b) => a.start - b.start || a.i - b.i);
+    return list.map((l, i) => {
+      const sp = spaced == null ? !looksUnspaced(l.text) : spaced;
+      const end = lineEnd(list, i, duration);
+      const words = timeWords(l, end, sp);
+      let prev = l.start;
+      const fixed = words.map((w, k) => {
+        let s = Math.min(Math.max(Number.isFinite(w.start) ? w.start : prev, prev), end);
+        if (k === 0) s = Math.max(s, l.start);
+        let e = Math.min(Math.max(Number.isFinite(w.end) ? w.end : s, s), end);
+        const nextStart = k + 1 < words.length && Number.isFinite(words[k + 1].start) ? Math.max(words[k + 1].start, s) : end;
+        e = Math.min(e, nextStart);
+        if (e <= s) e = Math.min(s + 0.05, end);
+        prev = e;
+        return { text: w.text, start: r3(s), end: r3(Math.max(e, s)) };
+      });
+      const lineStart = fixed.length ? Math.min(l.start, fixed[0].start) : l.start;
+      return { start: r3(lineStart), end: r3(Math.max(end, fixed.length ? fixed[fixed.length - 1].end : end)), text: l.text, words: fixed, spaced: sp };
+    });
+  }
+
+  /** Index of the word being sung at `t` in a line with timed words, or -1 (before its first word). */
+  function currentWord(words, t) {
+    let idx = -1;
+    if (!Array.isArray(words)) return idx;
+    for (let i = 0; i < words.length; i++) { if (words[i].start <= t + 1e-6) idx = i; else break; }
+    return idx;
   }
 
   /** @param {{start:number,text:string}[]} lines */
@@ -116,6 +212,140 @@
     return sorted.map((l) => `${lrcStamp(l.start)}${String(l.text).replace(/[\r\n]+/g, ' ').trim()}`).join('\r\n') + (sorted.length ? '\r\n' : '');
   }
   const formatPlain = (lines) => lines.filter((l) => l && String(l.text).trim()).map((l) => String(l.text).replace(/[\r\n]+/g, ' ').trim()).join('\r\n') + '\r\n';
+
+  // ---- TTML (word-synced lyrics) ------------------------------------------------------------------------------------------------
+  /** 65.4 -> "00:01:05.400" (a TTML clock time, hours always written, milliseconds) */
+  function ttmlTime(sec) {
+    const t = Math.max(0, Math.round(Number(sec) * 1000));
+    const h = Math.floor(t / 3600000); const m = Math.floor((t % 3600000) / 60000); const s = Math.floor((t % 60000) / 1000); const ms = t % 1000;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+  }
+  /** A TTML time expression -> seconds, or null: "00:01:05.400", "1:05.4", "65.4s", "1200ms", "1.5m", "0.5h", "65.4" */
+  function parseTtmlTime(text) {
+    const s = String(text == null ? '' : text).trim();
+    let m = /^(?:(\d+):)?(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/.exec(s);
+    if (m) { if (Number(m[2]) > 59 && m[1] != null) return null; if (Number(m[3]) >= 60) return null; return (m[1] ? Number(m[1]) * 3600 : 0) + Number(m[2]) * 60 + Number(m[3]); }
+    m = /^(\d+(?:\.\d+)?)(h|m|s|ms)?$/.exec(s);
+    if (m) { const v = Number(m[1]); return m[2] === 'h' ? v * 3600 : m[2] === 'm' ? v * 60 : m[2] === 'ms' ? v / 1000 : v; }
+    return null;
+  }
+  const xmlEscape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const xmlUnescape = (s) => String(s).replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_m, e) => {
+    const k = e.toLowerCase();
+    if (k[0] === '#') { const n = k[1] === 'x' ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10); try { return String.fromCodePoint(n); } catch { return ''; } }
+    return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }[k];
+  });
+  // characters XML 1.0 does not allow at all
+  const xmlSafe = (s) => String(s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, '');
+
+  /**
+   * Write word-synced lyrics as TTML (Timed Text Markup Language), the format Apple Music and other karaoke-style lyric players
+   * read: one <p> per line with its start and end, and a <span> with its own start and end for every word.
+   * @param {{start:number,end?:number,text:string,words?:{text:string,start:number,end:number}[]}[]} lines
+   * @param {{language?:string, title?:string, duration?:number, spaced?:boolean}} [o]
+   */
+  function formatTtml(lines, { language, title, duration, spaced } = {}) {
+    const list = timedLines(lines, { spaced, duration });
+    const lang = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(String(language || '')) ? language : '';
+    const last = list.length ? list[list.length - 1].end : 0;
+    const dur = Number.isFinite(duration) && duration > last ? duration : last;
+    const out = ['<?xml version="1.0" encoding="UTF-8"?>'];
+    out.push(`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="Word"${lang ? ` xml:lang="${lang}"` : ''}>`);
+    out.push('  <head>', '    <metadata>');
+    if (title) out.push(`      <ttm:title>${xmlEscape(xmlSafe(title))}</ttm:title>`);
+    out.push('      <ttm:agent type="person" xml:id="v1"/>', '    </metadata>', '  </head>');
+    out.push(`  <body dur="${ttmlTime(dur)}">`);
+    if (list.length) {
+      out.push(`    <div begin="${ttmlTime(list[0].start)}" end="${ttmlTime(last)}">`);
+      list.forEach((l, i) => {
+        const sep = l.spaced ? ' ' : '';
+        const spans = l.words.map((w) => `<span begin="${ttmlTime(w.start)}" end="${ttmlTime(w.end)}">${xmlEscape(xmlSafe(w.text))}</span>`).join(sep);
+        out.push(`      <p begin="${ttmlTime(l.start)}" end="${ttmlTime(l.end)}" itunes:key="L${i + 1}" ttm:agent="v1">${spans}</p>`);
+      });
+      out.push('    </div>');
+    }
+    out.push('  </body>', '</tt>');
+    return out.join('\n') + '\n';
+  }
+
+  /**
+   * Read a TTML lyrics file (ours, Apple Music's, or another program's): every <p> becomes a line, and every <span> that has
+   * its own time becomes a timed word. A file timed by line only gives lines without word times. Background vocals
+   * (ttm:role="x-bg") are kept, in brackets, as part of the line.
+   * @returns {{start:number,end:number,text:string,words?:{text:string,start:number,end:number}[]}[]}
+   */
+  function parseTtml(text) {
+    const src = String(text || '').replace(/^\uFEFF/, '').replace(/<!--[\s\S]*?-->/g, '').replace(/<\?[\s\S]*?\?>/g, '');
+    if (!/<tt[\s>]/.test(src)) throw new UserError('This is not a TTML lyrics file');
+    // attributes by local name (itunes:key -> key, ttm:role -> role), except xml:lang and such, which keep their prefix
+    const attrs = (tag) => { const a = {}; for (const m of tag.matchAll(/([\w:.-]+)\s*=\s*("([^"]*)"|'([^']*)')/g)) a[m[1].startsWith('xml:') ? m[1] : m[1].replace(/^.*:/, '')] = xmlUnescape(m[3] != null ? m[3] : m[4]); return a; };
+    const out = [];
+    const r3 = (x) => Math.round(x * 1000) / 1000;
+    for (const pm of src.matchAll(/<p(\s[^>]*)?>([\s\S]*?)<\/p>/g)) {
+      const pa = attrs(pm[1] || '');
+      const pStart = parseTtmlTime(pa.begin); let pEnd = parseTtmlTime(pa.end);
+      if (pEnd == null && pStart != null && pa.dur) { const d = parseTtmlTime(pa.dur); if (d != null) pEnd = pStart + d; }
+      // walk the inside of the <p>: text, <span ...>, </span>, <br/>
+      const words = []; let plain = ''; const stack = [];
+      let bgOpen = false; let bgFirst = -1;      // inside background vocals: their words are kept, in brackets
+      for (const tm of pm[2].matchAll(/<(\/?)([\w:.-]+)([^>]*?)(\/?)>|([^<]+)/g)) {
+        if (tm[5] != null) {
+          const txt = xmlUnescape(tm[5]);
+          plain += txt;
+          const top = stack[stack.length - 1];
+          if (top && top.timed) top.text += txt;
+          continue;
+        }
+        const name = tm[2].replace(/^.*:/, '');
+        if (name === 'br') { plain += ' '; continue; }
+        if (name !== 'span' || tm[4]) continue;          // other tags, and an empty <span/>
+        if (tm[1]) {
+          const sp = stack.pop();
+          if (!sp) continue;
+          if (sp.timed) {
+            const t = sp.text.replace(/\s+/g, ' ').trim();
+            if (t) {
+              words.push({ text: t, start: r3(sp.start), end: r3(Math.max(sp.end, sp.start)), glued: words.length > 0 && !sp.spaceBefore && !/^\s/.test(sp.text) });
+              if (bgOpen && bgFirst < 0) bgFirst = words.length - 1;
+            }
+          }
+          if (sp.bg) {
+            plain += ')';
+            if (bgFirst >= 0) { words[bgFirst].text = '(' + words[bgFirst].text; words[bgFirst].glued = false; words[words.length - 1].text += ')'; }
+            bgOpen = false; bgFirst = -1;
+          }
+          continue;
+        }
+        const at = attrs(tm[3] || '');
+        const bg = at.role === 'x-bg' && !bgOpen;
+        const st = parseTtmlTime(at.begin); let en = parseTtmlTime(at.end);
+        if (en == null && st != null && at.dur) { const d = parseTtmlTime(at.dur); if (d != null) en = st + d; }
+        // a span that holds other timed spans (background vocals, or a word split in syllables) is not a word itself
+        const holds = /^[^]*?<span[^>]*begin=/.test(pm[2].slice(tm.index + tm[0].length).split(/<\/span>/)[0]);
+        stack.push({ bg, timed: st != null && !holds, start: st, end: en == null ? st : en, text: '', spaceBefore: plain === '' || /\s$/.test(plain) });
+        if (bg) { plain += plain && !/\s$/.test(plain) ? ' (' : '('; bgOpen = true; bgFirst = -1; }
+      }
+      const lineText = plain.replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').replace(/\s+/g, ' ').trim();
+      if (!lineText) continue;
+      const start = pStart != null ? pStart : words.length ? words[0].start : null;
+      if (start == null) continue;
+      const end = Math.max(pEnd != null ? pEnd : start, words.length ? words[words.length - 1].end : start);
+      const line = { start: r3(start), end: r3(Math.max(end, start)), text: lineText };
+      if (words.length) {
+        // syllables written as separate spans with nothing between them ("ba", "by") make one word, unless the language is
+        // written without spaces, where every character is its own word
+        const merged = [];
+        const unspaced = looksUnspaced(lineText);
+        for (const w of words) {
+          const prev = merged[merged.length - 1];
+          if (w.glued && prev && !unspaced) { prev.text += w.text; prev.end = Math.max(prev.end, w.end); } else merged.push({ text: w.text, start: w.start, end: w.end });
+        }
+        line.words = merged;
+      }
+      out.push(line);
+    }
+    return out.map((l, i) => ({ l, i })).sort((a, b) => a.l.start - b.l.start || a.i - b.i).map((x) => x.l);
+  }
 
   /** Read an .lrc: every [mm:ss.xx] stamp on a line gives a line with that text; [ar:], [ti:] and such are skipped. */
   function parseLrc(text) {
@@ -132,8 +362,24 @@
     return out.sort((a, b) => a.start - b.start);
   }
 
-  /** Move every line by `delta` seconds (never before 0). */
-  const shiftLines = (lines, delta) => lines.map((l) => ({ ...l, start: Math.max(0, Math.round((l.start + delta) * 100) / 100), ...(l.end != null ? { end: Math.max(0, Math.round((l.end + delta) * 100) / 100) } : {}) }));
+  /**
+   * The user's pasted lyrics as lines to time: one per row, blank rows dropped, and rows that are only a section heading or a
+   * note in brackets ("[Chorus]", "(x2)", "[Verse 2: Someone]") left out, since nobody sings them.
+   */
+  function pastedLines(text) {
+    return String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n')
+      .map((l) => l.replace(/\s+/g, ' ').trim())
+      .filter((l) => l && !/^[\[(][^\])]*[\])]$/.test(l) && /[\p{L}\p{N}]/u.test(l))
+      .slice(0, 2000).map((l) => l.slice(0, 300));
+  }
+
+  /** Move every line (and every word in it) by `delta` seconds (never before 0). */
+  const mv = (x, delta) => Math.max(0, Math.round((x + delta) * 1000) / 1000);
+  const shiftLines = (lines, delta) => lines.map((l) => ({
+    ...l, start: mv(l.start, delta),
+    ...(l.end != null ? { end: mv(l.end, delta) } : {}),
+    ...(Array.isArray(l.words) ? { words: l.words.map((w) => ({ ...w, start: mv(w.start, delta), end: mv(w.end, delta) })) } : {}),
+  }));
 
   /** Index of the line being sung at `t` (the last one that has started), or -1. */
   function currentLine(lines, t) {
@@ -150,5 +396,6 @@
   return {
     INPUT_EXTS, MAX_SECONDS, UserError, extOf, isAudio, baseName, LANGUAGES, languageList, formatTime, parseTime, lrcStamp, cleanText,
     buildLines, formatLrc, formatPlain, parseLrc, shiftLines, currentLine, estimateSeconds, formatDuration, defaultName,
+    pastedLines, splitWords, looksUnspaced, lineEnd, timeWords, timedLines, currentWord, ttmlTime, parseTtmlTime, formatTtml, parseTtml, xmlEscape,
   };
 }));

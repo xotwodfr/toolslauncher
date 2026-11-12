@@ -9,20 +9,28 @@
     return n;
   };
   const LANG_KEY = 'lyricsmaker.language';
+  const MODEL_KEY = 'lyricsmaker.model';
+  const ISOLATE_KEY = 'lyricsmaker.isolate';
   const round2 = (x) => Math.round(x * 100) / 100;
 
   const S = {
-    song: null,                    // { id, name, duration, url, estimate, existingLrc }
-    lines: [],                     // { uid, start, text }  what the window shows and saves
-    made: [],                      // the lines as they were made, for "Undo all edits"
+    song: null,                    // { id, name, duration, url, estimate, existingTtml, existingLrc }
+    lines: [],                     // { uid, start, end?, text, words: [{ text, start, end, est? }] }  what the window shows and saves
+    made: [],                      // the lines as they were made (or loaded), for "Undo all edits"
     sel: null,                     // the selected line object
+    selWord: -1,                   // the selected word of that line, or -1
+    tap: null,                     // "Tap words" mode: { line, word } is the next word a tap will time
+    langCode: null,                // the language of the lyrics (as made, or from a loaded TTML), written into the TTML
+    model: 'standard',             // the speech model: 'standard' (in the app) or 'accurate' (downloaded once)
+    models: [],                    // [{ id, name, installed, bytes }]
+    modelDownload: null,           // { done, total } while the accurate model is being downloaded
     edited: false,
     working: false,
     language: 'auto',
     detected: null,
     uid: 1,
   };
-  try { S.language = localStorage.getItem(LANG_KEY) || 'auto'; } catch { /* private mode: fine */ }
+  try { S.language = localStorage.getItem(LANG_KEY) || 'auto'; S.model = localStorage.getItem(MODEL_KEY) === 'accurate' ? 'accurate' : 'standard'; } catch { /* private mode: fine */ }
 
   // ---- messages ----------------------------------------------------------------------------------------------------------------
   let toastTimer = null;
@@ -57,7 +65,29 @@
     $('timeSet').disabled = !lines; $('saveSet').disabled = !lines;
     $('revert').disabled = !S.edited || S.working;
     $('open').disabled = S.working;
-    $('make').textContent = S.lines.length ? 'Make lyrics again' : 'Make lyrics';
+    const pasted = P.pastedLines($('lyricsIn').value).length;
+    $('make').textContent = pasted ? (S.lines.length ? 'Time my lyrics again' : 'Time my lyrics') : (S.lines.length ? 'Make lyrics again' : 'Make lyrics');
+    $('lyricsCount').textContent = pasted ? `${pasted} line${pasted === 1 ? '' : 's'} to time` : '';
+    $('lyricsIn').disabled = S.working;
+    // the speech model: the accurate one must be downloaded once before it can be used
+    const acc = S.models.find((m) => m.id === 'accurate');
+    const needsModel = S.model === 'accurate' && !(acc && acc.installed);
+    $('model').value = S.model; $('model').disabled = S.working;
+    $('modelBox').hidden = S.model !== 'accurate';
+    const dl = S.modelDownload;
+    const gb = acc ? (acc.bytes / 1e9).toFixed(1) : '1.1';
+    $('modelInfo').textContent = needsModel
+      ? (dl ? `Downloading… ${Math.round((dl.done / dl.total) * 100)}% (${(dl.done / 1e9).toFixed(2)} of ${gb} GB)` : `Better at singing, accents and fast words, and up to about twice as slow. A one-time ${gb} GB download from Hugging Face, checked file by file; after that it works offline.`)
+      : 'Downloaded. Better at singing, accents and fast words, and up to about twice as slow.';
+    $('modelGet').hidden = !needsModel || !!dl; $('modelCancel').hidden = !dl; $('modelRemove').hidden = needsModel || S.working;
+    $('modelBar').hidden = !dl;
+    if (dl) { const pct = Math.round((dl.done / dl.total) * 100); $('modelFill').style.width = pct + '%'; $('modelBar').setAttribute('aria-valuenow', String(pct)); }
+    $('make').disabled = needsModel;
+    $('isolate').disabled = S.working || !S.vocalsAvailable;
+    $('load').disabled = !has || S.working;
+    $('tap').setAttribute('aria-pressed', S.tap ? 'true' : 'false');
+    $('tap').textContent = S.tap ? 'Stop tapping (Esc)' : 'Tap words (W)';
+    $('tapHint').hidden = !S.tap;
     $('progressBox').hidden = !S.working;
     const n = S.lines.length;
     $('status').textContent = S.working ? `${n} line${n === 1 ? '' : 's'} so far…` : n ? `${n} line${n === 1 ? '' : 's'}${S.detected ? ' · ' + S.detected : ''}${S.edited ? ' · edited' : ''}` : '';
@@ -65,7 +95,55 @@
 
   // ---- the lines -----------------------------------------------------------------------------------------------------------------
   const sortLines = () => { S.lines = S.lines.map((l, i) => ({ l, i })).sort((a, b) => a.l.start - b.l.start || a.i - b.i).map((x) => x.l); };
-  const newLine = (start, text) => ({ uid: S.uid++, start: round2(start), text });
+  const spaced = (line) => (S.langCode ? !['zh', 'ja', 'th', 'lo', 'my', 'yue', 'km'].includes(S.langCode) : !P.looksUnspaced(line.text));
+  const copyWords = (words) => (Array.isArray(words) ? words.map((w) => ({ text: w.text, start: w.start, end: w.end, ...(w.est ? { est: true } : {}) })) : undefined);
+  /** Make sure a line has one timed word per word of its text. Words that had to be guessed are marked `est` (shown in italics). */
+  function ensureWords(line) {
+    const texts = P.splitWords(line.text, spaced(line));
+    const old = Array.isArray(line.words) ? line.words : [];
+    if (old.length === texts.length && old.every((w, i) => w.text === texts[i])) { line.words = old; return old; }
+    const i = S.lines.indexOf(line);
+    const end = P.lineEnd(S.lines, i < 0 ? 0 : i, S.song ? S.song.duration : undefined);
+    const same = old.length === texts.length;
+    line.words = P.timeWords(line, end, spaced(line)).map((w, k) => ({ text: w.text, start: round2(w.start), end: round2(w.end), ...((same ? old[k].est : true) ? { est: true } : {}) }));
+    return line.words;
+  }
+  const newLine = (start, text, words, end, doubt) => {
+    const l = { uid: S.uid++, start: round2(start), text, ...(Number.isFinite(end) ? { end } : {}), ...(doubt ? { doubt: true } : {}) };
+    if (Array.isArray(words) && words.length) l.words = copyWords(words);
+    return l;
+  };
+  /** Move a line to start at `t`, taking its words along. */
+  function moveLine(line, t) {
+    delete line.doubt;                                   // the user has timed it by hand
+    const d = round2(t) - line.start;
+    line.start = round2(t);
+    if (Number.isFinite(line.end)) line.end = round2(Math.max(line.start, line.end + d));
+    if (line.words) for (const w of line.words) { w.start = round2(Math.max(0, w.start + d)); w.end = round2(Math.max(0, w.end + d)); }
+  }
+
+  function renderWords(box, line) {
+    box.textContent = '';
+    const words = ensureWords(line);
+    const isSel = S.sel === line;
+    words.forEach((w, k) => {
+      const chip = el('button', { type: 'button', class: 'w' + (w.est ? ' est' : '') + (isSel && S.selWord === k ? ' sel' : ''), 'data-k': String(k), title: `${P.formatTime(w.start)} – ${P.formatTime(w.end)}${w.est ? ' (estimated: stamp or tap it to time it exactly)' : ''}`, tabindex: '-1' }, w.text);
+      if (isSel) chip.append(el('small', null, P.formatTime(w.start)));
+      chip.addEventListener('mousedown', (e) => e.preventDefault());   // keep the keyboard where it was
+      chip.addEventListener('click', () => { selectLine(line, k); seek(w.start); });
+      box.append(chip);
+    });
+  }
+  function selectLine(line, word = -1) {
+    const before = S.sel;
+    S.sel = line; S.selWord = word;
+    for (const r of $('lines').children) {
+      const uid = r.dataset.uid;
+      r.classList.toggle('sel', uid === String(line.uid));
+      if ((before && uid === String(before.uid)) || uid === String(line.uid)) renderWords(r.querySelector('.words'), S.lines.find((l) => String(l.uid) === uid));
+    }
+    lastWord = -2; highlight(true);
+  }
 
   function rowFor(line) {
     const idx = S.lines.indexOf(line);
@@ -74,20 +152,25 @@
     const text = el('input', { class: 'text', value: line.text, 'aria-label': `Text of line ${n}`, spellcheck: 'false' });
     const go = el('button', { type: 'button', class: 'go', 'aria-label': `Play from line ${n}`, title: 'Play from here' }, '▶');
     const del = el('button', { type: 'button', class: 'del', 'aria-label': `Delete line ${n}`, title: 'Delete this line' }, '×');
-    const row = el('div', { class: 'line' + (S.sel === line ? ' sel' : ''), 'data-uid': String(line.uid) }, go, time, text, del);
+    const words = el('div', { class: 'words', 'aria-label': `Words of line ${n}, each with its own time` });
+    const row = el('div', { class: 'line' + (S.sel === line ? ' sel' : '') + (line.doubt ? ' doubt' : ''), 'data-uid': String(line.uid), ...(line.doubt ? { title: 'Check this line: few of its words were clearly heard, so its timing is less sure' } : {}) }, go, time, text, del, words);
+    renderWords(words, line);
     if (S.working) { time.disabled = true; text.disabled = true; go.disabled = true; del.disabled = true; }
-    const select = () => { if (S.sel !== line) { S.sel = line; for (const r of $('lines').children) r.classList.toggle('sel', r.dataset.uid === String(line.uid)); } };
+    const select = () => { if (S.sel !== line || S.selWord !== -1) selectLine(line); };   // working on the text or time of a line means the whole line
     time.addEventListener('focus', select); text.addEventListener('focus', select);
-    row.addEventListener('mousedown', select);
+    row.addEventListener('mousedown', (e) => { if (!e.target.classList.contains('w')) select(); });
     text.addEventListener('input', () => { line.text = text.value; markEdited(); });
+    const checked = () => { if (line.doubt) { delete line.doubt; row.classList.remove('doubt'); row.removeAttribute('title'); } };   // the user has looked at it
+    text.addEventListener('change', () => { ensureWords(line); renderWords(words, line); });   // words that no longer match are timed again
     time.addEventListener('change', () => {
       const t = P.parseTime(time.value);
       if (t == null) { time.value = P.formatTime(line.start); toast('Type a time like 1:05.30 (minutes:seconds)', true); return; }
-      line.start = round2(t); markEdited(); sortLines(); renderLines(line, 'time');
+      moveLine(line, t); checked(); markEdited(); sortLines(); renderLines(line, 'time');
     });
     go.addEventListener('click', () => playFrom(line.start));
     del.addEventListener('click', () => {
-      if (S.sel === line) S.sel = null;
+      if (S.sel === line) { S.sel = null; S.selWord = -1; }
+      if (S.tap && S.tap.line === line) S.tap = null;
       S.lines = S.lines.filter((l) => l !== line); markEdited(); renderLines();
     });
     return row;
@@ -102,26 +185,38 @@
     for (const l of S.lines) frag.append(rowFor(l));
     box.append(frag);
     box.scrollTop = scroll;
-    if (focusLine) { const r = box.querySelector(`[data-uid="${focusLine.uid}"]`); if (r) { const f = r.querySelector(focusField === 'time' ? '.time' : '.text'); if (f) f.focus(); r.scrollIntoView({ block: 'nearest' }); } }
+    if (focusLine) { const r = box.querySelector(`[data-uid="${focusLine.uid}"]`); if (r) { const f = focusField && r.querySelector(focusField === 'time' ? '.time' : '.text'); if (f) f.focus(); r.scrollIntoView({ block: 'nearest' }); } }
     syncControls(); highlight(true);
   }
   function appendLines(list) {
     const box = $('lines');
-    for (const l of list) { const line = newLine(l.start, l.text); S.lines.push(line); box.append(rowFor(line)); }
+    for (const l of list) { const line = newLine(l.start, l.text, l.words, l.end); S.lines.push(line); box.append(rowFor(line)); }
     syncControls();
   }
   function markEdited() { if (!S.edited) { S.edited = true; syncControls(); } }
 
   // ---- playing -----------------------------------------------------------------------------------------------------------------------
   const player = () => $('player');
-  let lastNow = -2;
+  let lastNow = -2; let lastWord = -2;
   function highlight(force) {
-    const i = P.currentLine(S.lines, player().currentTime || 0);
-    if (i === lastNow && !force) return;
-    lastNow = i;
+    const t = player().currentTime || 0;
+    const i = P.currentLine(S.lines, t);
     const rows = $('lines').children;
-    for (let k = 0; k < rows.length; k++) rows[k].classList.toggle('now', k === i);
-    if (i >= 0 && rows[i] && !player().paused) rows[i].scrollIntoView({ block: 'nearest' });
+    if (i !== lastNow || force) {
+      if (lastNow >= 0 && rows[lastNow]) for (const c of rows[lastNow].querySelectorAll('.w')) c.classList.remove('sung', 'now');
+      lastNow = i; lastWord = -2;
+      for (let k = 0; k < rows.length; k++) rows[k].classList.toggle('now', k === i);
+      if (i >= 0 && rows[i] && !player().paused) rows[i].scrollIntoView({ block: 'nearest' });
+    }
+    if (i < 0 || !rows[i]) return;
+    // karaoke: the words already sung, and the one being sung now
+    const words = S.lines[i].words || [];
+    let w = P.currentWord(words, t);
+    if (w >= 0 && t > words[w].end + 0.25 && w === words.length - 1) w = words.length;   // the line is over
+    if (w === lastWord && !force) return;
+    lastWord = w;
+    const chips = rows[i].querySelectorAll('.w');
+    chips.forEach((c, k) => { c.classList.toggle('sung', k < w); c.classList.toggle('now', k === w); });
   }
   function clock() {
     const p = player();
@@ -132,6 +227,7 @@
   }
   function frame() { clock(); highlight(false); if (!player().paused) requestAnimationFrame(frame); }
   function playFrom(t) { const p = player(); p.currentTime = Math.max(0, t); p.play().catch(() => {}); }
+  function seek(t) { const p = player(); p.currentTime = Math.max(0, t); clock(); highlight(false); }
   function togglePlay() { const p = player(); if (!S.song) return; if (p.paused) p.play().catch(() => {}); else p.pause(); }
 
   // ---- opening and making ----------------------------------------------------------------------------------------------------------------
@@ -141,13 +237,13 @@
     if (S.working) return;
     if (S.edited && !window.confirm('Opening another song discards the changes you made to these lyrics. Continue?')) return;
     const old = S.song;
-    S.song = r; S.lines = []; S.made = []; S.sel = null; S.edited = false; S.detected = null; lastNow = -2;
+    S.song = r; S.lines = []; S.made = []; S.sel = null; S.selWord = -1; S.tap = null; S.edited = false; S.detected = null; S.langCode = null; lastNow = -2;
     banner('');
-    if (old) window.lm.forget(old.id);
+    if (old) { window.lm.forget(old.id); $('lyricsIn').value = ''; }   // a new song: its own lyrics
     const p = player();
     p.pause(); p.src = r.url; p.load();
     $('fileInfo').textContent = `${r.name} · ${P.formatDuration(r.duration)}`;
-    $('makeNote').textContent = `Takes about ${P.formatDuration(r.estimate)} on this computer.` + (r.existingLrc ? ' A .lrc file already sits next to this song; saving keeps the old one as .lrc.bak.' : '');
+    updateEstimate();
     showResult('', '');
     renderLines(); clock();
   }
@@ -155,21 +251,29 @@
   const etaText = (s) => (s == null ? '' : `about ${P.formatDuration(Math.max(1, s))} left`);
   async function make() {
     if (!S.song || S.working) return;
+    const isolate = $('isolate').checked && !$('isolate').disabled;   // read before the controls are locked for the work
     if (S.edited && !window.confirm('Making the lyrics again replaces the edits you made. Continue?')) return;
-    S.working = true; S.lines = []; S.made = []; S.sel = null; S.edited = false; S.detected = null; lastNow = -2;
+    S.working = true; S.lines = []; S.made = []; S.sel = null; S.selWord = -1; S.tap = null; S.edited = false; S.detected = null; lastNow = -2;
     showResult('', '');
     $('phase').textContent = 'Starting…'; $('eta').textContent = ''; $('fill').style.width = '0%'; $('bar').classList.add('indeterminate'); $('bar').setAttribute('aria-valuenow', '0');
     $('cancel').disabled = false;
     renderLines();
     let res;
-    try { res = await window.lm.make(S.song.id, S.language); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
+    const lyrics = $('lyricsIn').value;
+    try { res = await window.lm.make(S.song.id, S.language, P.pastedLines(lyrics).length ? lyrics : null, S.model, isolate); } catch (e) { res = { ok: false, error: (e && e.message) || String(e) }; }
     S.working = false;
     if (res.ok) {
-      S.lines = res.lines.map((l) => newLine(l.start, l.text));
-      S.made = S.lines.map((l) => ({ start: l.start, text: l.text }));
+      S.lines = res.lines.map((l) => newLine(l.start, l.text, l.words, l.end, l.doubt));
+      S.made = S.lines.map(snapshot);
+      S.langCode = res.language || null;
       S.detected = res.languageName + (S.language === 'auto' ? ' (detected)' : '');
       renderLines();
       if (!S.lines.length) toast('No words were found in this song. If it has singing, try choosing its language instead of detecting it.', true);
+      else if (res.fromLyrics) {
+        const pct = Math.round((res.matched || 0) * 100);
+        const doubts = S.lines.filter((l) => l.doubt).length;
+        toast(`Timed your ${S.lines.length} lines. ${pct}% of the words were clearly heard.` + (doubts ? ` ${doubts} line${doubts === 1 ? ' is' : 's are'} marked to check.` : ''), pct < 60);
+      }
     } else {
       renderLines();
       if (!res.cancelled) banner(res.error || 'Something went wrong');
@@ -178,24 +282,138 @@
   }
 
   // ---- timing tools -------------------------------------------------------------------------------------------------------------------------
-  function shiftAll(delta) { S.lines = P.shiftLines(S.lines, delta); markEdited(); renderLines(); }
+  const snapshot = (l) => ({ start: l.start, end: l.end, text: l.text, words: copyWords(l.words) });
+  function shiftAll(delta) {
+    const sel = S.sel ? S.lines.indexOf(S.sel) : -1;
+    const tapAt = S.tap ? { line: S.lines.indexOf(S.tap.line), word: S.tap.word } : null;
+    S.lines = P.shiftLines(S.lines, delta).map((l) => ({ ...l, start: round2(l.start), words: l.words && l.words.map((w) => ({ ...w, start: round2(w.start), end: round2(w.end) })) }));
+    if (sel >= 0) S.sel = S.lines[sel];
+    if (tapAt && tapAt.line >= 0) S.tap = { line: S.lines[tapAt.line], word: tapAt.word };
+    markEdited(); renderLines();
+  }
+  const selected = () => (S.sel && S.lines.includes(S.sel) ? S.sel : null);
+  /** Start word k of a line at `t`: the word before it ends there, and the first word moves the line's start too. */
+  function timeWord(line, k, t) {
+    const words = ensureWords(line);
+    const w = words[k];
+    if (!w) return;
+    delete line.doubt;
+    t = round2(Math.max(0, t));
+    const len = Math.max(0.1, w.end - w.start);
+    w.start = t; delete w.est;
+    const next = words[k + 1];
+    w.end = round2(next && !next.est && next.start > t ? Math.min(next.start, t + Math.max(len, 0.1)) : t + len);
+    if (k > 0 && (words[k - 1].end > t || words[k - 1].est || t - words[k - 1].end < 0.6)) words[k - 1].end = t;   // the word before ends where this one begins (unless there is a real pause)
+    for (let j = k + 1; j < words.length; j++) if (words[j].start < t) { words[j].start = t; if (words[j].end < t) words[j].end = t; }
+    if (k === 0) { line.start = t; if (Number.isFinite(line.end) && line.end < t) line.end = t; }
+    else if (t < line.start) line.start = t;
+  }
   function stamp() {
-    if (!S.sel || !S.lines.includes(S.sel)) { toast('Select a line first (click it), then press S at the moment it starts', true); return; }
-    S.sel.start = round2(player().currentTime || 0); markEdited(); sortLines(); renderLines(S.sel, 'text');
+    const line = selected();
+    if (!line) { toast('Select a line first (click it), then press S at the moment it starts', true); return; }
+    const now = player().currentTime || 0;
+    if (S.selWord >= 0) timeWord(line, S.selWord, now);
+    else moveLine(line, now);
+    markEdited(); sortLines(); renderLines(S.selWord >= 0 ? null : line, S.selWord >= 0 ? null : 'text');
+  }
+  /** [ and ]: move the selected word (or the whole line, with its words) a little earlier or later. */
+  function nudge(delta) {
+    const line = selected();
+    if (!line) return;
+    if (S.selWord >= 0) {
+      const words = ensureWords(line); const w = words[S.selWord];
+      const lo = S.selWord > 0 ? words[S.selWord - 1].start : 0;
+      const t = round2(Math.max(lo, w.start + delta));
+      w.end = round2(Math.max(t, w.end + (t - w.start))); w.start = t; delete w.est;
+      if (S.selWord > 0 && words[S.selWord - 1].end > t) words[S.selWord - 1].end = t;
+      if (S.selWord === 0) line.start = t;
+    } else moveLine(line, Math.max(0, line.start + delta));
+    markEdited(); sortLines(); renderLines();
+  }
+  // "Tap words": play the song and press W the moment each word is sung; the next word is lined up after every tap.
+  function startTap() {
+    if (!S.lines.length) return;
+    const line = selected() || S.lines[Math.max(0, P.currentLine(S.lines, player().currentTime || 0))] || S.lines[0];
+    S.tap = { line, word: S.sel === line && S.selWord >= 0 ? S.selWord : 0 };
+    selectLine(line, S.tap.word);
+    syncControls();
+    if (player().paused) playFrom(Math.max(0, line.start - 2));
+  }
+  function stopTap() { S.tap = null; syncControls(); }
+  function tapWord() {
+    if (!S.tap || !S.lines.includes(S.tap.line)) { startTap(); return; }
+    const { line, word } = S.tap;
+    timeWord(line, word, player().currentTime || 0);
+    markEdited();
+    const words = line.words;
+    let next = { line, word: word + 1 };
+    if (word + 1 >= words.length) {
+      const i = S.lines.indexOf(line);
+      next = i + 1 < S.lines.length ? { line: S.lines[i + 1], word: 0 } : null;
+    }
+    sortLines();
+    S.tap = next;
+    renderLines();
+    if (next) { selectLine(next.line, next.word); const r = $('lines').querySelector(`[data-uid="${next.line.uid}"]`); if (r) r.scrollIntoView({ block: 'nearest' }); }
+    else toast('That was the last word. Every word has a time now.');
+    syncControls();
   }
   function addLine() {
     const line = newLine(player().currentTime || 0, '');
-    S.lines.push(line); sortLines(); S.sel = line; markEdited(); renderLines(line, 'text');
+    S.lines.push(line); sortLines(); S.sel = line; S.selWord = -1; markEdited(); renderLines(line, 'text');
   }
-  function revert() { S.lines = S.made.map((l) => newLine(l.start, l.text)); S.sel = null; S.edited = false; renderLines(); }
+  function revert() { S.lines = S.made.map((l) => newLine(l.start, l.text, l.words, l.end)); S.sel = null; S.selWord = -1; S.tap = null; S.edited = false; renderLines(); }
+
+  async function loadLyrics() {
+    if (!S.song || S.working) return;
+    if (S.edited && !window.confirm('Loading lyrics replaces the edits you made. Continue?')) return;
+    let r;
+    try { r = await window.lm.load(S.song.id); } catch (e) { r = { ok: false, error: (e && e.message) || String(e) }; }
+    if (r.dialogCancelled) return;
+    if (!r.ok) { toast(r.error || 'Could not read that file', true); return; }
+    S.tap = null; S.sel = null; S.selWord = -1; lastNow = -2;
+    if (r.language) S.langCode = r.language;
+    S.lines = r.lines.map((l) => newLine(l.start, l.text, l.words, l.end));
+    sortLines();
+    for (const l of S.lines) ensureWords(l);
+    S.made = S.lines.map(snapshot); S.edited = false;
+    const timed = r.lines.filter((l) => l.words && l.words.length).length;
+    S.detected = `loaded from ${r.name}`;
+    showResult('', '');
+    renderLines();
+    toast(r.kind === 'ttml' && timed ? `Loaded ${r.lines.length} lines with their word times.` : `Loaded ${r.lines.length} lines. They have no word times yet: the words are spread over each line (in italics) until you tap or stamp them.`);
+  }
 
   async function save(kind) {
-    const lines = S.lines.filter((l) => l.text.trim()).map((l) => ({ start: l.start, text: l.text.trim() }));
+    const lines = S.lines.filter((l) => l.text.trim()).map((l) => ({ start: l.start, ...(Number.isFinite(l.end) ? { end: l.end } : {}), text: l.text.trim(), words: ensureWords(l).map((w) => ({ text: w.text, start: w.start, end: w.end })) }));
     if (!lines.length) { toast('There are no lyrics to save yet', true); return; }
-    const r = await window.lm.save(S.song.id, kind, lines);
+    const r = await window.lm.save(S.song.id, kind, lines, S.langCode || (S.language !== 'auto' ? S.language : null));
     if (r.dialogCancelled) return;
     if (!r.ok) { showResult(r.error || 'Could not save', 'err'); return; }
     showResult(`Saved ${P.baseName(r.path)} (${r.lines} line${r.lines === 1 ? '' : 's'})`, 'ok', r.path, r.backup ? `The file it replaced was kept as ${P.baseName(r.backup)}.` : null);
+  }
+
+  // ---- speech models -----------------------------------------------------------------------------------------------------------------------------
+  async function refreshModels() { try { S.models = await window.lm.models(); } catch { S.models = []; } syncControls(); }
+  async function downloadModel() {
+    if (S.modelDownload) return;
+    S.modelDownload = { done: 0, total: (S.models.find((m) => m.id === 'accurate') || {}).bytes || 1 };
+    syncControls();
+    const r = await window.lm.downloadModel('accurate');
+    S.modelDownload = null;
+    if (r.ok) toast('The accurate model is ready. It works offline from now on.');
+    else if (r.cancelled) toast('The download was stopped. Files that had finished are kept, so it goes on from there next time.');
+    else toast(r.error || 'The download failed', true);
+    await refreshModels();
+  }
+  /** "Takes about…": the accurate model can take up to about twice as long. */
+  function updateEstimate() {
+    if (!S.song) return;
+    const r = S.song;
+    const have = [r.existingTtml && '.ttml', r.existingLrc && '.lrc'].filter(Boolean);
+    const iso = $('isolate').checked && S.vocalsAvailable;
+    const est = r.estimate * (S.model === 'accurate' ? 2 : 1) + (iso ? r.duration * 0.75 + 15 : 0);
+    $('makeNote').textContent = `Takes about ${P.formatDuration(est)} on this computer${S.model === 'accurate' ? ' with the accurate model' : ''}${iso ? (S.model === 'accurate' ? ' and' : ' with') + ' vocal separation' : ''}.` + (have.length ? ` This song already has lyrics next to it (${have.join(' and ')}): load them to fix them, or make new ones. Saving over a file keeps the old one as .bak.` : '');
   }
 
   // ---- wiring ------------------------------------------------------------------------------------------------------------------------------
@@ -208,6 +426,18 @@
     for (const l of P.languageList()) lang.append(el('option', { value: l.code }, l.name));
     lang.value = S.language;
     lang.addEventListener('change', () => { S.language = lang.value; try { localStorage.setItem(LANG_KEY, S.language); } catch { /* fine */ } });
+    $('lyricsIn').addEventListener('input', syncControls);
+    try { $('isolate').checked = localStorage.getItem(ISOLATE_KEY) === '1'; } catch { /* fine */ }
+    $('isolate').addEventListener('change', () => { try { localStorage.setItem(ISOLATE_KEY, $('isolate').checked ? '1' : '0'); } catch { /* fine */ } updateEstimate(); });
+    $('model').addEventListener('change', () => { S.model = $('model').value === 'accurate' ? 'accurate' : 'standard'; try { localStorage.setItem(MODEL_KEY, S.model); } catch { /* fine */ } updateEstimate(); syncControls(); });
+    $('modelGet').addEventListener('click', downloadModel);
+    $('modelCancel').addEventListener('click', () => window.lm.cancelModel());
+    $('modelRemove').addEventListener('click', async () => {
+      if (!window.confirm('Remove the accurate model from this computer? It can be downloaded again later.')) return;
+      const r = await window.lm.removeModel('accurate');
+      if (!r.ok) toast(r.error || 'Could not remove it', true); else toast('The accurate model was removed.');
+      await refreshModels();
+    });
     $('make').addEventListener('click', make);
     $('cancel').addEventListener('click', () => { $('cancel').disabled = true; $('phase').textContent = 'Stopping…'; window.lm.cancel(); });
     $('play').addEventListener('click', togglePlay);
@@ -221,17 +451,30 @@
     p.addEventListener('error', () => { if (S.song) toast('This song cannot be played in the window (the lyrics can still be made).', true); });
     for (const b of document.querySelectorAll('[data-shift]')) b.addEventListener('click', () => shiftAll(Number(b.dataset.shift)));
     $('stamp').addEventListener('click', stamp); $('addLine').addEventListener('click', addLine); $('revert').addEventListener('click', revert);
+    $('tap').addEventListener('click', () => (S.tap ? stopTap() : startTap()));
+    $('load').addEventListener('click', loadLyrics);
+    $('saveTtml').addEventListener('click', () => save('ttml'));
     $('saveLrc').addEventListener('click', () => save('lrc')); $('saveTxt').addEventListener('click', () => save('txt'));
 
     window.addEventListener('keydown', (e) => {
       const typing = /^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '') && e.target.type !== 'range' && e.target.type !== 'checkbox';
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); if (!$('open').disabled) pickSong(); return; }
-      if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); if (!$('saveSet').disabled) save('lrc'); return; }
+      if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); if (!$('saveSet').disabled) save('ttml'); return; }
       if (!S.song || mod) return;
       if (e.key === ' ' && !typing && e.target.tagName !== 'BUTTON') { e.preventDefault(); togglePlay(); return; }
       if (typing && e.key === 'Enter' && e.target.classList.contains('time')) { e.target.blur(); return; }
-      if (!typing && e.key.toLowerCase() === 's' && !$('timeSet').disabled) { e.preventDefault(); stamp(); }
+      if (typing || $('timeSet').disabled) return;
+      const k = e.key.toLowerCase();
+      if (k === 's') { e.preventDefault(); stamp(); }
+      else if (k === 'w') { e.preventDefault(); tapWord(); }
+      else if (e.key === 'Escape' && S.tap) { e.preventDefault(); stopTap(); }
+      else if (e.key === '[' || e.key === ']') { e.preventDefault(); nudge(e.key === '[' ? -0.05 : 0.05); }
+      else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.sel) {
+        e.preventDefault();
+        const n = ensureWords(S.sel).length;
+        selectLine(S.sel, Math.max(-1, Math.min(n - 1, S.selWord + (e.key === 'ArrowLeft' ? -1 : 1))));
+      }
     });
 
     let depth = 0;
@@ -257,19 +500,22 @@
       if (!S.working) return;
       const pct = Math.round(p.fraction * 100);
       $('bar').classList.remove('indeterminate'); $('fill').style.width = pct + '%'; $('bar').setAttribute('aria-valuenow', String(pct));
-      $('phase').textContent = `Listening… ${pct}%`;
+      $('phase').textContent = p.phase === 'timing' ? `Timing your lyrics… ${pct}%` : p.phase === 'separating-load' ? 'Starting the vocal separation…' : p.phase === 'separating' ? `Separating the vocals… ${pct}%` : `Listening… ${pct}%`;
       $('eta').textContent = etaText(p.eta);
     });
     window.lm.onLines((p) => { if (S.working) appendLines(p.lines); });
     window.lm.onOpened((r) => loadSong(r));
+    window.lm.onModelProgress((p) => { if (S.modelDownload) { S.modelDownload = { done: p.done, total: p.total }; syncControls(); } });
+    await refreshModels();
     syncControls();
     try {
       const e = await window.lm.engine();
+      S.vocalsAvailable = !!e.vocals; syncControls();
       if (!e.ok) { $('engineWarn').textContent = e.problems.join(' '); $('engineWarn').hidden = false; $('open').disabled = true; $('open2').disabled = true; }
       else if (e.warnings && e.warnings.length) { $('engineWarn').textContent = e.warnings.join(' '); $('engineWarn').hidden = false; }
     } catch { /* ignore */ }
   }
 
-  window.__app = { S, P, loadSong, make, currentLine: () => P.currentLine(S.lines, player().currentTime || 0) };
+  window.__app = { S, P, loadSong, make, ensureWords, currentLine: () => P.currentLine(S.lines, player().currentTime || 0) };
   init();
 })();

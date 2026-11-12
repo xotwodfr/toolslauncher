@@ -53,6 +53,30 @@
     'ocr': '<svg viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>',
     // a film frame with a play triangle
     'video-converter': '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M10 9.2v5.6l4.8-2.8z"/><path d="M3.5 8.5H6M3.5 15.5H6M18 8.5h2.5M18 15.5h2.5"/></svg>',
+    // two pages side by side, with lines that do not match
+    'text-diff': '<svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="7.5" height="16" rx="1.5"/><rect x="13" y="4" width="7.5" height="16" rx="1.5"/><path d="M5.8 8h3M5.8 11h3M5.8 14h1.6M15.3 11h3M15.3 14h3"/></svg>',
+    // a name field with a text cursor in it
+    'file-renamer': '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M6.5 12h5M15 9.5v5M13.8 9.5h2.4M13.8 14.5h2.4"/></svg>',
+    // a treemap: one big box and smaller boxes beside it
+    'disk-space': '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M11 3.5v17M11 12.5h9.5M16 12.5v8M11 8h9.5"/></svg>',
+    // a QR code: three corner squares and a few modules
+    'qr-studio': '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 18.5v2M18.5 14h2"/></svg>',
+    // a safe door with a dial
+    'password-vault': '<svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="15" rx="2.5"/><circle cx="12" cy="11.5" r="3.4"/><path d="M12 8.1v1.2M12 13.7v1.2M8.6 11.5h1.2M14.2 11.5h1.2M6.5 19v1.5M17.5 19v1.5"/></svg>',
+    // a page with a folded corner and a padlock on it
+    'file-encryptor': '<svg viewBox="0 0 24 24"><path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/><rect x="9.5" y="13" width="6" height="5" rx="1"/><path d="M10.8 13v-1.6a1.7 1.7 0 0 1 3.4 0V13"/></svg>',
+    // a rounded frame with the Markdown "M" and a down arrow inside
+    'markdown-notes': '<svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/><path d="M7 15.5v-7l2.5 3 2.5-3v7M16 8.5v7M14 13.5l2 2 2-2"/></svg>',
+    // an open book: two curved pages meeting at the spine
+    'ebook-studio': '<svg viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5c-3.5-.5-6.5 0-8.5 1.5z"/><path d="M12 6.5v13"/></svg>',
+    // a microphone on a stand
+    'voice-recorder': '<svg viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5M8.5 20.5h7"/></svg>',
+    // a photo (hills and a sun) with a second photo stacked behind it
+    'photo-batch-editor': '<svg viewBox="0 0 24 24"><rect x="6.5" y="7.5" width="14" height="12" rx="2.4"/><path d="M3.5 15.5V6.5a2 2 0 0 1 2-2h11"/><path d="M7 17.5l4-4 3 3 2.2-2.2 4 4"/><circle cx="16" cy="11" r="1.4"/></svg>',
+    // a screen with two lines of subtitles along the bottom
+    'subtitle-maker': '<svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.6"/><path d="M7 13.5h10M8.5 16.5h7"/></svg>',
+    // a magnifying glass over a waveform
+    'audio-inspector': '<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.3 15.3l5.2 5.2M7 10.5h1.2l1-2.5 1.6 5 1.2-2.5H14"/></svg>',
   };
   const icon = (name, cls = 'ico') => { const s = document.createElement('span'); s.className = cls; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name] || ''; return s; };
 

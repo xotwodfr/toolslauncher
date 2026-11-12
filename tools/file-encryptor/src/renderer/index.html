@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <title>File Encryptor &amp; Hasher</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand"><span class="glyph" aria-hidden="true"></span><h1>File Encryptor &amp; Hasher</h1></div>
+      <nav class="tabs" role="tablist" aria-label="What to do">
+        <button role="tab" id="tab-encrypt" data-mode="encrypt" aria-selected="true" aria-controls="panel">Encrypt</button>
+        <button role="tab" id="tab-decrypt" data-mode="decrypt" aria-selected="false" aria-controls="panel">Decrypt</button>
+        <button role="tab" id="tab-hash" data-mode="hash" aria-selected="false" aria-controls="panel">Checksums</button>
+      </nav>
+      <span class="grow"></span>
+      <button id="clear" class="btn ghost" type="button" hidden>Clear list</button>
+      <button id="addFolder" class="btn" type="button">Add folder…</button>
+      <button id="addFiles" class="btn" type="button">Add files…</button>
+    </header>
+
+    <main id="panel" class="stage" role="tabpanel" aria-labelledby="tab-encrypt">
+      <section id="empty" class="drop" tabindex="0" role="button" aria-label="Add files">
+        <strong class="big" id="emptyTitle"></strong>
+        <span class="muted" id="emptySub"></span>
+        <span class="row"><button id="addFiles2" class="btn primary" type="button">Add files…</button><button id="addFolder2" class="btn" type="button">Add folder…</button></span>
+        <p class="muted small fine" id="emptyFine"></p>
+      </section>
+
+      <section id="list" class="listwrap" hidden>
+        <div class="statusbar" aria-live="polite">
+          <span id="status" class="status"></span>
+          <div id="prog" class="progress" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="fill"></div></div>
+          <span class="grow"></span>
+          <button id="cancel" class="btn small" type="button" hidden>Cancel</button>
+        </div>
+        <div class="tablewrap">
+          <table id="grid">
+            <thead id="thead"></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="verify" class="listwrap" hidden>
+        <div class="statusbar">
+          <button id="verifyBack" class="btn small" type="button">← Back</button>
+          <span id="verifyTitle" class="status"></span>
+          <span class="grow"></span>
+          <span id="verifySummary" class="small"></span>
+        </div>
+        <div class="tablewrap">
+          <table aria-label="Checksum file results">
+            <thead><tr><th class="c-name">File</th><th class="c-alg">Kind</th><th class="c-hash">Expected</th><th class="c-res">Result</th></tr></thead>
+            <tbody id="vrows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div id="result" class="result" role="status" hidden></div>
+
+    <!-- options for encrypt / decrypt -->
+    <footer id="cryptBar" class="optbar">
+      <div class="optgrid">
+        <div class="f">
+          <label for="pw">Password</label>
+          <div class="pwrow"><input type="password" id="pw" autocomplete="off" spellcheck="false"><button type="button" id="pwShow" class="btn small" aria-pressed="false">Show</button></div>
+          <div class="meter" id="meter"><div class="bars"><i></i><i></i><i></i><i></i></div><span class="mlabel small muted"></span></div>
+        </div>
+        <div class="f" id="pw2Box">
+          <label for="pw2">Type it again</label>
+          <input type="password" id="pw2" autocomplete="off" spellcheck="false">
+          <span class="muted small">There is no way to recover a forgotten password.</span>
+        </div>
+        <div class="f">
+          <label>Save to</label>
+          <label class="check"><input type="radio" name="dest" value="same" checked> Next to the originals</label>
+          <label class="check"><input type="radio" name="dest" value="dir"> <span id="destDir">A folder I choose…</span></label>
+        </div>
+      </div>
+      <div class="row actions">
+        <label class="check" id="delBox"><input type="checkbox" id="del"> Move the originals to the Recycle Bin after each one is encrypted and checked</label>
+        <span class="grow"></span>
+        <button id="go" class="btn primary" type="button">Encrypt</button>
+      </div>
+      <p id="delWarn" class="notice warn small" hidden>Each <em>.locked</em> file is decrypted again and compared before its original is moved. The Recycle Bin is <strong>not</strong> secure deletion: the original can be restored from it, and even after emptying it the data may stay recoverable on the disk. Make sure you remember the password.</p>
+    </footer>
+
+    <!-- options for checksums -->
+    <footer id="hashBar" class="optbar" hidden>
+      <div class="row">
+        <span class="lab">Compute</span>
+        <label class="check"><input type="checkbox" class="alg" value="sha256" checked> SHA-256</label>
+        <label class="check"><input type="checkbox" class="alg" value="sha512"> SHA-512</label>
+        <label class="check"><input type="checkbox" class="alg" value="sha1"> SHA-1</label>
+        <label class="check"><input type="checkbox" class="alg" value="md5"> MD5</label>
+        <label class="check"><input type="checkbox" class="alg" value="blake2b"> BLAKE2b</label>
+        <span class="grow"></span>
+        <button id="hashGo" class="btn primary" type="button">Compute</button>
+      </div>
+      <div class="row">
+        <label for="compare" class="lab">Compare with</label>
+        <input type="text" id="compare" class="grow" placeholder="Paste a published checksum: the kind is recognised from its length" spellcheck="false" autocomplete="off">
+        <span id="compareInfo" class="small muted"></span>
+      </div>
+      <div class="row">
+        <button id="verifyFile" class="btn" type="button">Check a checksum file…</button>
+        <span class="muted small">.sha256, .md5, SHA256SUMS… (GNU and BSD formats)</span>
+        <span class="grow"></span>
+        <select id="sumAlg" aria-label="Checksum kind to save"></select>
+        <select id="sumFmt" aria-label="Checksum file format"><option value="gnu">sha256sum format</option><option value="bsd">BSD format</option></select>
+        <button id="saveSums" class="btn" type="button">Save checksum file…</button>
+      </div>
+    </footer>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

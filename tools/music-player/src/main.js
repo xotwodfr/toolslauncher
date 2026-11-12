@@ -206,7 +206,7 @@ function knownTrack(rel) {
 ipcMain.handle('lyrics:get', (_e, rel) => {
   const abs = knownTrack(rel);
   const l = Lyrics.loadLyrics(abs);
-  return { source: l.source, fileName: l.file ? path.basename(l.file) : '', synced: l.synced, lines: l.lines, meta: l.meta, raw: l.raw, sidecarName: path.basename(abs, path.extname(abs)) + '.lrc' };
+  return { source: l.source, fileName: l.file ? path.basename(l.file) : '', synced: l.synced, wordSynced: !!l.wordSynced, lines: l.lines, meta: l.meta, raw: l.raw, sidecarName: path.basename(abs, path.extname(abs)) + '.lrc' };
 });
 ipcMain.handle('lyrics:save', (_e, rel, text) => {
   const abs = knownTrack(rel);

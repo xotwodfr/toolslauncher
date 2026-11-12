@@ -12,7 +12,7 @@
   <div class="app">
     <header class="top">
       <h1>Lyrics Maker</h1>
-      <span class="muted small tagline">listen · write down · time</span>
+      <span class="muted small tagline">listen · write down · time every word</span>
       <span class="grow"></span>
       <span id="fileInfo" class="muted small trunc"></span>
       <button id="open" class="btn">Open song…</button>
@@ -26,7 +26,7 @@
         <strong class="big">Drop a song here</strong>
         <span class="muted">MP3, FLAC, WAV, OGG, Opus, M4A, AAC and more, up to 30 minutes</span>
         <button id="open2" class="btn primary">Open song…</button>
-        <p class="muted small fine">The song is listened to on this computer, offline, and its words are written down with the time each line starts. You can play it, fix any line, and save a timed <code>.lrc</code> file that music players show as the song plays. The audio file is never changed.</p>
+        <p class="muted small fine">The song is listened to on this computer, offline, and its words are written down with the time <em>each word</em> is sung. Play it with the words lighting up, fix any word or time, and save word-synced <code>.ttml</code> lyrics (karaoke style, the format Apple Music uses) or a line-timed <code>.lrc</code> file. The audio file is never changed.</p>
       </section>
 
       <section id="work" class="work" hidden>
@@ -36,8 +36,8 @@
             <div class="progress" id="bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="fill"></div></div>
           </div>
           <div class="listhead"><span id="status" class="muted small" aria-live="polite"></span></div>
-          <div id="lines" class="lines" aria-label="Lyric lines, each with the time it starts"></div>
-          <p id="placeholder" class="placeholder muted">No lyrics yet. Choose the language (or let it be detected) and press <strong>Make lyrics</strong>.</p>
+          <div id="lines" class="lines" aria-label="Lyric lines, each with the time it starts and the time of every word"></div>
+          <p id="placeholder" class="placeholder muted">No lyrics yet. Choose the language (or let it be detected) and press <strong>Make lyrics</strong>, or load a <code>.ttml</code> or <code>.lrc</code> file to fix it.</p>
         </div>
 
         <aside class="side" aria-label="Controls">
@@ -53,7 +53,20 @@
           <fieldset id="makeSet" disabled>
             <legend>Make</legend>
             <div class="opt"><label for="lang">Language</label><select id="lang" aria-label="Language of the lyrics"></select></div>
-            <div class="opt"><button id="make" class="btn primary">Make lyrics</button></div>
+            <p class="exp-head">Experimental</p>
+            <p class="muted small exp-note">Better on some songs, worse on others (tested on real songs: the standard settings time pasted lyrics best on average). Try them when a song comes out badly.</p>
+            <div class="opt"><label for="model">Model</label><select id="model" aria-label="Speech model">
+              <option value="standard">Standard (built in)</option><option value="accurate">Accurate (large-v3-turbo)</option></select></div>
+            <div id="modelBox" class="opt col" hidden>
+              <p id="modelInfo" class="muted small"></p>
+              <div class="row left"><button id="modelGet" class="btn small">Download (1.1 GB)</button><button id="modelCancel" class="btn ghost small" hidden>Cancel</button><button id="modelRemove" class="btn ghost small" hidden>Remove it</button></div>
+              <div id="modelBar" class="progress" role="progressbar" aria-label="Download progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="modelFill"></div></div>
+            </div>
+            <label class="check" title="Removes the band before listening (Demucs). Slower: about 30 to 45 s per minute of song first."><input id="isolate" type="checkbox"> Isolate vocals first</label>
+            <div class="opt col"><label for="lyricsIn">Lyrics (optional)</label>
+              <textarea id="lyricsIn" rows="6" spellcheck="false" placeholder="Paste the song's lyrics here, one line per row, and every word is timed to the song. Leave empty to let it listen for the words."></textarea>
+              <span id="lyricsCount" class="muted small"></span></div>
+            <div class="opt"><button id="make" class="btn primary">Make lyrics</button><button id="load" class="btn small" title="Open a .ttml or .lrc file to fix its timing">Load lyrics file…</button></div>
             <p id="makeNote" class="muted small"></p>
           </fieldset>
 
@@ -64,17 +77,19 @@
               <button class="btn small" data-shift="0.1">+0.1 s</button><button class="btn small" data-shift="0.5">+0.5 s</button>
             </div>
             <div class="opt">
-              <button id="stamp" class="btn small" title="Start the selected line at the playhead (S)">Stamp line here</button>
+              <button id="stamp" class="btn small" title="Start the selected word (or line) at the playhead (S)">Stamp here (S)</button>
+              <button id="tap" class="btn small" aria-pressed="false" title="Play the song and press W the moment each word is sung">Tap words (W)</button>
               <button id="addLine" class="btn small" title="Add a line at the playhead">Add line</button>
-              <button id="revert" class="btn ghost small" title="Throw away your edits and go back to the lyrics as they were made" disabled>Undo all edits</button>
+              <button id="revert" class="btn ghost small" title="Throw away your edits and go back to the lyrics as they were made or loaded" disabled>Undo all edits</button>
             </div>
-            <p class="muted small">Click ▶ on a line to hear it. If a line starts late or early, press play, wait for the moment it begins and press <kbd>S</kbd> with that line selected.</p>
+            <p id="tapHint" class="note small" hidden>Tapping: press <kbd>W</kbd> the moment each word is sung. The next word to tap is outlined. <kbd>Esc</kbd> stops.</p>
+            <p class="muted small">Click ▶ on a line to hear it, or click a word to jump to it. With a word selected (<kbd>←</kbd> <kbd>→</kbd> move between words), <kbd>S</kbd> starts it at the playhead and <kbd>[</kbd> <kbd>]</kbd> nudge it by 0.05 s; with no word selected they move the whole line. Words in <em>italics</em> have estimated times.</p>
           </fieldset>
 
           <fieldset id="saveSet" disabled>
             <legend>Save</legend>
-            <div class="opt"><button id="saveLrc" class="btn primary">Save timed lyrics (.lrc)…</button></div>
-            <div class="opt"><button id="saveTxt" class="btn small">Save as plain text (.txt)…</button></div>
+            <div class="opt"><button id="saveTtml" class="btn primary" title="Every word with its own time (Ctrl+S)">Save word-synced lyrics (.ttml)…</button></div>
+            <div class="opt"><button id="saveLrc" class="btn small" title="One time per line, for players that do not read TTML">Save line-timed (.lrc)…</button><button id="saveTxt" class="btn small">Save as plain text (.txt)…</button></div>
             <div id="result" class="result" hidden role="status"></div>
           </fieldset>
         </aside>

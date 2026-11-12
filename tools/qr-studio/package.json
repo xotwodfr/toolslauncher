@@ -1,0 +1,67 @@
+{
+  "name": "qr-studio",
+  "productName": "QR Barcode Studio",
+  "version": "0.1.0",
+  "description": "Make QR codes and barcodes (Wi-Fi, contacts, links, events, EAN, UPC, Code 128...) and read them from pictures or the screen. Offline.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/qr.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "bwip-js": "^4.11.4",
+    "qrcode": "^1.5.4",
+    "zxing-wasm": "^3.1.6"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  },
+  "build": {
+    "appId": "com.toolslauncher.qrstudio",
+    "productName": "QR Barcode Studio",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "artifactName": "QRBarcodeStudio-${version}-${os}-${arch}.${ext}",
+    "executableName": "qr-studio",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Graphics"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 'use strict';
 // Finding, reading and saving lyrics. Electron-free (testable with plain Node).
-//  - sidecar file next to the song:   "Song.mp3" -> "Song.lrc" (synced or plain) or "Song.txt" (plain)
+//  - sidecar file next to the song:   "Song.mp3" -> "Song.ttml" (word-synced), "Song.lrc" (synced or plain) or "Song.txt" (plain);
+//    when both a .ttml and an .lrc are there, the one changed last wins (so lyrics fixed in either place show up)
 //  - embedded in the tags:            ID3 SYLT (synced), ID3 USLT / Vorbis LYRICS / MP4 ©lyr (plain, or LRC text)
 // Saving only ever writes the sidecar .lrc: the audio file itself is never touched.
 let fs;
@@ -8,8 +9,9 @@ try { fs = require('original-fs'); } catch { fs = require('fs'); }
 const path = require('path');
 const T = require('node-taglib-sharp');
 const LRC = require('./lrc');
+const TTML = require('./ttml');
 
-const MAX_FILE_BYTES = LRC.MAX_CHARS * 3; // UTF-8 can be up to 3 bytes per char in the BMP
+const MAX_FILE_BYTES = TTML.MAX_CHARS * 3; // UTF-8 can be up to 3 bytes per char in the BMP (TTML, being XML, is the larger limit)
 
 /** Decode lyric file bytes: UTF-8/16 with a BOM, else UTF-8, else Windows-1252 (old LRC files). */
 function decodeText(buf) {
@@ -21,14 +23,30 @@ function decodeText(buf) {
 
 const withExt = (file, ext) => file.slice(0, file.length - path.extname(file).length) + ext;
 
-/** Existing sidecar lyrics file for a song (".lrc" preferred over ".txt"), or null. */
-function findSidecar(trackPath) {
-  for (const ext of ['.lrc', '.LRC', '.Lrc', '.txt', '.TXT']) {
+const firstExisting = (trackPath, exts) => {
+  for (const ext of exts) {
     const f = withExt(trackPath, ext);
-    try { if (fs.statSync(f).isFile()) return f; } catch { /* next */ }
+    try { const st = fs.statSync(f); if (st.isFile()) return { file: f, mtime: st.mtimeMs }; } catch { /* next */ }
   }
   return null;
+};
+const TTML_EXTS = ['.ttml', '.TTML', '.Ttml'];
+const LRC_EXTS = ['.lrc', '.LRC', '.Lrc'];
+
+/**
+ * Existing sidecar lyrics files for a song, best first: the newer of ".ttml" and ".lrc" (the .ttml when they are the same
+ * age), then the other one, then ".txt".
+ */
+function findSidecars(trackPath) {
+  const ttml = firstExisting(trackPath, TTML_EXTS);
+  const lrc = firstExisting(trackPath, LRC_EXTS);
+  const txt = firstExisting(trackPath, ['.txt', '.TXT']);
+  const timed = [ttml, lrc].filter(Boolean).sort((a, b) => (b.mtime - a.mtime) || (a === ttml ? -1 : 1));
+  return [...timed, txt].filter(Boolean).map((x) => x.file);
 }
+/** The best sidecar lyrics file for a song, or null. */
+const findSidecar = (trackPath) => findSidecars(trackPath)[0] || null;
+const isTtmlFile = (file) => /\.ttml$/i.test(file);
 
 function readSidecar(file) {
   const st = fs.statSync(file);
@@ -57,30 +75,37 @@ function readEmbedded(trackPath) {
 }
 
 /**
- * Best lyrics for a song, in this order: sidecar .lrc (synced) > embedded SYLT > embedded LRC text > sidecar plain >
- * embedded plain. `source` says where it came from ("sidecar" | "embedded" | "none").
- * @returns {{ source: string, file: string|null, synced: boolean, lines: {t:number|null,text:string}[], meta: object, raw: string }}
+ * Best lyrics for a song, in this order: sidecar .ttml or .lrc (synced; the newer one) > embedded SYLT > embedded LRC text >
+ * sidecar plain > embedded plain. `source` says where it came from ("sidecar" | "embedded" | "none"). Lines of word-synced
+ * lyrics (TTML, or enhanced LRC) carry `words`, and `wordSynced` is true.
+ * @returns {{ source: string, file: string|null, synced: boolean, wordSynced: boolean, lines: {t:number|null,text:string,words?:object[]}[], meta: object, raw: string }}
  */
 function loadLyrics(trackPath) {
-  const none = { source: 'none', file: null, synced: false, lines: [], meta: {}, raw: '' };
-  const sidecar = findSidecar(trackPath);
+  const none = { source: 'none', file: null, synced: false, wordSynced: false, lines: [], meta: {}, raw: '' };
+  const hasWords = (lines) => lines.some((l) => Array.isArray(l.words) && l.words.length > 0);
+  let sidecar = null;
   let sidecarParsed = null;
   let sidecarText = '';
-  if (sidecar) {
-    try { sidecarText = readSidecar(sidecar); sidecarParsed = LRC.parse(sidecarText); } catch { /* unreadable: fall through to embedded */ }
+  for (const f of findSidecars(trackPath)) {
+    try {
+      const text = readSidecar(f);
+      const parsed = isTtmlFile(f) || TTML.isTtml(text) ? TTML.parse(text) : LRC.parse(text);
+      if (parsed.synced) { sidecar = f; sidecarParsed = parsed; sidecarText = text; break; }        // the best synced file
+      if (!sidecarParsed && parsed.lines.length && !isTtmlFile(f)) { sidecar = f; sidecarParsed = parsed; sidecarText = text; } // remember plain words
+    } catch { /* unreadable: try the next one */ }
   }
-  if (sidecarParsed && sidecarParsed.synced) return { source: 'sidecar', file: sidecar, synced: true, lines: sidecarParsed.lines, meta: sidecarParsed.meta, raw: sidecarText };
+  if (sidecarParsed && sidecarParsed.synced) return { source: 'sidecar', file: sidecar, synced: true, wordSynced: hasWords(sidecarParsed.lines), lines: sidecarParsed.lines, meta: sidecarParsed.meta, raw: sidecarText };
 
   const emb = readEmbedded(trackPath);
-  if (emb.synced) return { source: 'embedded', file: null, synced: true, lines: emb.synced, meta: {}, raw: LRC.serialize(emb.synced) };
+  if (emb.synced) return { source: 'embedded', file: null, synced: true, wordSynced: false, lines: emb.synced, meta: {}, raw: LRC.serialize(emb.synced) };
   if (emb.plain && LRC.looksSynced(emb.plain)) {
     const p = LRC.parse(emb.plain);
-    if (p.synced) return { source: 'embedded', file: null, synced: true, lines: p.lines, meta: p.meta, raw: emb.plain };
+    if (p.synced) return { source: 'embedded', file: null, synced: true, wordSynced: hasWords(p.lines), lines: p.lines, meta: p.meta, raw: emb.plain };
   }
-  if (sidecarParsed && sidecarParsed.lines.length) return { source: 'sidecar', file: sidecar, synced: false, lines: sidecarParsed.lines, meta: sidecarParsed.meta, raw: sidecarText };
+  if (sidecarParsed && sidecarParsed.lines.length) return { source: 'sidecar', file: sidecar, synced: false, wordSynced: false, lines: sidecarParsed.lines, meta: sidecarParsed.meta, raw: sidecarText };
   if (emb.plain) {
     const lines = emb.plain.split(/\r\n|\r|\n/).map((s) => s.trim()).filter(Boolean).map((text) => ({ t: null, text }));
-    return { source: 'embedded', file: null, synced: false, lines, meta: {}, raw: emb.plain };
+    return { source: 'embedded', file: null, synced: false, wordSynced: false, lines, meta: {}, raw: emb.plain };
   }
   return none;
 }
@@ -111,4 +136,4 @@ function saveSidecar(trackPath, text) {
   return { file: target, backup };
 }
 
-module.exports = { decodeText, findSidecar, readSidecar, readEmbedded, loadLyrics, saveSidecar };
+module.exports = { decodeText, findSidecar, findSidecars, readSidecar, readEmbedded, loadLyrics, saveSidecar };

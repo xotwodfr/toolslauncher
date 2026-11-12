@@ -1,19 +1,20 @@
 {
   "name": "lyrics-maker",
   "productName": "Lyrics Maker",
-  "version": "0.1.0",
-  "description": "Write the lyrics of a song with their timing (.lrc) from the audio itself. Offline (Whisper).",
+  "version": "0.3.0",
+  "description": "Write the lyrics of a song with the time of every word (word-synced .ttml, also .lrc) from the audio itself. Offline (Whisper).",
   "main": "src/main.js",
   "license": "MIT",
   "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },
   "homepage": "https://github.com/xotwodfr/toolslauncher",
   "scripts": {
-    "setup": "node scripts/fetch-ffmpeg.js && node scripts/fetch-model.js",
+    "setup": "node scripts/fetch-ffmpeg.js && node scripts/fetch-model.js && node scripts/fetch-demucs.js",
     "start": "node ../../node_modules/electron/cli.js .",
-    "test": "node test/lyrics.test.js",
+    "test": "node test/lyrics.test.js && node test/vocals.test.js",
     "e2e": "node test/run-e2e.js",
-    "dist:win": "node scripts/fetch-ffmpeg.js && node scripts/fetch-model.js && node ../../node_modules/electron-builder/cli.js --win zip --publish never",
-    "dist:linux": "node scripts/fetch-ffmpeg.js && node scripts/fetch-model.js && node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+    "benchmark": "node test/benchmark.js",
+    "dist:win": "node scripts/fetch-ffmpeg.js && node scripts/fetch-model.js && node scripts/fetch-demucs.js && node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node scripts/fetch-ffmpeg.js && node scripts/fetch-model.js && node scripts/fetch-demucs.js && node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
   },
   "dependencies": {
     "ffmpeg-static": "^5.3.0",

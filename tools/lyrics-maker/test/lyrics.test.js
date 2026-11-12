@@ -1,7 +1,7 @@
 'use strict';
 // Lyrics Maker core tests. The audio front end, the decoding rules, the word timing maths and the lyric lines are checked
 // exactly with small known inputs. The real Whisper model is then run on SPOKEN test clips (made with the voices that ship with
-// Windows, so on other systems those tests are skipped) whose words and timing are known, and on silence. How it does on real
+// Windows, or espeak-ng where it is installed; otherwise those tests are skipped) whose words and timing are known, and on silence. How it does on real
 // singing over a band is NOT claimed here.
 const assert = require('assert');
 const crypto = require('crypto');
@@ -14,10 +14,12 @@ const P = require('../src/plan');
 const A = require('../src/audio');
 const E = require('../src/engine');
 const SP = require('../src/speech');
+const M = require('../src/models');
+const http = require('http');
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
-const skipUnlessSpeech = (fn) => async () => { if (!SP.available()) { console.log('     (skipped: needs the Windows speech voices)'); return; } await fn(); };
+const skipUnlessSpeech = (fn) => async () => { if (!SP.available()) { console.log('     (skipped: needs the Windows speech voices or espeak-ng)'); return; } await fn(); };
 const near = (a, b, tol, msg) => assert(Math.abs(a - b) <= tol, `${msg || ''} expected ${b} +/- ${tol}, got ${a}`);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lyrics-test-'));
 const modelDir = E.modelDir();
@@ -172,6 +174,9 @@ test('segments: repeated lines are trimmed (a loop of the same line is a failure
   const mk = (txt, n) => Array.from({ length: n }, (_, i) => ({ start: i, end: i + 1, text: txt }));
   assert.strictEqual(W.dropLoops(mk('Thank you.', 9)).length, 2);
   assert.strictEqual(W.dropLoops([...mk('Hey hey', 2), { start: 5, end: 6, text: 'Something else' }, ...mk('Hey hey', 2)]).length, 5);
+  const stutter = [{ start: 13, end: 17, text: 'singing songs we used to know.' }, { start: 17, end: 17.5, text: 'to know.' }, { start: 26, end: 28, text: 'Hold on.' }];
+  assert.deepStrictEqual(W.dropLoops(stutter).map((x) => x.text), ['singing songs we used to know.', 'Hold on.'], 'a repeated sentence end is a stutter');
+  assert.strictEqual(W.dropLoops([{ start: 0, end: 2, text: 'we used to know' }, { start: 5, end: 6, text: 'to know' }]).length, 2, 'an echo sung later is kept');
   assert(W.compressionRatio('la la la la la la la la la la la la la la la la la la la la la la la la') > 3.5);
   assert(W.compressionRatio('The river runs down to the sea and the morning light is warm') < 2);
   assert.strictEqual(W.compressionRatio(''), 0);
@@ -270,6 +275,152 @@ test('lrc: times are written as [mm:ss.xx] with the carry done right, sorted, an
   assert.strictEqual(P.formatPlain([{ start: 2, text: 'a' }, { start: 1, text: ' ' }, { start: 3, text: 'b' }]), 'a\r\nb\r\n');
 });
 
+test('lines: every line keeps the time of each of its words, and a cleaned-away label does not leave a stray word', () => {
+  const w = (text, start, end) => ({ text, start, end });
+  const lines = P.buildLines([{ start: 10, end: 14, text: '', words: [w('We', 10, 10.3), w('walked', 10.3, 10.8), w('all', 10.8, 11), w('night,', 11, 11.6), w('and', 13, 13.2), w('sang', 13.2, 13.9)] }]);
+  assert.deepStrictEqual(lines.map((l) => l.words.map((x) => x.text).join(' ')), lines.map((l) => l.text), 'the words spell the line');
+  assert.deepStrictEqual(lines[0].words[1], { text: 'walked', start: 10.3, end: 10.8 });
+  assert.strictEqual(lines[1].end, 13.9);
+  const music = P.buildLines([{ start: 0, end: 3, text: '', words: [w('♪', 0, 0.5), w('Hold', 0.5, 1), w('on', 1, 1.4)] }]);
+  assert.deepStrictEqual(music[0].words.map((x) => x.text), ['Hold', 'on']);
+  const shifted = P.shiftLines(lines, 0.25);
+  assert.deepStrictEqual(shifted[0].words[1], { text: 'walked', start: 10.55, end: 11.05 }, 'shifting moves the words too');
+  assert.deepStrictEqual(P.shiftLines([{ start: 0.1, text: 'a', words: [w('a', 0.1, 0.3)] }], -1)[0].words[0], { text: 'a', start: 0, end: 0 }, 'never before 0');
+  assert.strictEqual(P.currentWord(lines[0].words, 10.5), 1); assert.strictEqual(P.currentWord(lines[0].words, 9), -1); assert.strictEqual(P.currentWord(lines[0].words, 99), 3); assert.strictEqual(P.currentWord(undefined, 1), -1);
+});
+
+test('words: a changed line keeps word times when the words still line up, and shares its time out by length when they do not', () => {
+  const line = { start: 2, end: 4, text: 'Hello big world', words: [{ text: 'Hello', start: 2, end: 2.6 }, { text: 'big', start: 2.7, end: 3 }, { text: 'world', start: 3.1, end: 3.9 }] };
+  assert.deepStrictEqual(P.timeWords({ ...line, text: 'Hello bright world' }, 4).map((x) => [x.text, x.start, x.end]), [['Hello', 2, 2.6], ['bright', 2.7, 3], ['world', 3.1, 3.9]], 'a word typed over keeps its time');
+  const spread = P.timeWords({ ...line, text: 'Hello there big wide world' }, 4);
+  assert.strictEqual(spread.length, 5); near(spread[0].start, 2, 1e-9); near(spread[4].end, 4, 1e-9);
+  for (let i = 1; i < spread.length; i++) near(spread[i].start, spread[i - 1].end, 1e-9, 'one after the other');
+  assert(spread[4].end - spread[4].start > spread[2].end - spread[2].start, 'a longer word gets longer');
+  assert.deepStrictEqual(P.splitWords('  two   words '), ['two', 'words']); assert.deepStrictEqual(P.splitWords('你好 世', false), ['你', '好', '世']); assert.deepStrictEqual(P.splitWords(''), []);
+  assert.strictEqual(P.looksUnspaced('你好世界'), true); assert.strictEqual(P.looksUnspaced('Hello world'), false);
+  // a line without an end runs to the next one (at most 8 s), and the last one to the end of the song
+  const ls = [{ start: 1, text: 'a' }, { start: 30, text: 'b' }];
+  assert.strictEqual(P.lineEnd(ls, 0), 9); assert.strictEqual(P.lineEnd([{ start: 1, text: 'a' }, { start: 3, text: 'b' }], 0), 3); assert.strictEqual(P.lineEnd(ls, 1, 33), 33);
+  // ready to write: sorted, empty lines gone, words never go backwards or overlap, and stay inside their line
+  const messy = [{ start: 9, text: 'second line here' }, { start: 1, end: 5, text: 'first', words: [{ text: 'first', start: 0.5, end: 7 }] }, { start: 4, text: '   ' }, { start: 6, text: 'odd times', words: [{ text: 'odd', start: 7, end: 6.5 }, { text: 'times', start: 6.2, end: 8 }] }];
+  const t = P.timedLines(messy, { duration: 12 });
+  assert.deepStrictEqual(t.map((l) => l.text), ['first', 'odd times', 'second line here']);
+  for (const l of t) {
+    assert(l.end > l.start, 'a line ends after it starts');
+    l.words.forEach((x, k) => { assert(x.start >= l.start - 1e-9 && x.end <= l.end + 1e-9, `${x.text} inside its line`); assert(x.end >= x.start); if (k) assert(x.start >= l.words[k - 1].end - 1e-9, 'no overlap'); });
+  }
+  assert.strictEqual(t[0].words[0].start, 1, 'a word cannot start before its line'); assert(t[0].words[0].end <= 6, 'or run into the next line');
+  assert.strictEqual(t[2].end, 12, 'the last line ends with the song');
+});
+
+test('pasted lyrics: one line per row; blank rows, section headings and notes in brackets are left out', () => {
+  assert.deepStrictEqual(P.pastedLines('[Verse 1]\r\nI said, ooh, I\'m blinded by the lights\n\n(x2)\n  No, I can\'t   sleep \n[Chorus: Someone]\n♪\n(Ooh, yeah) singing\n'),
+    ["I said, ooh, I'm blinded by the lights", "No, I can't sleep", '(Ooh, yeah) singing'], 'a sung bracket next to words is kept');
+  assert.deepStrictEqual(P.pastedLines(''), []); assert.deepStrictEqual(P.pastedLines(null), []);
+  assert.strictEqual(P.pastedLines('x\n'.repeat(3000)).length, 2000, 'a sane limit');
+});
+
+test('tokens: text is turned into exactly the tokens the model writes itself, and back', () => {
+  const t = T();
+  for (const text of [" Hello world, it's me!", " I'm blinded by the lights", ' Café 2024 — naïve', ' 你好世界', '  two  spaces', ' emoji 🎵 ok']) {
+    const ids = W.encodeText(t, text);
+    assert(ids.every((id) => Number.isInteger(id) && id < t.eot), 'plain text tokens only');
+    assert.strictEqual(Buffer.concat(ids.map((id) => t.pieces[id])).toString('utf8'), text, 'the bytes come back exactly: ' + text);
+  }
+  // the most common words are one token each, with the leading space (as the model writes them)
+  assert.deepStrictEqual(W.encodeText(t, ' the').length, 1); assert.deepStrictEqual(W.encodeText(t, ' and the').length, 2);
+});
+
+test('matching: pasted words line up with heard words despite misheard, missing and extra words, and repeated choruses', () => {
+  const norm = (s) => s.split(' ').map(W.normWord);
+  assert.strictEqual(W.normWord('Can\'t,'), 'cant'); assert.strictEqual(W.normWord('Été!'), 'ete');
+  assert(W.editSimilarity('walked', 'walk') >= 0.6 && W.editSimilarity('lights', 'fight') < 0.67 && W.editSimilarity('a', 'a') === 1);
+  const pasted = norm('I said ooh I\'m blinded by the lights No I can\'t sleep until I feel your touch I said ooh I\'m blinded by the lights');
+  const heard = norm('I said oh I\'m blind by the light no I can sleep until I feel your touch thank you I said ooh I\'m blinded by the lights');
+  const m = W.matchWords(pasted, heard);
+  assert.strictEqual(m[4], 4, '"blinded" matches "blind"'); assert.strictEqual(m[7], 7, '"lights" matches "light"');
+  assert.strictEqual(m[10], 10, '"can\'t" matches "can"');
+  assert.deepStrictEqual(Array.from(m.slice(17)), [19, 20, 21, 22, 23, 24, 25, 26], 'the repeated chorus lines up with its own repeat, after the extra words');
+  for (let i = 1; i < m.length; i++) if (m[i] >= 0 && m[i - 1] >= 0) assert(m[i] > m[i - 1], 'in order');
+  // a line the model did not hear at all gets times between its neighbours
+  const est = W.estimateTimes(Int32Array.from([0, 1, -1, -1, 2]), [10, 11, 20], 60);
+  assert.deepStrictEqual(Array.from(est).map((x) => Math.round(x * 100) / 100), [10, 11, 14, 17, 20]);
+  const before = W.estimateTimes(Int32Array.from([-1, -1, 0]), [5], 60); assert.deepStrictEqual(Array.from(before).map((x) => Math.round(x * 100) / 100), [4.3, 4.65, 5]);
+  const none = W.estimateTimes(Int32Array.from([-1, -1]), [], 60); assert.deepStrictEqual(Array.from(none), [0, 30], 'nothing heard: spread over the song');
+});
+
+test('decoding: a decoder stuck repeating itself is caught (and cut after one repeat); a song repeating a word or phrase a few times is not', () => {
+  assert.strictEqual(W.loopCut([1, 2, 3, 4, 5, 5, 5, 5, 5, 5]), 6, '"ah ah ah ah ah ah": keep the start and one repeat');
+  assert.strictEqual(W.loopCut([1, 7, 8, 7, 8, 7, 8, 7, 8]), 5, 'a two-token phrase four times');
+  assert.strictEqual(W.loopCut([1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]), 6, 'a longer phrase, from where it started');
+  assert.strictEqual(W.loopCut([9, 9, 9, 9, 9]), -1, 'five times "la" is a song, not a loop');
+  assert.strictEqual(W.loopCut([4, 5, 4, 5, 4, 5]), -1, 'a phrase three times is a song');
+  assert.strictEqual(W.loopCut([1, 2, 3, 4]), -1);
+  assert.deepStrictEqual(W.TEMPERATURES.slice(0, 1), [0], 'the first try is always the most likely text');
+});
+
+test('matching: letter by letter, words written together or apart still line up ("lalala" / "la la la"), and common mishearings too', () => {
+  const n = (s) => s.split(' ').map(W.normWord);
+  assert.deepStrictEqual(Array.from(W.matchLetters(n('lalalala la la lala back when you and i'), n('la la la la la la la la back when you and i'))).slice(4), [8, 9, 10, 11, 12], 'the words after "lalala" are matched in place');
+  assert(W.matchLetters(n('lalalala la la lala'), n('la la la la la la la la'))[0] === 0, '"lalalala" is heard as "la la la la"');
+  assert.deepStrictEqual(Array.from(W.matchLetters(n("I said ooh I'm blinded by the lights"), n("I said oh I'm blind by the light"))), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepStrictEqual(Array.from(W.matchLetters(n('every day'), n('everyday'))), [0, 0], 'two pasted words, one heard word');
+  const skip = W.matchLetters(n('one two three four five six'), n('one two five six'));
+  assert.deepStrictEqual([skip[0], skip[1], skip[2], skip[3], skip[4], skip[5]], [0, 1, -1, -1, 2, 3], 'words the model did not hear stay unmatched');
+  assert.deepStrictEqual(Array.from(W.matchLetters([], n('x'))), []); assert.deepStrictEqual(Array.from(W.matchLetters(n('x'), [])), [-1]);
+});
+
+test('timing: under music, a voice coming in is found where the sound gets clearly louder (single drum hits do not count)', () => {
+  const sr = 16000; const s = new Float32Array(sr * 2);
+  let seed = 3; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+  for (let i = 0; i < s.length; i++) { const t = i / sr; s[i] = 0.05 * rnd() + ((t * 4) % 1 < 0.03 ? 0.2 * rnd() : 0) + (t >= 1.2 ? 0.4 * Math.sin(2 * Math.PI * 200 * t) : 0); }
+  near(W.riseOnset(s, sr, 0, 2), 1.2, 0.1, 'the voice comes in at 1.2 s');
+  const flat = new Float32Array(sr); for (let i = 0; i < flat.length; i++) flat[i] = 0.1 * rnd();
+  assert.strictEqual(W.riseOnset(flat, sr, 0, 1), null, 'steady music alone: nothing');
+});
+
+test('ttml: word-synced lyrics are written as TTML with a <span> per word, escaped, and read back exactly', () => {
+  assert.strictEqual(P.ttmlTime(0), '00:00:00.000'); assert.strictEqual(P.ttmlTime(65.4), '00:01:05.400'); assert.strictEqual(P.ttmlTime(3725.0006), '01:02:05.001'); assert.strictEqual(P.ttmlTime(59.9996), '00:01:00.000'); assert.strictEqual(P.ttmlTime(-3), '00:00:00.000');
+  for (const [s, v] of [['00:01:05.400', 65.4], ['1:05.4', 65.4], ['01:02:05', 3725], ['65.4s', 65.4], ['1200ms', 1.2], ['1.5m', 90], ['0.5h', 1800], ['12.25', 12.25]]) near(P.parseTtmlTime(s), v, 1e-9, s);
+  for (const bad of ['', 'abc', '1:75', '-3s', null, '12f']) assert.strictEqual(P.parseTtmlTime(bad), null, JSON.stringify(bad));
+  const w = (text, start, end) => ({ text, start, end });
+  const lines = [
+    { start: 1, end: 3, text: 'Hello big world', words: [w('Hello', 1, 1.5), w('big', 1.6, 2), w('world', 2.1, 2.9)] },
+    { start: 4, end: 6, text: 'Tom & "Jerry" <3 été', words: [w('Tom', 4, 4.3), w('&', 4.3, 4.5), w('"Jerry"', 4.5, 5), w('<3', 5, 5.4), w('été', 5.4, 6)] },
+    { start: 7, end: 9, text: '你好世界', words: [w('你', 7, 7.5), w('好', 7.5, 8), w('世', 8, 8.5), w('界', 8.5, 9)] },
+  ];
+  const xml = P.formatTtml(lines, { language: 'en', title: 'Songs & <More>', duration: 200 });
+  assert(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<tt xmlns="http://www.w3.org/ns/ttml"'), 'a TTML document');
+  assert(/itunes:timing="Word"/.test(xml) && /xml:lang="en"/.test(xml) && /<body dur="00:03:20.000">/.test(xml));
+  assert(/<ttm:title>Songs &amp; &lt;More&gt;<\/ttm:title>/.test(xml), 'the title is escaped');
+  assert(xml.includes('<span begin="00:00:01.000" end="00:00:01.500">Hello</span> <span begin="00:00:01.600" end="00:00:02.000">big</span>'), 'one span per word, a space between');
+  assert(xml.includes('>&amp;</span>') && xml.includes('>&quot;Jerry&quot;</span>') && xml.includes('>&lt;3</span>'), 'special characters are escaped');
+  assert(xml.includes('你</span><span'), 'no space between words of a language written without spaces');
+  assert.strictEqual((xml.match(/<p /g) || []).length, 3); assert.strictEqual((xml.match(/<span /g) || []).length, 12);
+  const back = P.parseTtml(xml);
+  assert.deepStrictEqual(back, lines, 'read back exactly');
+  assert.deepStrictEqual(P.parseTtml('﻿' + xml.replace(/\n/g, '\r\n')), lines, 'with a BOM and Windows line ends too');
+  const empty = P.formatTtml([], {}); assert(/<body dur="00:00:00.000">\s*<\/body>/.test(empty)); assert.deepStrictEqual(P.parseTtml(empty), []);
+  assert(!/xml:lang/.test(P.formatTtml(lines, { language: 'bad" onload="x' })), 'a strange language code is left out');
+  assert(!/\u0001/.test(P.formatTtml([{ start: 1, text: 'bell\u0001' }])), 'characters XML does not allow are dropped');
+  // a line typed in without word times gets its words timed from the line
+  const typed = P.parseTtml(P.formatTtml([{ start: 2, text: 'one two' }, { start: 4, text: 'three' }]));
+  assert.deepStrictEqual(typed[0].words.map((x) => [x.text, x.start, x.end]), [['one', 2, 3], ['two', 3, 4]]);
+});
+
+test('ttml: files from other programs are read: syllables, background vocals, line-only timing, offset times, nested <div>s', () => {
+  const apple = '<?xml version="1.0"?><!-- made elsewhere --><tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xml:lang="en"><body><div begin="1.5">'
+    + '<p begin="1.5" end="3.2"><span begin="1.5" end="1.9">Ba</span><span begin="1.9" end="2.3">by</span> <span begin="2.4" end="3.0">come</span><span ttm:role="x-bg" begin="3" end="3.6"><span begin="3.0" end="3.2">oh</span> <span begin="3.2" end="3.6">yeah</span></span></p>'
+    + '</div><div><p begin="00:04.000" end="00:05.000">Line only<br/>two</p><p begin="6s" dur="1500ms"><span begin="6s" dur="0.5s">Fast</span> <span begin="6.5s" end="7.5s">one &#x2764;&#65;</span></p><p>no time at all</p></div></body></tt>';
+  assert.deepStrictEqual(P.parseTtml(apple), [
+    { start: 1.5, end: 3.6, text: 'Baby come (oh yeah)', words: [{ text: 'Baby', start: 1.5, end: 2.3 }, { text: 'come', start: 2.4, end: 3 }, { text: '(oh', start: 3, end: 3.2 }, { text: 'yeah)', start: 3.2, end: 3.6 }] },
+    { start: 4, end: 5, text: 'Line only two' },
+    { start: 6, end: 7.5, text: 'Fast one ❤A', words: [{ text: 'Fast', start: 6, end: 6.5 }, { text: 'one ❤A', start: 6.5, end: 7.5 }] },
+  ]);
+  assert.throws(() => P.parseTtml('[00:01.00]an lrc file'), /not a TTML/);
+  assert.throws(() => P.parseTtml(''), /not a TTML/);
+});
+
 test('lines: times are typed and shown as m:ss.cc, lines can be shifted, and the playing line is found', () => {
   assert.strictEqual(P.formatTime(65.4), '1:05.40'); assert.strictEqual(P.formatTime(0), '0:00.00'); assert.strictEqual(P.formatTime(600.005), '10:00.01');
   assert.strictEqual(P.parseTime('1:05.4'), 65.4); assert.strictEqual(P.parseTime('1:05'), 65); assert.strictEqual(P.parseTime('65.25'), 65.25); assert.strictEqual(P.parseTime(' 0:12,50 '), 12.5); assert.strictEqual(P.parseTime('70'), 70);
@@ -320,7 +471,7 @@ test('model: silence is skipped without asking the model, quickly, and an unknow
   await assert.rejects(eng.transcribe(new Float32Array(16000 * 5).fill(0.1), { language: 'xx' }), /Unknown language/);
 });
 
-test('model: spoken sentences are written down correctly, with their start times, words and language (Windows voices)', skipUnlessSpeech(async () => {
+test('model: spoken sentences are written down correctly, with their start times, words and language (spoken test voices)', skipUnlessSpeech(async () => {
   const eng = await getEngine();
   const at = [1.0, 13.0, 26.0];
   const clip = await SP.makeClip(SP.SENTENCES.slice(0, 3).map((text, i) => ({ text, at: at[i], voice: i % 2 ? 'Microsoft Zira Desktop' : 'Microsoft David Desktop' })), 45, path.join(tmp, 'speech.wav'));
@@ -341,10 +492,47 @@ test('model: spoken sentences are written down correctly, with their start times
   });
   const lines = P.buildLines(r.segments);
   assert(lines.length >= 3 && lines[0].text.startsWith('The river'), 'lines were built: ' + lines.map((l) => l.text).join(' | '));
+  assert(lines.every((l) => l.words && l.words.length && l.words.map((x) => x.text).join(' ') === l.text), 'every line keeps its timed words');
+  const back = P.parseTtml(P.formatTtml(lines, { language: r.language, duration: 45 }));
+  assert.strictEqual(back.length, lines.length, 'the TTML holds every line');
+  back.forEach((l, i) => {
+    assert.strictEqual(l.text, lines[i].text);
+    assert.deepStrictEqual(l.words.map((x) => x.text), lines[i].words.map((x) => x.text), 'and every word');
+    l.words.forEach((x, k) => { near(x.start, lines[i].words[k].start, 0.011, 'word start kept'); assert(x.start >= l.start - 1e-9 && x.end <= l.end + 1e-9); });
+  });
+  const second = lines.find((l) => /walked/i.test(l.text));
+  const walked = second.words.find((x) => /walked/i.test(x.text));
+  assert(walked.start > 13 && walked.start < 14.2, `"walked" is the second word said at 13 s: ${walked.start}`);
+
   assert(streamed >= 3, 'segments were streamed while working (' + streamed + ')');
   assert(progress.length >= 6 && progress.every((p, i) => i === 0 || p.fraction >= progress[i - 1].fraction - 1e-9), 'progress only goes forward');
   assert(progress[progress.length - 1].fraction === 1 && progress.some((p) => p.language === 'en'), 'progress ends at 1 and reports the language');
   console.log(`     starts ${seen.join(', ')} (truth ${at.join(', ')}); ${secs.toFixed(1)} s for 45 s of audio`);
+}));
+
+test('model: pasted lyrics come back exactly as pasted (lines and words), each word timed, also with music under the voice (spoken test voices)', skipUnlessSpeech(async () => {
+  const eng = await getEngine();
+  const at = [1.0, 13.0, 26.0];
+  const clip = await SP.makeClip(SP.SENTENCES.slice(0, 3).map((text, i) => ({ text, at: at[i] })), 45, path.join(tmp, 'pasted.wav'));
+  const lyrics = ['The river runs down to the sea,', 'and the morning light is warm on the hills.', 'We walked all night through the empty streets,', 'singing songs we used to know.', 'Hold on to the little things,', 'they will carry you home.'];
+  let pw = 0; for (const v of clip.samples) pw += v * v; const rms = Math.sqrt(pw / clip.samples.length);
+  let seed = 7; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+  const music = clip.samples.slice();
+  for (let i = 0; i < music.length; i++) { const t = i / 16000; const beat = (t * 2) % 1 < 0.12 ? 1 : 0.25; music[i] += rms * 0.6 * (0.5 * rnd() * beat + 0.2 * (Math.sin(2 * Math.PI * 220 * t) + Math.sin(2 * Math.PI * 277 * t) + Math.sin(2 * Math.PI * 330 * t))); }
+  for (const [what, samples] of [['clean', clip.samples], ['with music', music]]) {
+    const r = await eng.transcribe(samples.slice(), { language: 'auto', lyrics });
+    assert.strictEqual(r.language, 'en');
+    assert(r.matched > 0.9, `${what}: most words were heard (${r.matched})`);
+    assert.deepStrictEqual(r.lines.map((l) => l.text), lyrics, `${what}: the lines are the pasted ones`);
+    r.lines.forEach((l, i) => {
+      assert.deepStrictEqual(l.words.map((w) => w.text), lyrics[i].split(' '), `${what}: the words are the pasted ones`);
+      l.words.forEach((w, k) => { assert(w.end >= w.start); if (k) assert(w.start >= l.words[k - 1].end - 1e-9, 'in order, no overlap'); });
+      if (i) assert(l.start >= r.lines[i - 1].end - 1e-9, 'lines in order');
+    });
+    near(r.lines[0].start, at[0], 0.35, `${what}: first sentence starts`); near(r.lines[2].start, at[1], 0.35, `${what}: second sentence`); near(r.lines[4].start, at[2], 0.35, `${what}: third sentence`);
+    const walked = r.lines[2].words[1]; assert(walked.start > 13.0 && walked.start < 13.6, `${what}: "walked" ${walked.start}`);
+    console.log(`     ${what}: starts ${[0, 2, 4].map((i) => r.lines[i].start.toFixed(2)).join(', ')} (truth ${at.join(', ')}), ${Math.round(r.matched * 100)}% heard`);
+  }
 }));
 
 test('model: cancelling in the middle of a song stops it within seconds without crashing, and the engine keeps working', skipUnlessSpeech(async () => {
@@ -373,6 +561,98 @@ test('model: releasing in the middle of a song waits for it to stop, never crash
   const r = await fresh.transcribe(clip.samples.slice(0, 16000 * 10), { language: 'en' });
   assert(r.segments.length >= 1);
   await fresh.release();
+}));
+
+// ---- the downloadable "accurate" model ---------------------------------------------------------------------------------------------------
+test('models: the accurate model downloads file by file, every file is checked, an interrupted download goes on, a damaged one is refused, cancel leaves nothing half-written', async () => {
+  const files = { 'a.json': Buffer.from('{"x":1}'), 'big.onnx': crypto.randomBytes(3 * 1024 * 1024 + 17) };
+  let served = []; let corrupt = false; let slow = false;
+  const server = http.createServer((req, res) => {
+    const name = decodeURIComponent(req.url.slice(1)); served.push(name);
+    const body = files[name];
+    if (!body) { res.writeHead(404); res.end(); return; }
+    const out = corrupt && name === 'big.onnx' ? Buffer.concat([body.subarray(0, 100), Buffer.from([body[100] ^ 1]), body.subarray(101)]) : body;
+    res.writeHead(200, { 'content-length': out.length });
+    if (!slow) { res.end(out); return; }
+    let i = 0; const t = setInterval(() => { if (i >= out.length || res.destroyed) { clearInterval(t); res.end(); return; } res.write(out.subarray(i, i + 65536)); i += 65536; }, 20);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+  const model = { id: 'accurate', folder: 'test-model', files: Object.entries(files).map(([name, b]) => ({ name, from: name, size: b.length, sha256: sha(b) })) };
+  model.bytes = model.files.reduce((n, f) => n + f.size, 0);
+  const dirs = { bundledDir: modelDir, userDir: path.join(tmp, 'user') };
+  const dir = path.join(dirs.userDir, 'models', 'test-model');
+  const opts = (o = {}) => ({ fetch, model, urlFor: (f) => `${base}/${f.name}`, ...o });
+  try {
+    const progress = [];
+    await M.download('accurate', dirs, opts({ onProgress: (p) => progress.push(p.done) }));
+    for (const [name, b] of Object.entries(files)) assert(fs.readFileSync(path.join(dir, name)).equals(b), name + ' arrived intact');
+    assert.strictEqual(progress[progress.length - 1], model.bytes, 'progress ends at the full size');
+    assert(progress.every((x, i) => !i || x >= progress[i - 1]), 'progress only goes forward');
+    assert(JSON.parse(fs.readFileSync(path.join(dir, 'verified.json'), 'utf8')).revision, 'a record of what was checked');
+    // run again: nothing is fetched again (the files are already right)
+    served = [];
+    await M.download('accurate', dirs, opts());
+    assert.deepStrictEqual(served, [], 'files that are already right are kept');
+    // a damaged file on disk is fetched again; a damaged download is refused and nothing of it is kept
+    fs.writeFileSync(path.join(dir, 'big.onnx'), 'broken');
+    corrupt = true;
+    await assert.rejects(M.download('accurate', dirs, opts()), /did not arrive intact/);
+    assert(!fs.existsSync(path.join(dir, 'big.onnx.part')), 'no half-written file left');
+    corrupt = false;
+    served = [];
+    await M.download('accurate', dirs, opts());
+    assert.deepStrictEqual(served, ['big.onnx'], 'only the damaged file is fetched again');
+    // cancel in the middle
+    fs.rmSync(path.join(dir, 'big.onnx'));
+    slow = true;
+    const ac = new AbortController();
+    const p = M.download('accurate', dirs, opts({ signal: ac.signal }));
+    setTimeout(() => ac.abort(), 150);
+    await assert.rejects(p, (e) => e.cancelled === true || e.name === 'AbortError');
+    assert(!fs.existsSync(path.join(dir, 'big.onnx.part')) && !fs.existsSync(path.join(dir, 'big.onnx')), 'cancel leaves nothing half-written');
+    // the real list: standard is in the app; accurate is not downloaded in this test folder; remove only touches its own folder
+    const list = M.list(dirs);
+    assert.deepStrictEqual(list.map((m) => [m.id, m.bundled]), [['standard', true], ['accurate', false]]);
+    assert.strictEqual(list[0].installed, true); assert.strictEqual(list[1].installed, false);
+    assert(list[1].bytes > 1e9 && list[1].bytes < 1.2e9, 'about 1.1 GB');
+    await assert.rejects(M.remove('standard', dirs), /part of the app/);
+    assert.throws(() => M.dirFor('../evil', dirs), /Unknown model/);
+  } finally { server.close(); }
+});
+
+test('models: the pinned accurate model (if it is on this computer) has exactly the pinned sizes and SHA-256 hashes', async () => {
+  const dir = path.join(modelDir, 'turbo');
+  if (!fs.existsSync(path.join(dir, 'encoder_model_int8.onnx'))) { console.log('     (skipped: the accurate model is not in models/turbo)'); return; }
+  for (const f of M.MODELS.accurate.files) {
+    assert.strictEqual(fs.statSync(path.join(dir, f.name)).size, f.size, f.name + ' size');
+    assert.strictEqual(await M.hashFile(path.join(dir, f.name)), f.sha256, f.name + ' hash');
+  }
+  const t = W.loadAssets(dir);
+  assert.strictEqual(t.nMels, 128); assert.strictEqual(t.layers, 4); assert(t.alignmentHeads.length > 0, 'it can time words');
+  assert.notStrictEqual(t.noSpeech, 50362, 'its "no speech" token is read from its own files');
+});
+
+test('model: the accurate model (if present) writes the spoken sentences down and times pasted lyrics too (spoken test voices)', skipUnlessSpeech(async () => {
+  const dir = path.join(modelDir, 'turbo');
+  if (!fs.existsSync(path.join(dir, 'encoder_model_int8.onnx'))) { console.log('     (skipped: the accurate model is not in models/turbo)'); return; }
+  const at = [1.0, 13.0, 26.0];
+  const clip = await SP.makeClip(SP.SENTENCES.slice(0, 3).map((text, i) => ({ text, at: at[i] })), 45, path.join(tmp, 'turbo.wav'));
+  const eng = await E.createEngine({ dir });
+  try {
+    const t0 = Date.now();
+    const r = await eng.transcribe(clip.samples.slice(), { language: 'auto' });
+    const secs = (Date.now() - t0) / 1000;
+    const text = r.segments.map((x) => x.text).join(' ');
+    const wer = SP.wordErrorRate(SP.SENTENCES.slice(0, 3).join(' '), text);
+    assert.strictEqual(r.language, 'en'); assert(wer <= 0.1, `word error rate ${wer.toFixed(2)}: ${text}`);
+    near(r.segments[0].start, at[0], 0.5); assert(r.segments.some((x) => Math.abs(x.start - at[1]) < 0.6) && r.segments.some((x) => Math.abs(x.start - at[2]) < 0.6), 'sentence starts');
+    const lyrics = ['We walked all night through the empty streets,', 'singing songs we used to know.'];
+    const a = await eng.transcribe(clip.samples.slice(), { language: 'en', lyrics: ['The river runs down to the sea,', 'and the morning light is warm on the hills.', ...lyrics, 'Hold on to the little things,', 'they will carry you home.'] });
+    near(a.lines[2].start, at[1], 0.35, 'pasted lyrics timed with the accurate model');
+    console.log(`     accurate model: WER ${wer.toFixed(2)}, ${secs.toFixed(1)} s for 45 s of audio`);
+  } finally { await eng.release(); }
 }));
 
 test('model: a missing model file gives a clear message', async () => {

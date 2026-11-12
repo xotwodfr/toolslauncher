@@ -1,6 +1,6 @@
 'use strict';
 // Makes the README screenshot: `node ../../node_modules/electron/cli.js . --e2e --readme-shots=<folder>`.
-// The "song" is INVENTED: a spoken, made-up set of lines read by a Windows voice, listened to by the real model, so the
+// The "song" is INVENTED: a spoken, made-up set of lines read by a Windows voice (or espeak-ng), listened to by the real model, so the
 // screenshot shows real results without anyone's recording or lyrics.
 const fs = require('fs');
 const os = require('os');
@@ -25,7 +25,7 @@ exports.run = async ({ app, getWin, outDir, dialog }) => {
   const click = async (sel) => { const { x, y } = await center(sel); wc.sendInputEvent({ type: 'mouseMove', x, y }); wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 }); wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 }); await sleep(150); };
   let code = 1;
   try {
-    if (!SP.available()) throw new Error('the screenshot needs the Windows speech voices');
+    if (!SP.available()) throw new Error('the screenshot needs the Windows speech voices or espeak-ng');
     win.setContentSize(1240, 760);
     const at = [1.5, 8.0, 14.0, 20.5];
     const file = path.join(dir, 'Harbor Lights (demo).wav');
@@ -37,7 +37,10 @@ exports.run = async ({ app, getWin, outDir, dialog }) => {
     await click('#make');
     await waitFor('window.__app.S.working', 5000);
     await waitFor('!window.__app.S.working');
-    await js('document.getElementById("player").currentTime = 15; void 0');
+    // play into the third line so a word is lit up, then pause on it
+    await js('(() => { const l = window.__app.S.lines.find((x) => /radio/.test(x.text)) || window.__app.S.lines[2]; const w = l.words[Math.min(5, l.words.length - 1)]; const p = document.getElementById("player"); p.currentTime = w.start + 0.05; return p.play(); })()');
+    await sleep(250);
+    await js('document.getElementById("player").pause(); void 0');
     await sleep(500);
     await js('document.activeElement && document.activeElement.blur()');
     await sleep(500);

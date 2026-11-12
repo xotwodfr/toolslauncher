@@ -1,0 +1,6 @@
+﻿folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp
+Shopping,1,login,Example Shop,,"PIN: 4321
+Customer no: 88-123",0,"https://shop.example.com,https://m.shop.example.com",kim@example.com,Sh0p!ng-2024,JBSWY3DPEHPK3PXP
+,,note,Wifi at home,"Network: ExampleNet
+Key: hunter22",,0,,,,
+,,card,Old card,,,0,,,,

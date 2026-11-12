@@ -1,0 +1,4 @@
+"Group","Title","Username","Password","URL","Notes","TOTP","Icon","Last Modified","Created"
+"Root","Example Mail","ada@example.com","c0rrect-h0rse","https://mail.example.com","","otpauth://totp/Example:ada@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example","0","2024-03-01T10:00:00Z","2023-01-15T09:30:00Z"
+"Root/Work/Servers","Build box","deploy","p@ss, with ""quotes""","ssh://build.example.org","line one
+line two","","0","2024-05-02T08:00:00Z","2024-05-01T08:00:00Z"

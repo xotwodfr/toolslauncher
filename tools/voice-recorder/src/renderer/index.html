@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; media-src vr:; base-uri 'none'; form-action 'none';">
+  <title>Voice Recorder &amp; Cleaner</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Voice Recorder &amp; Cleaner</h1>
+      <span class="muted small tagline">record · clean · export</span>
+      <span class="grow"></span>
+      <span id="folderName" class="folder muted small trunc" title=""></span>
+      <button id="openFolder" class="btn ghost small">Open folder</button>
+      <button id="chooseFolder" class="btn small">Change folder…</button>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <section class="recorder" aria-label="Recorder">
+      <div class="recrow">
+        <div class="field mic">
+          <label for="mic">Microphone</label>
+          <select id="mic" aria-label="Microphone"><option value="">Looking for microphones…</option></select>
+        </div>
+        <div class="field meterbox">
+          <label id="meterLabel">Input level</label>
+          <div class="meter" id="meter" role="meter" aria-labelledby="meterLabel" aria-valuemin="-60" aria-valuemax="0" aria-valuenow="-60">
+            <div class="ticks"></div><div id="meterRms" class="rms"></div><div id="meterPeak" class="peakmark"></div>
+          </div>
+          <div class="meterfoot"><span id="hint" class="hint muted small">Waiting for the microphone…</span><span id="clip" class="clip" hidden>CLIP</span></div>
+        </div>
+        <div class="clock">
+          <div id="timer" class="timer" aria-live="off">0:00.0</div>
+          <div id="recState" class="chip">Ready</div>
+        </div>
+        <div class="recbtns">
+          <button id="rec" class="btn primary recbtn" disabled><span class="dot"></span>Record</button>
+          <button id="pause" class="btn" disabled>Pause</button>
+          <button id="mark" class="btn" disabled title="Add a marker here (M)">Marker</button>
+          <button id="stop" class="btn" disabled>Stop &amp; save</button>
+          <button id="discard" class="btn ghost small" disabled title="Throw this recording away">Discard</button>
+        </div>
+      </div>
+      <div class="recfoot muted small"><span><kbd>R</kbd> record / stop · <kbd>Space</kbd> pause · <kbd>M</kbd> marker</span><span id="markers" class="markers"></span><span class="grow"></span><span id="space"></span></div>
+    </section>
+
+    <main class="body">
+      <aside class="takes" aria-label="Takes">
+        <div class="listhead"><h2>Takes</h2><span id="takeCount" class="muted small"></span></div>
+        <div id="takeList" class="takelist" role="listbox" aria-label="Recordings"></div>
+        <p id="noTakes" class="muted small empty">No recordings yet. Press <strong>Record</strong>, talk, then <strong>Stop &amp; save</strong>. Takes are saved as WAV in the recordings folder as you speak, so nothing is lost if the computer stops.</p>
+      </aside>
+
+      <section class="editor" id="editor" hidden>
+        <div class="titlerow">
+          <input id="title" type="text" maxlength="120" placeholder="Add a title" aria-label="Title of the take" spellcheck="true">
+          <span id="meta" class="muted small"></span>
+          <span class="grow"></span>
+          <button id="reveal" class="btn ghost small">Show in folder</button>
+          <button id="delete" class="btn ghost small">Delete…</button>
+        </div>
+
+        <div class="wavewrap">
+          <canvas id="wave" aria-label="Waveform. Drag to select a part." tabindex="0"></canvas>
+          <div id="waveLoading" class="waveloading muted small" hidden>Reading the take…</div>
+        </div>
+        <div class="waverow">
+          <button id="play" class="btn small playbtn" aria-label="Play">▶ Play</button>
+          <span id="pos" class="pos">0:00.0</span>
+          <span id="selInfo" class="muted small">Drag to select a part · click to listen from there</span>
+          <span class="grow"></span>
+          <button id="selTrim" class="btn small" disabled>Trim to selection</button>
+          <button id="selNoise" class="btn small" disabled>Learn noise here</button>
+          <button id="selClear" class="btn ghost small" disabled>Clear</button>
+        </div>
+
+        <div class="opts">
+          <div class="opt" id="optTrim">
+            <label class="check"><input type="checkbox" id="trimOn"> Trim start and end</label>
+            <div class="sub"><input type="number" id="trimStart" min="0" step="0.1" aria-label="Start (seconds)"> to <input type="number" id="trimEnd" min="0" step="0.1" aria-label="End (seconds)"> s</div>
+          </div>
+          <div class="opt">
+            <label class="check"><input type="checkbox" id="hpOn"> Remove rumble</label>
+            <div class="sub">below <select id="hpFreq" aria-label="Rumble filter frequency"><option value="60">60 Hz</option><option value="80">80 Hz</option><option value="100">100 Hz</option><option value="120">120 Hz</option></select></div>
+          </div>
+          <div class="opt">
+            <label class="check"><input type="checkbox" id="nrOn"> Reduce noise</label>
+            <div class="sub"><select id="nrStrength" aria-label="Noise reduction strength"><option value="light">Light</option><option value="medium">Medium</option><option value="strong">Strong</option></select> <span id="nrFrom" class="muted small"></span></div>
+          </div>
+          <div class="opt">
+            <label class="check"><input type="checkbox" id="psOn"> Shorten long pauses</label>
+            <div class="sub">longer than <input type="number" id="psLonger" min="0.3" max="30" step="0.1" aria-label="Pauses longer than (seconds)"> s to <input type="number" id="psKeep" min="0" max="10" step="0.1" aria-label="Shorten to (seconds)"> s</div>
+          </div>
+          <div class="opt">
+            <label class="check"><input type="checkbox" id="ldOn"> Even out loudness</label>
+            <div class="sub"><select id="ldTarget" aria-label="Loudness target">
+              <option value="-16">-16 LUFS · podcast</option><option value="-19">-19 LUFS · mono speech</option><option value="-14">-14 LUFS · streaming</option><option value="-23">-23 LUFS · broadcast</option>
+            </select></div>
+          </div>
+          <div class="opt">
+            <label class="check"><input type="checkbox" id="dcOn"> Remove clicks</label>
+            <label class="check"><input type="checkbox" id="deOn"> Soften harsh "s" sounds</label>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="preview" class="btn">Preview cleaned</button>
+          <div class="ab" role="radiogroup" aria-label="Listen to">
+            <button id="abA" class="mode" role="radio" aria-checked="true">A · Original</button>
+            <button id="abB" class="mode" role="radio" aria-checked="false" disabled>B · Cleaned</button>
+          </div>
+          <span id="pvInfo" class="muted small trunc"></span>
+          <select id="format" aria-label="Export format"></select>
+          <button id="export" class="btn primary">Export…</button>
+        </div>
+        <div class="exportbar" id="xbar" hidden>
+          <div id="xprog" class="progress" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="xfill"></div></div>
+          <span id="xtext" class="small muted">Exporting…</span>
+          <button id="xcancel" class="btn small">Cancel</button>
+        </div>
+        <div id="result" class="result" role="status" hidden><span id="resultText"></span> <button id="resultReveal" class="btn ghost small" hidden>Show in folder</button></div>
+      </section>
+      <section class="editor placeholder" id="noTake"><p class="muted">Pick a take on the left to listen, clean it up and export it.</p></section>
+    </main>
+    <audio id="player" preload="auto" hidden></audio>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

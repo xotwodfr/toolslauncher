@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; media-src subs:; connect-src subs:;">
+  <title>Subtitle Maker</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Subtitle Maker</h1>
+      <span class="muted small tagline">listen · subtitle · burn in</span>
+      <span class="grow"></span>
+      <span id="fileInfo" class="muted small trunc"></span>
+      <button id="importSubs" class="btn">Open .srt / .vtt…</button>
+      <button id="open" class="btn">Open video…</button>
+    </header>
+
+    <div id="engineWarn" class="banner" role="alert" hidden></div>
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="stage">
+      <section id="empty" class="drop" tabindex="0" role="button" aria-label="Open a video or audio file">
+        <strong class="big">Drop a video or audio file here</strong>
+        <span class="muted">MP4, MKV, MOV, WebM, AVI, MP3, WAV, M4A and more, up to 3 hours. Or drop an .srt / .vtt file to edit it.</span>
+        <button id="open2" class="btn primary">Open video…</button>
+        <p class="muted small fine">What is said in the file is written down on this computer, offline, as subtitles that follow the usual rules (two lines at most, readable speed). You can watch them on the video, fix any word or time, save an <code>.srt</code> or <code>.vtt</code> file, or write a new MP4 with the subtitles in it. The original file is never changed.</p>
+      </section>
+
+      <section id="work" class="work" hidden>
+        <div class="left">
+          <div class="viewer">
+            <div id="screen" class="screen">
+              <video id="player" preload="auto"></video>
+              <div id="noPicture" class="nopicture muted" hidden></div>
+              <div id="overlay" class="overlay" aria-live="off"></div>
+            </div>
+            <div class="transport">
+              <button id="play" class="btn small" aria-label="Play or pause (Space)">▶ Play</button>
+              <button id="back" class="btn small ghost" aria-label="Back 2 seconds" title="Back 2 seconds (←)">−2 s</button>
+              <button id="fwd" class="btn small ghost" aria-label="Forward 2 seconds" title="Forward 2 seconds (→)">+2 s</button>
+              <span class="clock"><span id="pos">0:00.000</span> <span class="muted">/ <span id="len">0:00</span></span></span>
+              <input type="range" id="seek" min="0" max="10000" value="0" aria-label="Position">
+            </div>
+          </div>
+
+          <div id="progressBox" class="progressbox" hidden aria-live="polite">
+            <div class="progressrow"><span id="phase" class="phase">Starting…</span><span class="grow"></span><span id="eta" class="muted small"></span><button id="cancel" class="btn small">Cancel</button></div>
+            <div class="progress" id="bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="fill"></div></div>
+          </div>
+
+          <div class="listhead">
+            <span class="col-n">#</span><span class="col-t">Start</span><span class="col-t">End</span><span class="col-x">Text</span><span class="col-c" title="Reading speed: characters per second">CPS</span><span class="col-a"></span>
+          </div>
+          <div id="cues" class="cues" aria-label="Subtitles, each with its start and end time"></div>
+          <p id="placeholder" class="placeholder muted">No subtitles yet. Choose the language (or let it be detected) and press <strong>Make subtitles</strong>, or open an <code>.srt</code> / <code>.vtt</code> file.</p>
+          <div class="listfoot"><span id="status" class="muted small" aria-live="polite"></span></div>
+        </div>
+
+        <aside class="side" aria-label="Controls">
+          <fieldset id="makeSet" disabled>
+            <legend>Make</legend>
+            <div class="opt"><label for="lang">Spoken language</label><select id="lang" aria-label="Spoken language"></select></div>
+            <div class="opt"><label class="check"><input type="checkbox" id="translate"> Translate to English</label></div>
+            <div class="opt"><button id="make" class="btn primary">Make subtitles</button></div>
+            <p id="makeNote" class="muted small"></p>
+          </fieldset>
+
+          <fieldset id="editSet" disabled>
+            <legend>Edit</legend>
+            <div class="opt grid2">
+              <button id="addCue" class="btn small" title="Add a subtitle at the playhead (N)">Add at playhead</button>
+              <button id="undo" class="btn small" title="Undo the last change (Ctrl+Z)" disabled>Undo</button>
+              <button id="stampStart" class="btn small" title="Start the selected subtitle at the playhead ([)">Start here [</button>
+              <button id="stampEnd" class="btn small" title="End the selected subtitle at the playhead (])">End here ]</button>
+            </div>
+            <div class="opt shift" role="group" aria-label="Move every subtitle">
+              <span class="lbl">Shift all</span>
+              <button class="btn small" data-shift="-1">−1 s</button><button class="btn small" data-shift="-0.1">−0.1</button>
+              <button class="btn small" data-shift="0.1">+0.1</button><button class="btn small" data-shift="1">+1 s</button>
+            </div>
+            <p class="muted small">Select a subtitle, play, and press <kbd>[</kbd> when it should appear and <kbd>]</kbd> when it should go. Red rows break a rule: hover them to see which.</p>
+          </fieldset>
+
+          <fieldset id="saveSet" disabled>
+            <legend>Save subtitles</legend>
+            <div class="opt grid2"><button id="saveSrt" class="btn primary">Save .srt…</button><button id="saveVtt" class="btn">Save .vtt…</button></div>
+            <div id="result" class="result" hidden role="status"></div>
+          </fieldset>
+
+          <fieldset id="videoSet" disabled>
+            <legend>New video (MP4)</legend>
+            <div class="opt"><label for="size">Text size</label><select id="size"><option value="small">Small</option><option value="medium" selected>Medium</option><option value="large">Large</option></select></div>
+            <div class="opt"><label class="check"><input type="checkbox" id="box"> Dark box behind the text</label></div>
+            <div class="opt grid2"><button id="burn" class="btn" title="Draw the subtitles into the picture: they show in every player">Burn into video…</button><button id="soft" class="btn" title="Add the subtitles as a track players can switch on and off; the picture is copied as it is">Add as subtitle track…</button></div>
+            <div id="exportBox" class="progressbox inside" hidden>
+              <div class="progressrow"><span id="exportPhase" class="phase small">Writing…</span><span class="grow"></span><button id="exportCancel" class="btn small">Cancel</button></div>
+              <div class="progress" id="exportBar" role="progressbar" aria-label="Writing the video" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="exportFill"></div></div>
+            </div>
+            <div id="videoResult" class="result" hidden role="status"></div>
+            <p id="videoNote" class="muted small"></p>
+          </fieldset>
+        </aside>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../subs.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

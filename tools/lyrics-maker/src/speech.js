@@ -1,17 +1,30 @@
 'use strict';
-// Test material: spoken sentences made with the voices that ship with Windows (System.Speech), placed at known times in a
-// silent clip, so the recogniser can be checked against the truth (what was said, and when). Not available on other systems,
-// where the tests that need it are skipped. Also a word error rate, to compare what was heard with what was said.
+// Test material: spoken sentences made with the voices that ship with Windows (System.Speech), or with espeak-ng where it is
+// installed (Linux), placed at known times in a silent clip, so the recogniser can be checked against the truth (what was said,
+// and when). Without either, the tests that need it are skipped. Also a word error rate, to compare what was heard with what was said.
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const A = require('./audio');
 
-const available = () => process.platform === 'win32';
+let espeak;
+/** espeak-ng on the PATH (Linux test machines), or null */
+const espeakPath = () => {
+  if (espeak !== undefined) return espeak;
+  espeak = null;
+  if (process.platform !== 'win32') { const r = spawnSync('espeak-ng', ['--version'], { encoding: 'utf8' }); if (r.status === 0) espeak = 'espeak-ng'; }
+  return espeak;
+};
+const available = () => process.platform === 'win32' || !!espeakPath();
 
-/** Speak `text` into a WAV file with a Windows voice. */
+/** Speak `text` into a WAV file with a Windows voice (or, elsewhere, an espeak-ng voice: a "Zira" request gets a second voice). */
 function synthesize(text, file, voice = 'Microsoft David Desktop') {
-  if (!available()) throw new Error('Speech synthesis is only available on Windows');
+  if (!available()) throw new Error('Speech synthesis needs Windows or espeak-ng');
+  if (process.platform !== 'win32') {
+    const r = spawnSync(espeakPath(), ['-v', /zira/i.test(voice) ? 'en-us+f3' : 'en-us', '-s', '150', '-w', file, String(text)], { encoding: 'utf8' });
+    if (r.status !== 0 || !fs.existsSync(file)) throw new Error('Speech synthesis failed: ' + (r.stderr || '').slice(0, 200));
+    return file;
+  }
   const esc = (s) => String(s).replace(/'/g, "''");
   const script = `Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $s.SelectVoice('${esc(voice)}') } catch {}; $s.SetOutputToWaveFile('${esc(file)}'); $s.Speak('${esc(text)}'); $s.Dispose()`;
   const r = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true });

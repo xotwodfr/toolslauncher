@@ -1,0 +1,79 @@
+{
+  "name": "markdown-notes",
+  "productName": "Markdown Notes",
+  "version": "0.1.0",
+  "description": "Notes kept as plain Markdown files in a folder you choose, with search, tags, wiki links, live preview and export. Offline.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/notes.test.js",
+    "e2e": "node test/run-e2e.js",
+    "build:editor": "node scripts/build-editor.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "docx": "^9.15.3",
+    "highlight.js": "^11.12.0",
+    "htmlparser2": "^9.1.0",
+    "markdown-it": "^15.0.3",
+    "markdown-it-footnote": "^4.0.0"
+  },
+  "build": {
+    "appId": "com.toolslauncher.markdownnotes",
+    "productName": "Markdown Notes",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "artifactName": "MarkdownNotes-${version}-${os}-${arch}.${ext}",
+    "executableName": "markdown-notes",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Office"
+    }
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.5",
+    "codemirror": "^6.0.2",
+    "esbuild": "^0.28.2",
+    "fast-xml-parser": "^5.12.0",
+    "fflate": "^0.8.3"
+  }
+}

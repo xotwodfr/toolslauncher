@@ -35,7 +35,7 @@ async function createEngine({ dir = modelDir() } = {}) {
     if (!job) return undefined;
     if (m.type === 'segments') job.onSegments(m.segments);
     else if (m.type === 'progress') job.onProgress(m);
-    else if (m.type === 'done') { jobs.delete(m.id); job.resolve({ language: m.language, segments: m.segments }); }
+    else if (m.type === 'done') { jobs.delete(m.id); job.resolve({ language: m.language, segments: m.segments, ...(m.lines ? { lines: m.lines, matched: m.matched } : {}) }); }
     else if (m.type === 'cancelled') { jobs.delete(m.id); job.reject(cancelled()); }
     else if (m.type === 'error') { jobs.delete(m.id); job.reject(m.userError ? new A.UserError(m.message) : new Error(m.message)); }
     return undefined;
@@ -46,16 +46,17 @@ async function createEngine({ dir = modelDir() } = {}) {
   return {
     /**
      * @param {Float32Array} samples 16 kHz mono (handed over to the worker, so do not use it afterwards)
-     * @param {{ language?: string, signal?: AbortSignal, onSegments?: Function, onProgress?: Function }} [o]
+     * @param {{ language?: string, lyrics?: string[], signal?: AbortSignal, onSegments?: Function, onProgress?: Function }} [o]
+     *   lyrics: the user's own lines; the result then also has `lines` (those lines, timed word by word) and `matched`
      */
-    transcribe(samples, { language = 'auto', signal, onSegments = () => {}, onProgress = () => {} } = {}) {
+    transcribe(samples, { language = 'auto', lyrics = null, signal, onSegments = () => {}, onProgress = () => {} } = {}) {
       if (dead) return Promise.reject(dead);
       return new Promise((resolve, reject) => {
         const id = nextId++;
         jobs.set(id, { resolve, reject, onSegments, onProgress });
         const stop = () => { try { worker.postMessage({ type: 'cancel', id }); } catch { /* the worker is gone */ } };
         if (signal) { if (signal.aborted) { jobs.delete(id); return reject(cancelled()); } signal.addEventListener('abort', stop, { once: true }); }
-        worker.postMessage({ type: 'transcribe', id, samples, language }, [samples.buffer]);
+        worker.postMessage({ type: 'transcribe', id, samples, language, lyrics }, [samples.buffer]);
         return undefined;
       });
     },
@@ -77,11 +78,10 @@ async function createEngine({ dir = modelDir() } = {}) {
 }
 
 /** Read a song file and make lyrics for it. */
-async function makeLyrics(engine, file, { language = 'auto', signal, ffmpeg = A.ffmpegPath(), onSegments, onProgress, onPhase = () => {} } = {}) {
-  onPhase('reading');
-  const samples = await A.decode16k(ffmpeg, file, { signal });
+async function makeLyrics(engine, file, { language = 'auto', lyrics = null, signal, ffmpeg = A.ffmpegPath(), onSegments, onProgress, onPhase = () => {}, samples = null } = {}) {
+  if (!samples) { onPhase('reading'); samples = await A.decode16k(ffmpeg, file, { signal }); }
   onPhase('working');
-  return engine.transcribe(samples, { language, signal, onSegments, onProgress });
+  return engine.transcribe(samples, { language, lyrics, signal, onSegments, onProgress });
 }
 
 module.exports = { MODEL_FILES, ENCODER_OPTIONS, DECODER_OPTIONS, modelDir, missingFiles, createEngine, makeLyrics, cancelled };

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' book: data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'self'">
+  <title>Ebook Converter &amp; Reader</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top" id="topLib">
+      <h1>Ebook Converter &amp; Reader</h1>
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button role="tab" id="tabLibrary" data-tab="library" aria-selected="true">Library</button>
+        <button role="tab" id="tabConvert" data-tab="convert" aria-selected="false">Convert</button>
+        <button role="tab" id="tabDetails" data-tab="details" aria-selected="false">Edit details</button>
+      </nav>
+      <span class="grow"></span>
+      <button id="openBook" class="btn">Open book…</button>
+    </header>
+
+    <header class="top reader-top" id="topReader" hidden>
+      <button id="back" class="btn ghost small" title="Back to the library (Esc)">← Library</button>
+      <div class="booktitle trunc"><strong id="rTitle"></strong> <span id="rAuthor" class="muted"></span></div>
+      <span class="grow"></span>
+      <button id="tocBtn" class="btn small" aria-pressed="false" title="Contents (T)">Contents</button>
+      <button id="findBtn" class="btn small" aria-pressed="false" title="Search in the book (Ctrl+F)">Search</button>
+      <button id="aaBtn" class="btn small" aria-haspopup="dialog" title="Text and layout">Aa</button>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <!-- library -->
+    <main id="viewLibrary" class="view">
+      <section id="libEmpty" class="drop" tabindex="0">
+        <strong class="big">Drop a book here to read it</strong>
+        <span class="muted">EPUB, plain text (.txt), Markdown (.md) and HTML</span>
+        <span class="row"><button id="openBook2" class="btn primary">Open book…</button></span>
+        <p class="muted small fine">Books open on this computer and never touch the internet: pictures come only from inside the book, and anything in a book that could run (scripts, forms) is removed before it is shown. The library remembers where you stopped in each book.</p>
+      </section>
+      <section id="libGrid" class="grid" aria-label="Your books" hidden></section>
+    </main>
+
+    <!-- reader -->
+    <main id="viewReader" class="view reader" hidden>
+      <aside id="side" class="side" hidden>
+        <div id="tocPanel" class="panel"><h2>Contents</h2><ol id="toc" class="toc"></ol></div>
+        <div id="findPanel" class="panel" hidden>
+          <h2>Search in this book</h2>
+          <input id="findInput" type="search" placeholder="Words to find" aria-label="Search in this book" spellcheck="false">
+          <div id="findCount" class="muted small"></div>
+          <ol id="findResults" class="hits"></ol>
+        </div>
+      </aside>
+      <div class="pagearea">
+        <button id="prev" class="turn" aria-label="Previous page">‹</button>
+        <iframe id="frame" title="Book page" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe>
+        <button id="next" class="turn" aria-label="Next page">›</button>
+      </div>
+      <div id="aaPop" class="pop" role="dialog" aria-label="Text and layout" hidden>
+        <label>Text size</label>
+        <div class="row"><button id="fsDown" class="btn small" aria-label="Smaller text">A−</button><span id="fsVal" class="val">100%</span><button id="fsUp" class="btn small" aria-label="Bigger text">A+</button></div>
+        <label for="fontSel">Font</label>
+        <select id="fontSel"><option value="serif">Serif</option><option value="sans">Sans-serif</option><option value="easy">Easy to read</option><option value="mono">Monospace</option></select>
+        <label for="lhSel">Line spacing</label>
+        <select id="lhSel"><option value="1.3">Tight</option><option value="1.55">Normal</option><option value="1.8">Relaxed</option><option value="2.1">Loose</option></select>
+        <label>Colours</label>
+        <div class="seg" role="radiogroup" aria-label="Colours">
+          <button class="mode" role="radio" data-theme="light" aria-checked="false">Light</button>
+          <button class="mode" role="radio" data-theme="sepia" aria-checked="false">Sepia</button>
+          <button class="mode" role="radio" data-theme="dark" aria-checked="true">Dark</button>
+        </div>
+        <label>Layout</label>
+        <div class="seg" role="radiogroup" aria-label="Layout">
+          <button class="mode" role="radio" data-layout="paged" aria-checked="true">Pages</button>
+          <button class="mode" role="radio" data-layout="scrolled" aria-checked="false">Scroll</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- converter -->
+    <main id="viewConvert" class="view convert" hidden>
+      <section id="convDrop" class="drop small-drop" tabindex="0">
+        <strong>Drop books here, or</strong> <button id="convAdd" class="btn">Add files…</button>
+        <span class="muted small">EPUB, TXT, Markdown, HTML · the originals are only read, never changed</span>
+      </section>
+      <div id="convList" class="list" aria-label="Files to convert"></div>
+      <section class="options">
+        <div>
+          <label>Convert to</label>
+          <div class="seg formats" role="radiogroup" aria-label="Convert to">
+            <button class="mode" role="radio" data-format="epub" aria-checked="true">EPUB</button>
+            <button class="mode" role="radio" data-format="pdf" aria-checked="false">PDF</button>
+            <button class="mode" role="radio" data-format="html" aria-checked="false">HTML</button>
+            <button class="mode" role="radio" data-format="md" aria-checked="false">Markdown</button>
+            <button class="mode" role="radio" data-format="txt" aria-checked="false">Text</button>
+          </div>
+          <p id="formatNote" class="muted small note-line"></p>
+        </div>
+        <div id="pageSizeBox" hidden>
+          <label for="pageSize">Page size</label>
+          <select id="pageSize"><option>A4</option><option>A5</option><option>Letter</option><option>Legal</option></select>
+        </div>
+        <div>
+          <label>Save to</label>
+          <div class="row"><span id="outDirLabel" class="muted">Next to each original</span><button id="outDirBtn" class="btn small">Choose folder…</button><button id="outDirReset" class="btn ghost small" hidden>Reset</button></div>
+        </div>
+      </section>
+      <footer class="convbar">
+        <span id="convStatus" class="status"></span>
+        <div id="convProg" class="progress" hidden><div id="convFill"></div></div>
+        <span class="grow"></span>
+        <button id="convClear" class="btn ghost" hidden>Clear list</button>
+        <button id="convCancel" class="btn" hidden>Cancel</button>
+        <button id="convGo" class="btn primary" disabled>Convert</button>
+      </footer>
+    </main>
+
+    <!-- details -->
+    <main id="viewDetails" class="view details-view" hidden>
+      <section id="detEmpty" class="drop" tabindex="0">
+        <strong class="big">Change the title, author or cover of an EPUB</strong>
+        <span class="row"><button id="detOpen" class="btn primary">Choose an EPUB…</button></span>
+        <p class="muted small fine">The changes are saved as a NEW book file; the original stays exactly as it is. Drop an EPUB here too.</p>
+      </section>
+      <form id="detForm" class="detform" hidden>
+        <div class="coverbox">
+          <div id="coverDrop" class="cover" title="Drop a picture here"><img id="coverImg" alt="Cover"><span id="coverNone" class="muted small">No cover</span></div>
+          <button type="button" id="coverPick" class="btn small">Choose cover picture…</button>
+          <span id="coverNew" class="muted small"></span>
+        </div>
+        <div class="fields">
+          <p id="detFile" class="muted small trunc"></p>
+          <label for="fTitle">Title</label><input id="fTitle" type="text" required>
+          <label for="fAuthors">Authors <span class="hint">(separate several with ;)</span></label><input id="fAuthors" type="text">
+          <div class="two">
+            <div><label for="fLang">Language code</label><input id="fLang" type="text" placeholder="en" spellcheck="false"></div>
+            <div><label for="fPublisher">Publisher</label><input id="fPublisher" type="text"></div>
+          </div>
+          <label for="fDesc">Description</label><textarea id="fDesc" rows="6"></textarea>
+          <div class="row"><button type="submit" id="detSave" class="btn primary">Save as a new EPUB…</button><button type="button" id="detOther" class="btn ghost">Choose another book</button></div>
+        </div>
+      </form>
+    </main>
+
+    <footer id="readerBar" class="readerbar" hidden>
+      <span id="rChapter" class="trunc"></span>
+      <span class="grow"></span>
+      <span id="rPage" class="muted"></span>
+      <div class="progress wide" title="How far you are in the book"><div id="rFill"></div></div>
+      <span id="rPct" class="muted"></span>
+    </footer>
+    <div id="result" class="result" role="status" hidden></div>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
