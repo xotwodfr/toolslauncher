@@ -4,7 +4,7 @@
 // the window to 512 x 512, enlarging and blending the answer back) runs here too, so it never blocks anything either.
 //
 // workerData: { kind: 'lama' | 'sam', files: { lama } | { encoder, decoder }, options }
-// Messages in:  { type: 'fill', id, rgba, w, h, unknown, feather, pads?, match? }                       (lama)
+// Messages in:  { type: 'fill', id, rgba, w, h, unknown, feather, pads?, skip?, gaps? }                       (lama)
 //               { type: 'encode', id, key, rgb, w, h } | { type: 'decode', id, key, points, labels, maskInput? }   (sam)
 //               { type: 'release' }
 // Messages out: { type: 'ready' } | { type: 'result', id, ...answer } | { type: 'error', id, message } | { type: 'released' }
@@ -22,20 +22,15 @@ const C = require('./core');
     const lama = await open(workerData.files.lama);
     handlers.fill = async (m) => {
       const t0 = Date.now();
-      let rgba = new Uint8ClampedArray(m.rgba.buffer, m.rgba.byteOffset, m.rgba.byteLength);
-      let unknown = m.unknown; let w = m.w; let h = m.h; let padded = null;
-      if (m.pads && (m.pads.l || m.pads.t || m.pads.r || m.pads.b)) {
-        padded = C.mirrorPad(rgba, m.w, m.h, m.unknown, m.pads);
-        rgba = padded.rgba; unknown = padded.unknown; w = padded.w; h = padded.h;
-      }
-      const prep = C.prepareFill(rgba, w, h, unknown);
+      const rgba = new Uint8ClampedArray(m.rgba.buffer, m.rgba.byteOffset, m.rgba.byteLength);
       const N = C.MODEL;
-      const res = await lama.run({ image: new ort.Tensor('float32', prep.image, [1, 3, N, N]), mask: new ort.Tensor('float32', prep.mask, [1, 1, N, N]) });
-      const out = res[lama.outputNames[0]];
-      if (!out || out.data.length !== 3 * N * N) throw new Error('The fill model returned an unexpected result');
-      const answer = m.match ? C.matchTone(prep, Float32Array.from(out.data), m.match) : out.data;
-      let done = C.finishFill(answer, prep, rgba, unknown, m.feather, { grain: true, seed: m.w * 31 + m.h });
-      if (padded) done = C.unpad(done, w, padded.l, padded.t, m.w, m.h);
+      const model = async (image, mask) => {
+        const res = await lama.run({ image: new ort.Tensor('float32', image, [1, 3, N, N]), mask: new ort.Tensor('float32', mask, [1, 1, N, N]) });
+        const out = res[lama.outputNames[0]];
+        if (!out || out.data.length !== 3 * N * N) throw new Error('The fill model returned an unexpected result');
+        return out.data;
+      };
+      const done = await C.fillWindow({ rgba, w: m.w, h: m.h, unknown: m.unknown, feather: m.feather, pads: m.pads, skip: m.skip, gaps: m.gaps }, model);
       return { answer: { rgba: done, seconds: (Date.now() - t0) / 1000 }, transfer: [done.buffer] };
     };
   } else if (workerData.kind === 'sam') {

@@ -73,4 +73,69 @@ function beachScene(W, H, seed = 3) {
   return { rgba, W, H, bin, tap: { x: bin.cx, y: bin.top + Math.round(bin.h * 0.45) } };
 }
 
-module.exports = { testPhoto, beachScene, rng };
+/** Smooth value noise (several octaves, separate x / y scales) for natural-looking textures. Returns f(x, y) -> about -1..1. */
+function valueNoise(seed, sx, sy, octaves = 4) {
+  const rand = rng(seed); const N = 256; const g = new Float32Array(N * N); for (let i = 0; i < g.length; i++) g[i] = rand() * 2 - 1;
+  const at = (x, y) => g[(y & (N - 1)) * N + (x & (N - 1))];
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const one = (x, y) => { const x0 = Math.floor(x); const y0 = Math.floor(y); const tx = smooth(x - x0); const ty = smooth(y - y0);
+    const a = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * tx; const b = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * tx; return a + (b - a) * ty; };
+  return (x, y) => { let v = 0; let amp = 1; let f = 1; let tot = 0; for (let o = 0; o < octaves; o++) { v += one((x * f) / sx + o * 17.3, (y * f) / sy + o * 9.1) * amp; tot += amp; amp *= 0.5; f *= 2; } return v / tot; };
+}
+
+/**
+ * A park, like a real phone photo: a sky gradient (darker at the top left), a dark tree line, a pond with ripples on the
+ * left and textured grass with blades that get coarser towards the bottom, plus a large white-and-brown "dog" (with a soft
+ * outline) lying on the grass. For the seam and texture tests (and nobody's real photo is needed).
+ * Returns { rgba, W, H, dog: { cx, cy, rx, ry }, mask (Uint8Array, the dog), horizon }.
+ */
+function parkScene(W, H, seed = 5) {
+  const rgba = new Uint8ClampedArray(W * H * 4); const mask = new Uint8Array(W * H);
+  const rand = rng(seed);
+  const tree = valueNoise(seed + 1, W * 0.06, H * 0.05, 5); const edge = valueNoise(seed + 2, W * 0.05, 1, 4);
+  const grassLo = valueNoise(seed + 3, W * 0.08, H * 0.05, 3); const blades = valueNoise(seed + 4, 2.2, 9, 3); const bladesBig = valueNoise(seed + 5, 4.5, 18, 3);
+  const pondEdge = valueNoise(seed + 6, 1, H * 0.06, 3); const ripple = valueNoise(seed + 7, W * 0.05, 1.6, 3);
+  const horizon = Math.round(H * 0.36); const treeBottom = Math.round(H * 0.47);
+  const dog = { cx: Math.round(W * 0.48), cy: Math.round(H * 0.72), rx: Math.round(W * 0.2), ry: Math.round(H * 0.15) };
+  const fringe = Math.max(2, Math.round(Math.max(W, H) / 240));
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const o = (y * W + x) * 4; const u = x / W; const v = y / H; const n = rand() - 0.5;
+    let r; let g; let b;
+    const treeTop = horizon - (0.5 + 0.5 * edge(x, 0)) * H * 0.14;
+    if (y < treeTop) {                                          // sky
+      const t = y / horizon;
+      r = 60 + 110 * t + 25 * u; g = 120 + 80 * t + 15 * u; b = 205 + 35 * t; r += n * 2; g += n * 2; b += n * 2;
+    } else if (y < treeBottom) {                                // trees
+      const k = 0.5 + 0.5 * tree(x, y);
+      r = 25 + 60 * k; g = 50 + 90 * k; b = 20 + 35 * k; r += n * 18; g += n * 22; b += n * 10;
+    } else {
+      const depth = (y - treeBottom) / (H - treeBottom);        // 0 far .. 1 near
+      const pondRight = W * (0.42 - 0.35 * depth) + pondEdge(0, y) * W * 0.03;
+      if (x < pondRight && depth < 0.32) {                      // pond
+        const rp = ripple(x, y);
+        r = 70 + 25 * rp + 30 * (1 - depth); g = 105 + 30 * rp + 25 * (1 - depth); b = 120 + 35 * rp + 20 * (1 - depth);
+        r += n * 6; g += n * 6; b += n * 6;
+      } else {                                                  // grass
+        const scale = 0.35 + 1.4 * depth;
+        const bl = depth > 0.45 ? bladesBig(x / scale, y / scale) : blades(x / scale, y / scale);
+        const lo = grassLo(x, y);
+        const shade = 0.75 + 0.18 * lo + 0.22 * bl;
+        r = (70 + 30 * depth) * shade + n * 14; g = (135 + 25 * depth) * shade + n * 16; b = (45 + 10 * depth) * shade + n * 10;
+      }
+    }
+    // the dog: a white body with brown patches. Its outline is soft, as in a real photo (fur, a little blur): a light fringe
+    // of `fringe` pixels lies outside the mask, which (like Segment Anything's) only covers the body itself.
+    const dx = (x - dog.cx) / dog.rx; const dy = (y - dog.cy) / dog.ry; const d = dx * dx + dy * dy;
+    const out = (d - 1) / (2 * Math.hypot(dx / dog.rx, dy / dog.ry) + 1e-9);   // pixels outside the outline (about)
+    if (d >= 1 && out < fringe) { const k = 0.6 * (1 - out / fringe); r += (225 - r) * k; g += (220 - g) * k; b += (208 - b) * k; }
+    if (d < 1) {
+      mask[y * W + x] = 1;
+      const patch = tree(x * 1.7, y * 1.7) > 0.1;
+      if (patch) { r = 120 + n * 20; g = 70 + n * 14; b = 40 + n * 10; } else { r = 232 + n * 10; g = 226 + n * 10; b = 215 + n * 10; }
+    }
+    rgba[o] = clamp8(r); rgba[o + 1] = clamp8(g); rgba[o + 2] = clamp8(b); rgba[o + 3] = 255;
+  }
+  return { rgba, W, H, dog, mask, horizon };
+}
+
+module.exports = { testPhoto, beachScene, parkScene, valueNoise, rng };

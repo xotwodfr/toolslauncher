@@ -299,7 +299,7 @@
       small[t] = output[o]; small[t + 1] = output[N + o]; small[t + 2] = output[2 * N + o];
     }
     const big = resample(small, cw, ch, 3, ww, wh, 3);
-    const detail = opts.grain && ww / cw > 1.25 ? grainDetail(rgba, ww, wh, unknown, cw, ch, opts.seed || 1, big) : null;
+    const detail = opts.grain ? grainDetail(rgba, ww, wh, unknown, cw, ch, opts.seed || 1, big) : null;
     for (let y = box.y0; y < box.y1; y++) for (let x = box.x0; x < box.x1; x++) {
       const i = y * ww + x; const k = a[i];
       if (k <= 0) continue;
@@ -314,18 +314,27 @@
   }
 
   /**
-   * Grain for a fill computed at reduced resolution. The model works at 512 x 512, so a large window comes back without the
-   * fine texture of the photo (sand, grass, film grain, sensor noise) and the filled area looks smooth and blurry. The detail
-   * that the shrinking throws away (photo minus its shrunk-and-enlarged copy) is measured on the known pixels, and blocks of
-   * it are copied onto the unknown pixels from nearby known places (of the 16 nearest, the calmer two thirds, so edges and
-   * objects are not copied).
-   * Returns Float32Array (ww*wh*3) that is zero except on unknown pixels, or null when there is nothing suitable to copy.
+   * Grain: fine texture for the filled area. The model works at 512 x 512, so a large window comes back without the photo's
+   * fine texture (grass blades, sand, film grain, sensor noise), and even at full scale LaMa's fill is smoother than the
+   * photo. The "detail band" (picture minus a shrunk-and-enlarged copy of itself, shrunk by twice the model's scale and at
+   * least 3x, as LaMa's answer is softer than its own 512 px grid) is measured on the fill and on the real pixels that may
+   * be copied; only what the fill lacks is added (matching the local noise statistics). It is copied in overlapping blocks
+   * (sized to the scale) from nearby real pixels of about the same colour, leaving out blocks on an edge (horizon, tree
+   * line: their detail shows as dark scribbles elsewhere) and unusually busy ones, and the blocks are blended with sin^2
+   * weights with the variance kept constant, so there are no block edges. Returns Float32Array (ww*wh*3), zero except on
+   * unknown pixels, or null.
    */
   function grainDetail(rgba, ww, wh, unknown, cw, ch, seed, fill) {
-    const B = 16; const stride = ww * wh > 2.5e6 ? 8 : 4;
-    const small = resample(rgba, ww, wh, 4, cw, ch, 3); const back = resample(small, cw, ch, 3, ww, wh, 3);
-    // pixels that may serve as a source: known and at least 4 px away from unknown ones
+    const f = Math.max(3, (2 * ww) / cw);
+    const B = clamp(Math.round((f * 6) / 4) * 4, 12, 48); const stride = Math.max(4, B / 4);
+    const sw = Math.max(2, Math.round(ww / f)); const sh = Math.max(2, Math.round(wh / f));
+    const back = resample(resample(rgba, ww, wh, 4, sw, sh, 3), sw, sh, 3, ww, wh, 3);
+    const fillBack = resample(resample(fill, ww, wh, 3, sw, sh, 3), sw, sh, 3, ww, wh, 3);
     const d = distanceSq(unknown, ww, wh);
+    // how much detail the fill already has in the band
+    let ef = 0; let nf = 0;
+    for (let i = 0; i < ww * wh; i++) if (unknown[i]) { const q = i * 3; for (let c = 0; c < 3; c++) { const v = fill[q + c] - fillBack[q + c]; ef += v * v; } nf++; }
+    if (!nf) return null;
     const W1 = ww + 1; const bad = new Int32Array(W1 * (wh + 1)); const en = new Float64Array(W1 * (wh + 1));
     for (let y = 0; y < wh; y++) {
       let rb = 0; let re = 0;
@@ -337,22 +346,38 @@
       }
     }
     const sum = (A, x, y) => A[(y + B) * W1 + x + B] - A[y * W1 + x + B] - A[(y + B) * W1 + x] + A[y * W1 + x];
-    const cands = [];
-    const meanOf = (src, x, y) => { const m = [0, 0, 0]; for (let yy = y; yy < y + B; yy += 4) for (let xx = x; xx < x + B; xx += 4) { const q = (yy * ww + xx) * 3; m[0] += src[q]; m[1] += src[q + 1]; m[2] += src[q + 2]; } const n = (B / 4) ** 2; return [m[0] / n, m[1] / n, m[2] / n]; };
-    for (let y = 0; y + B <= wh; y += stride) for (let x = 0; x + B <= ww; x += stride) if (!sum(bad, x, y)) cands.push({ x, y, e: sum(en, x, y), m: meanOf(back, x, y) });
+    const meanOf = (src, x, y) => { const m = [0, 0, 0]; let n = 0; for (let yy = y; yy < y + B; yy += 4) for (let xx = x; xx < x + B; xx += 4) { const q = (yy * ww + xx) * 3; m[0] += src[q]; m[1] += src[q + 1]; m[2] += src[q + 2]; n++; } return [m[0] / n, m[1] / n, m[2] / n]; };
+    let cands = [];
+    // how much the smooth picture changes across a block (an edge: horizon, tree line, the border of an object)
+    const lumaAt = (x, y) => { const q = (y * ww + x) * 3; return back[q] + back[q + 1] + back[q + 2]; };
+    const slope = (x, y) => { const q = B >> 2; const v = [lumaAt(x + q, y + q), lumaAt(x + 3 * q, y + q), lumaAt(x + q, y + 3 * q), lumaAt(x + 3 * q, y + 3 * q)]; return Math.max(...v) - Math.min(...v); };
+    for (let y = 0; y + B <= wh; y += stride) for (let x = 0; x + B <= ww; x += stride) if (!sum(bad, x, y)) cands.push({ x, y, e: sum(en, x, y), m: meanOf(back, x, y), r: slope(x, y) });
     if (cands.length < 4) return null;
+    // blocks on an edge carry the edge's own detail (dark scribbles when copied into foliage or sky): leave them out
+    const rs = cands.map((c) => c.r).sort((a, b) => a - b); const rMax = Math.max(15, rs[Math.floor(rs.length / 2)] * 2.5);
+    const eSorted = cands.map((c) => c.e).sort((a, b) => a - b); const eMax = eSorted[Math.floor(eSorted.length * 0.9)];
+    cands = cands.filter((c) => c.r <= rMax && c.e <= eMax);
+    if (cands.length < 4) return null;
+    // only the detail the fill lacks is added: measured against the blocks that may be copied
+    let eKept = 0; for (const c of cands) eKept += c.e; eKept /= cands.length * B * B;
+    const gain = Math.sqrt(Math.max(0, 1 - (ef / nf) / Math.max(1e-6, eKept)));
+    if (gain < 0.05) return null;
     const CELL = 64; const gw = Math.ceil(ww / CELL); const gh = Math.ceil(wh / CELL); const maxRing = Math.max(gw, gh);
     const grid = Array.from({ length: gw * gh }, () => []);
-    for (const c of cands) grid[Math.floor((c.y + B / 2) / CELL) * gw + Math.floor((c.x + B / 2) / CELL)].push(c);
+    for (const c of cands) grid[Math.min(gh - 1, Math.floor((c.y + B / 2) / CELL)) * gw + Math.min(gw - 1, Math.floor((c.x + B / 2) / CELL))].push(c);
     let s = (seed >>> 0) || 1; const rand = () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
-    const out = new Float32Array(ww * wh * 3);
+    const acc = new Float32Array(ww * wh * 3); const accW = new Float32Array(ww * wh);
+    const wt = new Float32Array(B); for (let i = 0; i < B; i++) wt[i] = Math.sin((Math.PI * (i + 0.5)) / B) ** 2;
     const ub = maskBox(unknown, ww, wh); if (!ub) return null;
-    for (let by = ub.y0; by < ub.y1; by += B) for (let bx = ub.x0; bx < ub.x1; bx += B) {
-      // of the candidate blocks with about the same colour as the fill here, the nearest 16 (searched ring by ring on a
-      // grid of cells), without the busiest third of them (edges, objects), and one of those at random
-      const cx = bx + B / 2; const cy = by + B / 2;
-      const tm = meanOf(fill, Math.min(bx, ww - B), Math.min(by, wh - B));
-      const tcx = Math.floor(cx / CELL); const tcy = Math.floor(cy / CELL);
+    const h2 = B / 2;
+    for (let by = ub.y0 - h2; by < ub.y1; by += h2) for (let bx = ub.x0 - h2; bx < ub.x1; bx += h2) {
+      // does this block touch the hole?
+      let touches = false;
+      for (let y = Math.max(0, by); y < Math.min(wh, by + B) && !touches; y += 2) for (let x = Math.max(0, bx); x < Math.min(ww, bx + B); x += 2) if (unknown[y * ww + x]) { touches = true; break; }
+      if (!touches) continue;
+      const cx = bx + h2; const cy = by + h2;
+      const tm = meanOf(fill, clamp(bx, 0, ww - B), clamp(by, 0, wh - B));
+      const tcx = clamp(Math.floor(cx / CELL), 0, gw - 1); const tcy = clamp(Math.floor(cy / CELL), 0, gh - 1);
       let near = []; let firstSeen = -1;
       for (let ring = 0; ring <= maxRing && near.length < 16 && (firstSeen < 0 || ring <= firstSeen + 2); ring++) {
         for (let gy = tcy - ring; gy <= tcy + ring; gy++) for (let gx = tcx - ring; gx <= tcx + ring; gx++) {
@@ -360,80 +385,161 @@
           const cell = grid[gy * gw + gx];
           if (cell.length && firstSeen < 0) firstSeen = ring;
           for (const c of cell) {
-            if (Math.abs(c.m[0] - tm[0]) + Math.abs(c.m[1] - tm[1]) + Math.abs(c.m[2] - tm[2]) > 30) continue;
-            near.push({ c, dd: (c.x + B / 2 - cx) ** 2 + (c.y + B / 2 - cy) ** 2 });
+            if (Math.abs(c.m[0] - tm[0]) + Math.abs(c.m[1] - tm[1]) + Math.abs(c.m[2] - tm[2]) > 36) continue;
+            near.push({ c, dd: (c.x + h2 - cx) ** 2 + (c.y + h2 - cy) ** 2 });
           }
         }
       }
-      near = near.sort((p, q) => p.dd - q.dd).slice(0, 16);
       if (!near.length) continue;
-      near.sort((p, q) => p.c.e - q.c.e);
-      const pool = near.slice(0, Math.max(1, Math.ceil(near.length * 0.66)));
-      const src = pool[Math.floor(rand() * pool.length)].c;
-      for (let y = 0; y < B && by + y < wh; y++) for (let x = 0; x < B && bx + x < ww; x++) {
-        const i = (by + y) * ww + bx + x; if (!unknown[i]) continue;
-        const j = (src.y + y) * ww + src.x + x; const p = j * 4; const q = j * 3; const o = i * 3;
-        // per pixel: only where the source's smooth colour matches the fill's (no texture across a horizon or an edge)
-        if (Math.abs(back[q] - fill[o]) + Math.abs(back[q + 1] - fill[o + 1]) + Math.abs(back[q + 2] - fill[o + 2]) > 24) continue;
-        out[o] = rgba[p] - back[q]; out[o + 1] = rgba[p + 1] - back[q + 1]; out[o + 2] = rgba[p + 2] - back[q + 2];
+      near = near.sort((p, q) => p.dd - q.dd).slice(0, 16);
+      const med = near.map((n) => n.c.e).sort((p, q) => p - q)[Math.floor(near.length / 2)];
+      const pool = near.filter((n) => n.c.e <= med * 2.5);
+      const src = (pool.length ? pool : near)[Math.floor(rand() * (pool.length || near.length))].c;
+      for (let y = 0; y < B; y++) {
+        const ty = by + y; if (ty < 0 || ty >= wh) continue;
+        for (let x = 0; x < B; x++) {
+          const tx = bx + x; if (tx < 0 || tx >= ww) continue;
+          const i = ty * ww + tx; if (!unknown[i]) continue;
+          const j = (src.y + y) * ww + src.x + x; const p = j * 4; const q = j * 3; const o = i * 3;
+          // per pixel: only where the source's smooth colour matches the fill's (no texture across a horizon or an edge)
+          if (Math.abs(back[q] - fill[o]) + Math.abs(back[q + 1] - fill[o + 1]) + Math.abs(back[q + 2] - fill[o + 2]) > 30) continue;
+          const w = wt[y] * wt[x];
+          acc[o] += (rgba[p] - back[q]) * w; acc[o + 1] += (rgba[p + 1] - back[q + 1]) * w; acc[o + 2] += (rgba[p + 2] - back[q + 2]) * w;
+          accW[i] += w * w;
+        }
       }
     }
-    return out;
+    for (let i = 0; i < ww * wh; i++) {
+      if (!accW[i]) continue;
+      const k = gain / Math.sqrt(accW[i]); const o = i * 3;
+      acc[o] *= k; acc[o + 1] *= k; acc[o + 2] *= k;
+    }
+    return acc;
   }
 
   /**
-   * Tone match for extensions, in the model's 512 x 512 space: LaMa's new area can come out a shade lighter or darker than
-   * the picture it continues, which shows as a faint seam. The average difference between the real picture and the model's
-   * own redraw of it, in a band of known pixels next to the new area, is measured locally (box of 2R) and added to the new
-   * pixels, fading out over 2R pixels from the seam. Only the model's answer changes; the real pixels are not touched.
+   * Gradient-domain correction of the model's answer, in its 512 x 512 space (this replaces a simple tone match: the model
+   * passes known pixels through unchanged, so comparing it with them measures nothing). LaMa's fill of a large hole often
+   * comes out a shade darker or greyer than the picture around it, which shows as a seam or a patch. Here:
+   *  1. along the hole's border, the local offset between the real pixels just outside (a band of `band` px) and the fill
+   *     just inside is measured (box averages of radius `R`, so texture noise cancels);
+   *  2. that offset is spread over the whole hole as a membrane (Laplace equation: smooth, no corners or box shapes, exactly
+   *     the measured offset at the border), solved coarse-to-fine;
+   *  3. it is added to the fill. The fill keeps its own gradients and texture; only its overall level is bent to meet the
+   *     photo, as in Poisson image editing. Known pixels are not touched.
+   * Modifies and returns `output` (3 x 512 x 512, values 0..255).
    */
-  function matchTone(prep, output, R = 16) {
-    const N = MODEL; const NN = N * N; const mask = prep.mask; const img = prep.image;
-    const known = new Uint8Array(NN); for (let i = 0; i < NN; i++) known[i] = mask[i] ? 0 : 1;
-    const dU = distanceSq(mask, N, N); const dK = distanceSq(known, N, N);
-    const I = new Float64Array((N + 1) * (N + 1) * 4);         // integral images of the 3 differences and the count
+  function harmonize(prep, output, R = 6, band = 4) {
+    const N = MODEL; const NN = N * N; const U = prep.mask; const img = prep.image;
+    const known = new Uint8Array(NN); for (let i = 0; i < NN; i++) known[i] = U[i] ? 0 : 1;
+    const dU = distanceSq(U, N, N); const dK = distanceSq(known, N, N);
+    // integral images: known band (photo) and unknown band (fill), 3 channels + count each
+    const W1 = N + 1; const IK = new Float64Array(W1 * W1 * 4); const IU = new Float64Array(W1 * W1 * 4);
+    const b2 = band * band;
     for (let y = 0; y < N; y++) {
-      const r0 = [0, 0, 0, 0];
+      const rk = [0, 0, 0, 0]; const ru = [0, 0, 0, 0];
       for (let x = 0; x < N; x++) {
         const i = y * N + x;
-        if (known[i] && dU[i] <= R * R) { r0[0] += img[i] * 255 - output[i]; r0[1] += img[NN + i] * 255 - output[NN + i]; r0[2] += img[2 * NN + i] * 255 - output[2 * NN + i]; r0[3] += 1; }
-        const o = ((y + 1) * (N + 1) + x + 1) * 4; const u = (y * (N + 1) + x + 1) * 4;
-        for (let c = 0; c < 4; c++) I[o + c] = I[u + c] + r0[c];
+        if (known[i] && dU[i] <= b2) { rk[0] += img[i] * 255; rk[1] += img[NN + i] * 255; rk[2] += img[2 * NN + i] * 255; rk[3]++; }
+        if (!known[i] && dK[i] <= b2) { ru[0] += output[i]; ru[1] += output[NN + i]; ru[2] += output[2 * NN + i]; ru[3]++; }
+        const o = ((y + 1) * W1 + x + 1) * 4; const u = (y * W1 + x + 1) * 4;
+        for (let c = 0; c < 4; c++) { IK[o + c] = IK[u + c] + rk[c]; IU[o + c] = IU[u + c] + ru[c]; }
       }
     }
-    const Rb = 2 * R; const cap = 40;
+    const boxSum = (I, x0, y0, x1, y1, c) => I[(y1 * W1 + x1) * 4 + c] - I[(y0 * W1 + x1) * 4 + c] - I[(y1 * W1 + x0) * 4 + c] + I[(y0 * W1 + x0) * 4 + c];
+    // fixed values on the hole's border pixels (unknown, next to a known one)
+    const fixed = new Uint8Array(NN); const val = [new Float32Array(NN), new Float32Array(NN), new Float32Array(NN)];
+    let any = false;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const i = y * N + x; if (known[i]) continue;
-      const dist = Math.sqrt(dK[i]); if (dist >= Rb) continue;
-      const x0 = Math.max(0, x - Rb); const x1 = Math.min(N, x + Rb + 1); const y0 = Math.max(0, y - Rb); const y1 = Math.min(N, y + Rb + 1);
-      const a = (y0 * (N + 1) + x0) * 4; const b = (y0 * (N + 1) + x1) * 4; const c = (y1 * (N + 1) + x0) * 4; const d = (y1 * (N + 1) + x1) * 4;
-      const n = I[d + 3] - I[b + 3] - I[c + 3] + I[a + 3]; if (n < 8) continue;
-      const k = 1 - dist / Rb;
-      for (let ch = 0; ch < 3; ch++) {
-        const corr = (I[d + ch] - I[b + ch] - I[c + ch] + I[a + ch]) / n;
-        output[ch * NN + i] += clamp(corr, -cap, cap) * k;
+      const i = y * N + x; if (known[i] || dK[i] > 1) continue;
+      let r = R; let nk = 0; let nu = 0; let x0; let y0; let x1; let y1;
+      for (; r <= R * 4; r *= 2) {
+        x0 = Math.max(0, x - r); y0 = Math.max(0, y - r); x1 = Math.min(N, x + r + 1); y1 = Math.min(N, y + r + 1);
+        nk = boxSum(IK, x0, y0, x1, y1, 3); nu = boxSum(IU, x0, y0, x1, y1, 3);
+        if (nk >= 6 && nu >= 6) break;
       }
+      if (nk < 1 || nu < 1) continue;
+      fixed[i] = 1; any = true;
+      for (let c = 0; c < 3; c++) val[c][i] = boxSum(IK, x0, y0, x1, y1, c) / nk - boxSum(IU, x0, y0, x1, y1, c) / nu;
     }
+    if (!any) return output;
+    // solve Laplace(c) = 0 on the unknown pixels with the border values fixed: coarse-to-fine Gauss-Seidel
+    const solve = (fx, vals, U0, n, iters) => {
+      for (let it = 0; it < iters; it++) for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const i = y * n + x; if (!U0[i] || fx[i]) continue;
+        let s0 = 0; let s1 = 0; let s2 = 0; let k = 0;
+        const nb = (j) => { if (U0[j]) { s0 += vals[0][j]; s1 += vals[1][j]; s2 += vals[2][j]; k++; } };
+        if (x > 0) nb(i - 1); if (x < n - 1) nb(i + 1); if (y > 0) nb(i - n); if (y < n - 1) nb(i + n);
+        if (k) { vals[0][i] = s0 / k; vals[1][i] = s1 / k; vals[2][i] = s2 / k; }
+      }
+    };
+    // pyramid: shrink the unknown area, fixed pixels and their values
+    const levels = [{ n: N, U: U, fx: fixed, v: val }];
+    while (levels[levels.length - 1].n > 32) {
+      const p = levels[levels.length - 1]; const n = p.n / 2;
+      const U2 = new Uint8Array(n * n); const f2 = new Uint8Array(n * n); const v2 = [new Float32Array(n * n), new Float32Array(n * n), new Float32Array(n * n)];
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        let cu = 0; let cf = 0; const acc = [0, 0, 0];
+        for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+          const j = (2 * y + dy) * p.n + 2 * x + dx;
+          if (p.U[j]) cu++;
+          if (p.fx[j]) { cf++; acc[0] += p.v[0][j]; acc[1] += p.v[1][j]; acc[2] += p.v[2][j]; }
+        }
+        const i = y * n + x; U2[i] = cu ? 1 : 0;
+        if (cf) { f2[i] = 1; for (let c = 0; c < 3; c++) v2[c][i] = acc[c] / cf; }
+      }
+      levels.push({ n, U: U2, fx: f2, v: v2 });
+    }
+    for (let l = levels.length - 1; l >= 0; l--) {
+      const L = levels[l];
+      if (l < levels.length - 1) {                                   // start from the coarser solution
+        const C2 = levels[l + 1];
+        for (let y = 0; y < L.n; y++) for (let x = 0; x < L.n; x++) {
+          const i = y * L.n + x; if (!L.U[i] || L.fx[i]) continue;
+          const j = (y >> 1) * C2.n + (x >> 1);
+          for (let c = 0; c < 3; c++) L.v[c][i] = C2.v[c][j];
+        }
+      }
+      solve(L.fx, L.v, L.U, L.n, l === levels.length - 1 ? 200 : 40);
+    }
+    for (let i = 0; i < NN; i++) if (U[i]) for (let c = 0; c < 3; c++) output[c * NN + i] += clamp(val[c][i], -80, 80);
     return output;
   }
 
   /**
-   * Outpainting help: LaMa darkens and greys out an unknown area that touches the edge of its input. So before an extension
-   * tile is filled, the window is padded on its open side(s) with a mirror image of itself (pixels mirrored from unknown
-   * pixels stay unknown). The model then bridges between the real picture and its reflection instead of fading towards a
-   * border. Measured on a sky gradient: mean error against the true continuation 2.7 instead of 17 (levels of 255).
-   * pads: { l, t, r, b } in pixels, each at most the window size on that axis. Returns { rgba, unknown, w, h }.
+   * Outpainting help. LaMa washes out an unknown area that touches the edge of its input: towards the border its fill turns
+   * grey, low in contrast and saturation (measured on a park photo: half the photo's contrast and saturation in the outer
+   * half of the strip), which is the "hazy strip" look. So an extension window is padded on its open side with real picture,
+   * reflected about the inner edge of the new strip, with an unknown gap in between:
+   *     [ reflection (known) | gap (unknown, thrown away) | new strip (unknown) | photo ]
+   * The hole no longer touches the border, and because of the gap the model does not simply mirror the picture into the strip
+   * (lines that run into the edge would come back as a "V") or cross-fade the photo with its reflection (a ghost image), as a
+   * plain mirror does. pads / skip / gaps: { l, t, r, b } in pixels: padding, depth of the new strip on that side, gap.
+   * The padding is limited to the known pixels the window has beyond the strip. Returns { rgba, unknown, w, h, l, t }.
    */
-  function mirrorPad(rgba, w, h, unknown, pads) {
-    const l = Math.min(pads.l || 0, w); const r = Math.min(pads.r || 0, w); const t = Math.min(pads.t || 0, h); const b = Math.min(pads.b || 0, h);
+  function mirrorPad(rgba, w, h, unknown, pads, skip = {}, gaps = {}) {
+    const S = { l: skip.l || 0, r: skip.r || 0, t: skip.t || 0, b: skip.b || 0 };
+    const G = { l: gaps.l || 0, r: gaps.r || 0, t: gaps.t || 0, b: gaps.b || 0 };
+    const P = { l: Math.max(0, Math.min(pads.l || 0, w - S.l)), r: Math.max(0, Math.min(pads.r || 0, w - S.r)), t: Math.max(0, Math.min(pads.t || 0, h - S.t)), b: Math.max(0, Math.min(pads.b || 0, h - S.b)) };
+    for (const k of ['l', 'r', 't', 'b']) if (!P[k]) G[k] = 0;
+    const l = P.l + G.l; const r = P.r + G.r; const t = P.t + G.t; const b = P.b + G.b;
     const W2 = w + l + r; const H2 = h + t + b;
     const out = new Uint8ClampedArray(W2 * H2 * 4); const unk = new Uint8Array(W2 * H2);
-    const m = (i, n) => (i < 0 ? -1 - i : i >= n ? 2 * n - 1 - i : i);
+    // source index for padded index i on an axis of n pixels; -1 = in a gap (unknown)
+    const map = (i, n, lo, hi) => {
+      if (i < 0) { const k = -i - lo.g; return k <= 0 ? -1 : Math.min(n - 1, lo.s + k - 1); }
+      if (i >= n) { const k = i - n + 1 - hi.g; return k <= 0 ? -1 : Math.max(0, n - 1 - hi.s - (k - 1)); }
+      return i;
+    };
+    const xs = new Int32Array(W2); for (let x = 0; x < W2; x++) xs[x] = map(x - l, w, { s: S.l, g: G.l }, { s: S.r, g: G.r });
     for (let y = 0; y < H2; y++) {
-      const sy = m(y - t, h);
+      const sy = map(y - t, h, { s: S.t, g: G.t }, { s: S.b, g: G.b });
       for (let x = 0; x < W2; x++) {
-        const sx = m(x - l, w); const si = sy * w + sx; const di = y * W2 + x;
-        out[di * 4] = rgba[si * 4]; out[di * 4 + 1] = rgba[si * 4 + 1]; out[di * 4 + 2] = rgba[si * 4 + 2]; out[di * 4 + 3] = 255;
+        const di = y * W2 + x; const sx = xs[x];
+        out[di * 4 + 3] = 255;
+        if (sy < 0 || sx < 0) { unk[di] = 1; continue; }
+        const si = sy * w + sx;
+        out[di * 4] = rgba[si * 4]; out[di * 4 + 1] = rgba[si * 4 + 1]; out[di * 4 + 2] = rgba[si * 4 + 2];
         unk[di] = unknown[si] ? 1 : 0;
       }
     }
@@ -526,8 +632,10 @@
    * The known area grows one strip at a time (left, right, top, bottom, repeated); a strip is at most ~45% of a tile deep
    * and at most 80% of the known area's own size, so every tile keeps plenty of real picture as context. Each strip is
    * covered by overlapping tiles, filled one after another (each later tile sees the earlier ones' result as known).
-   * Every tile window lies inside (known area + its strip), so a window never contains pixels from a later step.
-   * Returns { FW, FH, ox, oy, tile, feather, steps: [{ side, strip: box, tiles: [rect] }], count }.
+   * Every tile window lies inside (known area + its strip), so a window never contains pixels from a later step. Across the
+   * strip a window is at most a tile deep; along it, it is as long as the window plus its padding is deep (about square for the
+   * model, so e.g. 16:9 from a 12 MP photo is one tall window per side).
+   * Returns { FW, FH, ox, oy, tile, feather, steps: [{ side, strip: box, tiles: [{ x, y, w, h, pads, skip, gaps }] }], count }.
    */
   function extendPlan(W, H, margins) {
     const m = clampMargins(W, H, margins);
@@ -557,23 +665,122 @@
         if (side === 't') { strip = { x0: K.x0, y0: K.y0 - d, x1: K.x1, y1: K.y0 }; R = { ...K, y0: K.y0 - d }; }
         if (side === 'b') { strip = { x0: K.x0, y0: K.y1, x1: K.x1, y1: K.y1 + d }; R = { ...K, y1: K.y1 + d }; }
         const rw = R.x1 - R.x0; const rh = R.y1 - R.y0;
-        const ww = Math.min(L, rw); const wh = Math.min(L, rh);
         const tiles = [];
-        const pad = Math.min(Math.round(d * 1.5), horiz ? ww : wh);      // mirror padding on the open side (see mirrorPad)
-        const pads = { l: 0, t: 0, r: 0, b: 0, [side]: pad };
+        // padding on the open side: real picture reflected about the strip's inner edge, behind an unknown gap (see mirrorPad).
+        // The window is made about square including the padding, so the model input needs no further (upside-down) padding.
+        const across = Math.min(L, horiz ? rw : rh);
+        const pad = Math.max(0, Math.min(Math.round(d * 1.2), across - d)); const gap = pad ? Math.round(d * 0.5) : 0;
+        const alongSize = Math.min(horiz ? rh : rw, Math.max(L, across + pad + gap));
+        const ww = horiz ? across : alongSize; const wh = horiz ? alongSize : across;
+        const z = { l: 0, t: 0, r: 0, b: 0 };
+        const pads = { ...z, [side]: pad }; const skip = { ...z, [side]: d }; const gaps = { ...z, [side]: gap };
         if (horiz) {
           const x = side === 'l' ? R.x0 : R.x1 - ww;
-          for (const y of along(R.y0, R.y1, wh)) tiles.push({ x, y: clamp(y, R.y0, R.y1 - wh), w: ww, h: wh, pads });
+          for (const y of along(R.y0, R.y1, wh)) tiles.push({ x, y: clamp(y, R.y0, R.y1 - wh), w: ww, h: wh, pads, skip, gaps });
         } else {
           const y = side === 't' ? R.y0 : R.y1 - wh;
-          for (const x of along(R.x0, R.x1, ww)) tiles.push({ x: clamp(x, R.x0, R.x1 - ww), y, w: ww, h: wh, pads });
+          for (const x of along(R.x0, R.x1, ww)) tiles.push({ x: clamp(x, R.x0, R.x1 - ww), y, w: ww, h: wh, pads, skip, gaps });
         }
         steps.push({ side, strip, tiles });
         Object.assign(K, R);
         rem[side] -= d;
       }
     }
-    return { FW, FH, ox: m.l, oy: m.t, margins: m, tile: L, feather: Math.max(3, Math.round(L / 256)), match: 16, steps, count: steps.reduce((n, s) => n + s.tiles.length, 0) };
+    return { FW, FH, ox: m.l, oy: m.t, margins: m, tile: L, feather: Math.max(3, Math.round(L / 256)), steps, count: steps.reduce((n, s) => n + s.tiles.length, 0) };
+  }
+
+  /**
+   * One fill: the whole pixel pipeline around the model, shared by the model worker, the self-test and the tests.
+   * req: { rgba, w, h, unknown, feather, pads?, skip?, gaps?, seed? }; model(image, mask) -> Promise<Float32Array 3x512x512,
+   * values 0..255>. Returns a new Uint8ClampedArray (RGBA, w x h): pixels away from the unknown ones are bit-identical.
+   */
+  async function fillWindow(req, model) {
+    let rgba = req.rgba; let unknown = req.unknown; let w = req.w; let h = req.h; let padded = null;
+    const p = req.pads;
+    if (p && (p.l || p.t || p.r || p.b)) {
+      padded = mirrorPad(rgba, w, h, unknown, p, req.skip || {}, req.gaps || {});
+      rgba = padded.rgba; unknown = padded.unknown; w = padded.w; h = padded.h;
+    }
+    const prep = prepareFill(rgba, w, h, unknown);
+    const answer = harmonize(prep, Float32Array.from(await model(prep.image, prep.mask)));
+    let done = finishFill(answer, prep, rgba, unknown, req.feather, { grain: true, seed: req.seed || (req.w * 31 + req.h) });
+    if (padded) done = unpad(done, w, padded.l, padded.t, req.w, req.h);
+    return done;
+  }
+
+  // ---- running a removal or an extension -----------------------------------------------------------------------------------
+  // The window, the self-test and the tests all run edits through these two functions, with `fill` doing the model call:
+  //   fill({ kind: 'remove' | 'extend', rgba, w, h, unknown, feather, pads }) -> Promise<Uint8ClampedArray | null (cancelled)>
+  // hooks: { onStep(index, count, rect), onUpdate(box) } - both may be async (the window redraws there).
+
+  /**
+   * Remove the selected pixels of a W x H RGBA picture, in place. The selection is grown by `grow` pixels, split into far-apart
+   * groups, and each group is filled in its own window. Returns { patches: [{ rect, before, after }], cancelled }; on cancel the
+   * picture is put back as it was.
+   */
+  async function runRemoval(rgba, W, H, mask, grow, fill, hooks = {}) {
+    const box = maskBox(mask, W, H);
+    if (!box) return { patches: [], cancelled: false };
+    const region = clipBox(growBox(box, grow + 2), W, H); const rr = boxToRect(region);
+    const grown = dilate(getRect(mask, W, 1, rr), rr.w, rr.h, grow);
+    const unknown = new Uint8Array(W * H); putRect(unknown, W, 1, rr, grown);
+    const parts = components(grown, rr.w, rr.h).map((p) => ({ x0: p.x0 + rr.x, y0: p.y0 + rr.y, x1: p.x1 + rr.x, y1: p.y1 + rr.y }));
+    const jobs = removalJobs(parts, W, H);
+    const patches = [];
+    const undo = () => { for (const p of patches.slice().reverse()) putRect(rgba, W, 4, p.rect, p.before); };
+    try {
+      for (let i = 0; i < jobs.length; i++) {
+        const win = jobs[i].win;
+        const unk = getRect(unknown, W, 1, win);
+        if (!maskCount(unk)) continue;
+        if (hooks.onStep) await hooks.onStep(i, jobs.length, win);
+        const before = getRect(rgba, W, 4, win);
+        const out = await fill({ kind: 'remove', rgba: before.slice(), w: win.w, h: win.h, unknown: unk, feather: featherFor(win), pads: null });
+        if (!out) { undo(); return { patches: [], cancelled: true }; }
+        putRect(rgba, W, 4, win, out);
+        putRect(unknown, W, 1, win, new Uint8Array(win.w * win.h));
+        const d = diffBox(before, out, win.w, win.h, 4);          // keep only the part that really changed
+        if (d) {
+          const rect = { x: win.x + d.x0, y: win.y + d.y0, w: d.x1 - d.x0, h: d.y1 - d.y0 };
+          patches.push({ rect, before: getRect(before, win.w, 4, { x: d.x0, y: d.y0, w: rect.w, h: rect.h }), after: getRect(rgba, W, 4, rect) });
+        }
+        if (hooks.onUpdate) await hooks.onUpdate(rectToBox(win));
+      }
+    } catch (e) { undo(); throw e; }
+    return { patches, cancelled: false };
+  }
+
+  /**
+   * Extend a W x H RGBA picture by margins (see extendPlan). Returns { rgba, w, h, plan, cancelled }. The new area starts as
+   * the nearest edge colour (only seen while the fill runs). hooks.onStart(rgba, w, h) lets the window show the new canvas.
+   */
+  async function runExtension(src, W, H, margins, fill, hooks = {}) {
+    const plan = extendPlan(W, H, margins);
+    const { FW, FH } = plan;
+    const rgba = new Uint8ClampedArray(FW * FH * 4); const pending = new Uint8Array(FW * FH).fill(1);
+    for (let y = 0; y < FH; y++) {
+      const sy = clamp(y - plan.oy, 0, H - 1);
+      for (let x = 0; x < FW; x++) {
+        const sx = clamp(x - plan.ox, 0, W - 1); const si = (sy * W + sx) * 4; const o = (y * FW + x) * 4;
+        rgba[o] = src[si]; rgba[o + 1] = src[si + 1]; rgba[o + 2] = src[si + 2]; rgba[o + 3] = src[si + 3];
+      }
+    }
+    for (let y = 0; y < H; y++) pending.fill(0, (y + plan.oy) * FW + plan.ox, (y + plan.oy) * FW + plan.ox + W);
+    if (hooks.onStart) await hooks.onStart(rgba, FW, FH);
+    let k = 0;
+    for (const step of plan.steps) {
+      for (const t of step.tiles) {
+        if (hooks.onStep) await hooks.onStep(k, plan.count, t);
+        k++;
+        const unk = getRect(pending, FW, 1, t);
+        if (!maskCount(unk)) continue;
+        const out = await fill({ kind: 'extend', rgba: getRect(rgba, FW, 4, t), w: t.w, h: t.h, unknown: unk, feather: plan.feather, pads: t.pads, skip: t.skip, gaps: t.gaps });
+        if (!out) return { rgba: null, w: FW, h: FH, plan, cancelled: true };
+        putRect(rgba, FW, 4, t, out); putRect(pending, FW, 1, t, new Uint8Array(t.w * t.h));
+        if (hooks.onUpdate) await hooks.onUpdate(rectToBox(t));
+      }
+    }
+    return { rgba, w: FW, h: FH, plan, cancelled: false };
   }
 
   // ---- formats and names ----------------------------------------------------------------------------------------------------
@@ -611,8 +818,13 @@
     if (n < 1048576) return (n / 1024).toFixed(0) + ' KB';
     return (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB';
   }
-  /** Default "grow selection" amount for a photo: about 0.25% of its long side, 3..24 px. */
-  const defaultGrow = (W, H) => clamp(Math.round(Math.max(W, H) / 400), 3, 24);
+  /**
+   * Default "grow selection" amount for a photo: 1/150 of its long side, 4..40 px. Segment Anything's mask comes from 256 x 256
+   * logits, so its outline is only good to about one logit pixel (long side / 256), and the object's soft edge (fur, motion
+   * blur, anti-aliasing) lies outside it. Any such rim left in the photo is continued by LaMa as a structure and redraws the
+   * object's silhouette (measured on a dog on grass: clearly visible at 3 px on a 1200 px photo, gone at 8 px).
+   */
+  const defaultGrow = (W, H) => clamp(Math.round(Math.max(W, H) / 150), 4, 40);
 
   /** Fast 32-bit FNV-1a hash of a byte array (used by tests to compare pictures). */
   function hash(bytes, step = 1) { let h = 0x811c9dc5; for (let i = 0; i < bytes.length; i += step) { h ^= bytes[i]; h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16); }
@@ -621,9 +833,9 @@
     MODEL, SAM, MAX_PIXELS, MAX_SIDE, MAX_FILE_BYTES, UserError, clamp,
     boxToRect, rectToBox, unionBox, clipBox, growBox, boxesTouch, getRect, putRect,
     maskBox, maskCount, diffBox, paintLine, distanceSq, dilate, featherWeights, components, removalWindow, featherFor, removalJobs,
-    resample, prepareFill, finishFill, grainDetail, matchTone, mirrorPad, unpad,
+    resample, prepareFill, finishFill, grainDetail, harmonize, mirrorPad, unpad, fillWindow,
     samSize, logitsToMask, pickSamMask,
-    PRESETS, clampMargins, presetMargins, extendTile, extendPlan,
+    PRESETS, clampMargins, presetMargins, extendTile, extendPlan, runRemoval, runExtension,
     OPEN_EXTS, extOf, isOpenable, FORMATS, sniff, defaultFormat, defaultName, formatBytes, defaultGrow, hash,
   };
 }));

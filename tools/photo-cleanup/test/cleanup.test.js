@@ -149,6 +149,35 @@ test('grain: a large window gets the photo\'s fine texture back in the filled ar
   return `texture ${b.toFixed(1)} vs ${orig.toFixed(1)}`;
 });
 
+test('harmonize: a fill that comes out darker than the picture around it is bent to meet it, smoothly, known pixels untouched', () => {
+  const W = 400; const H = 400; const rgba = new Uint8ClampedArray(W * H * 4);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const o = (y * W + x) * 4; rgba[o] = 100 + x / 8; rgba[o + 1] = 150; rgba[o + 2] = 200; rgba[o + 3] = 255; }
+  const unk = new Uint8Array(W * H); C.paintLine(unk, W, H, 200, 200, 200, 200, 90, 1);
+  const prep = C.prepareFill(rgba, W, H, unk); const N = C.MODEL * C.MODEL;
+  // the "model": the true picture everywhere, but 30 levels darker inside the hole
+  const out = new Float32Array(3 * N);
+  for (let i = 0; i < N; i++) for (let c = 0; c < 3; c++) out[c * N + i] = prep.image[c * N + i] * 255;
+  const s = C.MODEL / W; const truth = (x) => 100 + x / s / 8;
+  for (let i = 0; i < N; i++) if (prep.mask[i]) { const x = i % C.MODEL; out[i] = truth(x) - 30; out[N + i] = 120; out[2 * N + i] = 170; }
+  const known = Float32Array.from(out);
+  C.harmonize(prep, out);
+  let worst = 0;
+  for (let i = 0; i < N; i++) {
+    if (!prep.mask[i]) { assert.strictEqual(out[i], known[i]); continue; }
+    const x = i % C.MODEL; worst = Math.max(worst, Math.abs(out[i] - truth(x)), Math.abs(out[N + i] - 150), Math.abs(out[2 * N + i] - 200));
+  }
+  assert.ok(worst < 3, 'offset removed, worst ' + worst.toFixed(2));
+  return `worst ${worst.toFixed(2)}`;
+});
+test('mirrorPad for extensions: reflection about the strip\'s inner edge, behind an unknown gap', () => {
+  const w = 10; const rgba = new Uint8ClampedArray(w * 4); for (let i = 0; i < w; i++) rgba[i * 4] = i * 10;
+  const unk = new Uint8Array(w); unk[0] = 1; unk[1] = 1;                    // a new strip of 2 px on the left
+  const p = C.mirrorPad(rgba, w, 1, unk, { l: 4 }, { l: 2 }, { l: 2 });
+  assert.strictEqual(p.w, 16); assert.strictEqual(p.l, 6);
+  assert.deepStrictEqual(Array.from({ length: p.w }, (_, x) => (p.unknown[x] ? 'U' : p.rgba[x * 4] / 10)).join(''), '5432UUUU23456789');
+  const q = C.mirrorPad(rgba, w, 1, unk, { l: 20 }, { l: 2 }, { l: 2 });
+  assert.strictEqual(q.w, w + 8 + 2, 'padding limited to the known pixels');
+});
 test('mirrorPad and unpad: padded window is a reflection, unknown follows, unpad gives the window back', () => {
   const w = 6; const h = 4; const rgba = new Uint8ClampedArray(w * h * 4); for (let i = 0; i < w * h; i++) rgba[i * 4] = i;
   const unk = new Uint8Array(w * h); unk[w - 1] = 1;
@@ -201,7 +230,8 @@ function checkPlan(W, H, m) {
     // the strip is new, next to known pixels; tiles lie inside known + strip and together cover the strip
     for (const t of st.tiles) {
       assert.ok(t.x >= 0 && t.y >= 0 && t.x + t.w <= FW && t.y + t.h <= FH, 'tile inside the canvas');
-      assert.ok(t.w <= plan.tile && t.h <= plan.tile);
+      const across = st.side === 'l' || st.side === 'r' ? t.w : t.h;
+      assert.ok(across <= plan.tile && t.w * t.h <= plan.tile * plan.tile * 4, 'tile size');
       let known = 0; let unknown = 0; let alien = 0;
       for (let y = t.y; y < t.y + t.h; y++) for (let x = t.x; x < t.x + t.w; x++) {
         const inStrip = x >= st.strip.x0 && x < st.strip.x1 && y >= st.strip.y0 && y < st.strip.y1;
@@ -218,14 +248,18 @@ function checkPlan(W, H, m) {
 }
 test('extendPlan: tiles cover every new pixel, keep context and stay in bounds (presets and dragged edges)', () => {
   const p1 = checkPlan(4000, 3000, C.presetMargins(4000, 3000, '16:9', 0));
-  assert.strictEqual(p1.FW, 5333); assert.strictEqual(p1.FH, 3000); assert.strictEqual(p1.count, 4);
+  assert.strictEqual(p1.FW, 5333); assert.strictEqual(p1.FH, 3000); assert.strictEqual(p1.count, 2, '16:9 from 12 MP: one tall window per side');
   checkPlan(4000, 3000, C.presetMargins(4000, 3000, '9:16', 0));
   checkPlan(1200, 900, C.presetMargins(1200, 900, '1:1', 0.6));
   checkPlan(640, 480, { l: 900, t: 30, r: 0, b: 400 });
   checkPlan(300, 200, { l: 10, t: 10, r: 600, b: 0 });
   const p2 = C.extendPlan(1200, 900, { l: 0, t: 0, r: 2400, b: 0 });
   assert.ok(p2.steps.length > 1, 'a large extension goes outward in several steps');
-  for (const s of p2.steps) for (const t of s.tiles) assert.ok(t.pads.r > 0 && !t.pads.l, 'mirror padding on the open side');
+  for (const s of p2.steps) for (const t of s.tiles) {
+    assert.ok(t.pads.r > 0 && !t.pads.l, 'mirror padding on the open side');
+    assert.ok(t.gaps.r > 0 && t.skip.r === s.strip.x1 - s.strip.x0, 'an unknown gap between the strip and the reflection');
+    assert.ok(Math.abs(t.w + t.pads.r + t.gaps.r - t.h) <= 1 || t.h === p2.FH, 'about square with the padding');
+  }
 });
 
 // ---- metadata and files ---------------------------------------------------------------------------------------------------

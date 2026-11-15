@@ -131,7 +131,7 @@ ipcMain.handle('fill:run', async (_e, req) => {
     const res = await withRunner('lama', async (r) => {
       if (fillCancel) throw E.cancelled();
       send('fill:phase', { phase: 'filling' });
-      return r.call({ type: 'fill', rgba: req.rgba, w: req.w, h: req.h, unknown: req.unknown, feather: Math.max(0, Math.min(64, Number(req.feather) || 0)), pads: req.pads || null, match: Math.max(0, Math.min(64, Number(req.match) || 0)) });
+      return r.call({ type: 'fill', rgba: req.rgba, w: req.w, h: req.h, unknown: req.unknown, feather: Math.max(0, Math.min(64, Number(req.feather) || 0)), pads: req.pads || null, skip: req.skip || null, gaps: req.gaps || null, kind: req.kind === 'extend' ? 'extend' : 'remove' });
     });
     if (fillCancel) return { ok: false, cancelled: true };
     return { ok: true, rgba: res.rgba, seconds: res.seconds };

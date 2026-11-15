@@ -327,8 +327,9 @@
   }
 
   // ---- removing -------------------------------------------------------------------------------------------------------------------
-  async function runFill(rgba, w, h, unknown, feather, pads, match) {
-    const r = await window.pc.fill({ rgba, w, h, unknown, feather, pads: pads || null, match: match || 0 });
+  /** The model call for core.runRemoval / runExtension: null when cancelled. */
+  async function fillFor(req) {
+    const r = await window.pc.fill(req);
     if (S.busyJob && S.busyJob.cancelled) return null;
     if (!r.ok) { if (r.cancelled) return null; throw new Error(r.error); }
     S.modelSeconds.push(r.seconds);
@@ -339,40 +340,22 @@
     const t0 = performance.now();
     const { w: W, h: H } = S.doc; const grow = S.grow;
     const box = C.maskBox(S.mask, W, H);
-    const region = C.clipBox(C.growBox(box, grow + 2), W, H); const rr = C.boxToRect(region);
-    const grown = C.dilate(C.getRect(S.mask, W, 1, rr), rr.w, rr.h, grow);
-    const unknown = new Uint8Array(W * H); C.putRect(unknown, W, 1, rr, grown);
-    const parts = C.components(grown, rr.w, rr.h).map((p) => ({ x0: p.x0 + rr.x, y0: p.y0 + rr.y, x1: p.x1 + rr.x, y1: p.y1 + rr.y }));
-    const jobs = C.removalJobs(parts, W, H);
     setPhase('busy'); S.busyJob = { cancelled: false }; S.modelSeconds = [];
-    const patches = [];
     try {
-      for (let i = 0; i < jobs.length; i++) {
-        const win = jobs[i].win;
-        const unk = C.getRect(unknown, W, 1, win);
-        if (!C.maskCount(unk)) continue;
-        busy('Removing…', jobs.length > 1 ? `Area ${i + 1} of ${jobs.length}` : `${win.w} × ${win.h} px around the selection`, jobs.length > 1 ? i / jobs.length : null);
-        const before = C.getRect(S.doc.rgba, W, 4, win);
-        const out = await runFill(before.slice(), win.w, win.h, unk, C.featherFor(win), null);
-        if (!out) { for (const p of patches.reverse()) C.putRect(S.doc.rgba, W, 4, p.rect, p.before); refreshDoc(null); toast('Cancelled'); return; }
-        C.putRect(S.doc.rgba, W, 4, win, out);
-        C.putRect(unknown, W, 1, win, new Uint8Array(win.w * win.h));
-        // keep only the part that really changed
-        const d = C.diffBox(before, out, win.w, win.h, 4);
-        if (d) { const rect = { x: win.x + d.x0, y: win.y + d.y0, w: d.x1 - d.x0, h: d.y1 - d.y0 }; patches.push({ rect, before: C.getRect(before, win.w, 4, { x: d.x0, y: d.y0, w: rect.w, h: rect.h }), after: C.getRect(S.doc.rgba, W, 4, rect) }); }
-        refreshDoc(C.rectToBox(win));
-        await frame();
-      }
+      const r = await C.runRemoval(S.doc.rgba, W, H, S.mask, grow, fillFor, {
+        onStep: (i, n, win) => busy('Removing…', n > 1 ? `Area ${i + 1} of ${n}` : `${win.w} × ${win.h} px around the selection`, n > 1 ? i / n : null),
+        onUpdate: async (b) => { refreshDoc(b); await frame(); },
+      });
+      if (r.cancelled) { refreshDoc(null); toast('Cancelled'); return; }
       const mrect = C.boxToRect(box);
       const maskBefore = C.getRect(S.mask, W, 1, mrect);
       S.mask.fill(0); S.taps = null; S.version++;
       const seconds = (performance.now() - t0) / 1000;
-      S.lastEdit = { kind: 'remove', patches: patches.map((p) => p.rect), seconds, grow };
-      pushHistory({ kind: 'pixels', label: 'Removed', patches, mask: { rect: mrect, before: maskBefore, after: new Uint8Array(maskBefore.length) }, seconds });
+      S.lastEdit = { kind: 'remove', patches: r.patches.map((p) => p.rect), seconds, grow };
+      pushHistory({ kind: 'pixels', label: 'Removed', patches: r.patches, mask: { rect: mrect, before: maskBefore, after: new Uint8Array(maskBefore.length) }, seconds });
       maskChanged(box);
       scheduleEncode();
     } catch (e) {
-      for (const p of patches.reverse()) C.putRect(S.doc.rgba, W, 4, p.rect, p.before);
       refreshDoc(null);
       toast('Could not remove it: ' + ((e && e.message) || e), true);
     } finally { S.busyJob = null; unbusy(); setPhase('ready'); }
@@ -405,45 +388,25 @@
   async function runExtend() {
     if (S.phase !== 'ready' || S.mode !== 'extend') return;
     const old = S.doc; const W = old.w; const H = old.h;
-    const plan = C.extendPlan(W, H, S.ext.m);
-    if (plan.FW === W && plan.FH === H) return;
+    const m = C.clampMargins(W, H, S.ext.m);
+    if (!(m.l || m.r || m.t || m.b)) return;
     const t0 = performance.now();
-    const { FW, FH } = plan;
-    const rgba = new Uint8ClampedArray(FW * FH * 4); const pending = new Uint8Array(FW * FH).fill(1);
-    // the new area starts as the nearest edge colour (only seen while the fill is running)
-    for (let y = 0; y < FH; y++) {
-      const sy = Math.min(H - 1, Math.max(0, y - plan.oy));
-      for (let x = 0; x < FW; x++) {
-        const sx = Math.min(W - 1, Math.max(0, x - plan.ox)); const s = (sy * W + sx) * 4; const o = (y * FW + x) * 4;
-        rgba[o] = old.rgba[s]; rgba[o + 1] = old.rgba[s + 1]; rgba[o + 2] = old.rgba[s + 2]; rgba[o + 3] = old.rgba[s + 3];
-      }
-    }
-    for (let y = 0; y < H; y++) pending.fill(0, (y + plan.oy) * FW + plan.ox, (y + plan.oy) * FW + plan.ox + W);
-    const next = { w: FW, h: FH, rgba, ox: old.ox + plan.ox, oy: old.oy + plan.oy };
     const oldMask = S.mask;
     S.mode = 'edit';
-    S.doc = next; S.mask = new Uint8Array(FW * FH);
-    buildDocCanvases(); maskCountCache = 0; fitZoom();
     setPhase('busy'); S.busyJob = { cancelled: false }; S.modelSeconds = [];
     const restore = () => { S.doc = old; S.mask = oldMask; buildDocCanvases(); maskChanged(null); S.mode = 'extend'; fitZoom(); updateFileInfo(); };
     try {
-      let k = 0;
-      for (const step of plan.steps) {
-        for (const t of step.tiles) {
-          busy('Extending…', `Part ${k + 1} of ${plan.count}`, k / plan.count); k++;
-          const unk = C.getRect(pending, FW, 1, t);
-          if (!C.maskCount(unk)) continue;
-          const out = await runFill(C.getRect(rgba, FW, 4, t), t.w, t.h, unk, plan.feather, t.pads, plan.match);
-          if (!out) { restore(); toast('Cancelled'); return; }
-          C.putRect(rgba, FW, 4, t, out); C.putRect(pending, FW, 1, t, new Uint8Array(t.w * t.h));
-          refreshDoc(C.rectToBox(t));
-          await frame();
-        }
-      }
+      const r = await C.runExtension(old.rgba, W, H, m, fillFor, {
+        onStart: (rgba, FW, FH) => { S.doc = { w: FW, h: FH, rgba, ox: old.ox + m.l, oy: old.oy + m.t }; S.mask = new Uint8Array(FW * FH); buildDocCanvases(); maskCountCache = 0; fitZoom(); },
+        onStep: (k, n) => busy('Extending…', `Part ${k + 1} of ${n}`, k / n),
+        onUpdate: async (b) => { refreshDoc(b); await frame(); },
+      });
+      if (r.cancelled) { restore(); toast('Cancelled'); return; }
+      const next = S.doc; const plan = r.plan;
       const seconds = (performance.now() - t0) / 1000;
       S.version++; S.taps = null;
-      const label = S.ext.preset === 'free' ? `Extended to ${FW} × ${FH}` : `Extended to ${S.ext.preset}`;
-      S.lastEdit = { kind: 'extend', plan: { FW, FH, ox: plan.ox, oy: plan.oy, count: plan.count, tile: plan.tile }, seconds };
+      const label = S.ext.preset === 'free' ? `Extended to ${r.w} × ${r.h}` : `Extended to ${S.ext.preset}`;
+      S.lastEdit = { kind: 'extend', plan: { FW: r.w, FH: r.h, ox: plan.ox, oy: plan.oy, count: plan.count, tile: plan.tile }, seconds };
       pushHistory({ kind: 'frame', label, before: { doc: old, mask: oldMask }, after: { doc: next, mask: S.mask }, seconds });
       leaveExtend(); updateFileInfo(); scheduleEncode();
     } catch (e) {

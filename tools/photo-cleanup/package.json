@@ -1,7 +1,7 @@
 {
   "name": "photo-cleanup",
   "productName": "Photo Cleanup",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Remove unwanted things from photos and extend their edges, offline on your computer (LaMa inpainting, MobileSAM tap-to-select).",
   "main": "src/main.js",
   "license": "MIT",
@@ -10,7 +10,7 @@
   "scripts": {
     "setup": "node scripts/fetch-model.js",
     "start": "node ../../node_modules/electron/cli.js .",
-    "test": "node test/cleanup.test.js",
+    "test": "node test/cleanup.test.js && node test/seams.test.js",
     "e2e": "node test/run-e2e.js",
     "readme-shots": "node ../../node_modules/electron/cli.js . --e2e --readme-shots=../../docs/screenshots",
     "dist:win": "node scripts/fetch-model.js && node ../../node_modules/electron-builder/cli.js --win zip --publish never",
