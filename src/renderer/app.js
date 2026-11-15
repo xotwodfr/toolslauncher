@@ -79,6 +79,8 @@
     'audio-inspector': '<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.3 15.3l5.2 5.2M7 10.5h1.2l1-2.5 1.6 5 1.2-2.5H14"/></svg>',
     // a cube drawn in perspective with the 3x3 grid on its front face
     'cube-solver': '<svg viewBox="0 0 24 24"><path d="M4 8l4-4h12v12l-4 4"/><path d="M8 4l-4 4M20 4l-4 4"/><rect x="4" y="8" width="12" height="12"/><path d="M8 8v12M12 8v12M4 12h12M4 16h12"/></svg>',
+    // a picture frame with a sparkle (something being wiped away)
+    'photo-cleanup': '<svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="14" height="13" rx="2"/><path d="M3.5 15.5l3.8-3.8 3.2 3.2 2-2 5 5"/><path d="M19 2.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></svg>',
   };
   const icon = (name, cls = 'ico') => { const s = document.createElement('span'); s.className = cls; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name] || ''; return s; };
 

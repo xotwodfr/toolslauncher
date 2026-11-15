@@ -35,6 +35,7 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **Subtitle Maker** | Listens to a video or audio file and writes **subtitles**, offline (the Whisper model, 99 languages, optional **translate to English**), following the usual rules: two lines, 42 characters, 1–7 s each, a readable speed. Watch them over the video, fix any word or time, split, merge, shift, stamp at the playhead, then save `.srt` / `.vtt` or write a new MP4 with them **burnt in** or as a **subtitle track**. The original file is never changed. |
 | **Audio Inspector** | Shows what is **really** inside audio files, a batch or a whole folder at a time: catches **fake lossless** files (a FLAC/WAV made from an MP3: "Fake lossless file … the sound stops at 16 kHz"), **upsampled** hi-res and **padded 24-bit**, with a spectrogram and the cutoff marked. Also the true format, bitrate, peak and true peak, loudness (LUFS), dynamic range, clipping, DC offset, mono-in-stereo and silence, with a CSV or text report. Files are only read, never changed. |
 | **Rubik's Cube Solver** | Solves a **3x3 or 2x2** cube: fill it in on a net or **scan it** with a webcam or six photos, get told in plain words if the cube is impossible (twisted corner, flipped edge, swapped pieces), and follow the solution (3x3: at most 22 turns; 2x2: the fewest possible) on an **animated 3D cube** you can step through. |
+| **Photo Cleanup** | **Removes unwanted things** from photos (tap an object and it is outlined automatically, or paint over it) and **extends photos** wider or taller with matching edges (square, 4:5, 3:2, 16:9, 9:16 or free). Before/after compare, undo history; untouched pixels stay exactly as they were. |
 
 <p>
   <img src="docs/screenshots/audio-tagger.png" width="32%" alt="Audio Tagger">
@@ -65,6 +66,7 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/subtitle-maker.png" width="32%" alt="Subtitle Maker: an invented, spoken video with its subtitles drawn over it and the list of subtitles with their times and reading speed">
   <img src="docs/screenshots/audio-inspector.png" width="32%" alt="Audio Inspector: seven invented songs with their verdicts, one FLAC marked Fake lossless file with its spectrogram cut off at 16.6 kHz">
   <img src="docs/screenshots/cube-solver.png" width="32%" alt="Rubik's Cube Solver: an invented scramble on the net, and its solution being played on the 3D cube with the turns as chips">
+  <img src="docs/screenshots/photo-cleanup.png" width="32%" alt="Photo Cleanup: an invented beach photo with a striped bin selected for removal, and the remove and extend controls">
 </p>
 
 No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`. Lyrics Maker does the same with `.ttml` and `.lrc` files.)
@@ -250,6 +252,15 @@ No tool overwrites your original files. (Music Player never changes a song; when
 - **Solutions:** 3x3 in at most 22 turns (Kociemba's two-phase method, then about a second looking for shorter ones); 2x2 in the fewest possible turns. Every solution is checked before it is shown.
 - **Animated 3D cube:** play, pause, step, jump to any turn, change the speed, view it from the front or turn it around; copy or save the turns.
 - Nothing leaves your computer: the camera picture is read live and never recorded.
+
+### Photo Cleanup
+
+- **Tap to select:** tap an object and it is outlined automatically (MobileSAM); tap more to add, Alt-click or right-click to take a part away, and fix the outline with the brush or eraser. "Grow" widens the selection so soft edges go too.
+- **Remove:** the selection is filled in with LaMa, an inpainting model, around the object at its own resolution and blended back into the full-size photo, so everything outside the edited area stays exactly as it was. A 12 MP photo takes a few seconds per removal on a normal PC.
+- **Extend the edges:** make the photo square, 4:5, 3:2, 16:9, 9:16 or drag the edges freely, and the new area is filled to match, step by step outward. Works best on skies, walls, grass, water and plain backgrounds; offline it cannot invent new objects.
+- **Compare and undo:** hold to see the original or drag a before/after slider; every removal and extension can be undone and redone.
+- **Save** as JPEG, PNG or WebP (keeps the orientation; keep or strip the photo details), or copy to the clipboard. HEIC files are not supported yet: export them to JPEG first.
+- Nothing is uploaded: both models are inside the app.
 
 ## Install
 
