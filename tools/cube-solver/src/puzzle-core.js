@@ -118,8 +118,8 @@
         const t = turns[name];
         let k = m[1] ? Number(m[1]) : 1;
         if (m[2]) k = -k;
-        k = ((k % t.order) + t.order) % t.order;
-        if (t.order === 2 && !m[1] && !m[2]) k = 1; // "R" on a half-turn-only face means the half turn
+        // a half-turn-only face: "R", "R2", "R'" and "R2'" all mean its one turn
+        k = t.order === 2 ? 1 : ((k % t.order) + t.order) % t.order;
         return k ? { turn: name, amount: k } : null;
       }
       throw new Error(`"${tok}" is not a move on the ${spec.name}: use ${turnNames.join(', ')}`);
