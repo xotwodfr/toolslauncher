@@ -474,7 +474,93 @@
     return null; // top and front are opposite colours or the same
   }
 
+  // ---- the 2x2 / 3x3 as puzzle modules (src/puzzles/cube2.js, cube3.js) --------------------------------------------------------
+  const FACE_NAME = { U: 'Top', R: 'Right', F: 'Front', D: 'Bottom', L: 'Left', B: 'Back' };
+  const FACE_UP = { U: [0, 0, -1], D: [0, 0, 1], R: [0, 1, 0], F: [0, 1, 0], L: [0, 1, 0], B: [0, 1, 0] };
+  const SAY2 = {
+    F: 'Show the face you want as the front, with your chosen top face on top.',
+    R: 'Turn the cube a quarter to the left: the right face, same top.',
+    B: 'Another quarter to the left: the back face, same top.',
+    L: 'Another quarter: the left face, same top.',
+    U: 'Turn back to the front, then tip the top towards you: the top face, the back on top.',
+    D: 'Now tip it the other way: the bottom face, the front on top.',
+  };
+  function say3(face, sc) {
+    const w = (f) => COLOUR_NAME[sc[f]];
+    switch (face) {
+      case 'F': return `Show the ${w('F')}-centred face, ${w('U')} on top.`;
+      case 'R': return `Turn the cube a quarter to the left: the ${w('R')}-centred face, ${w('U')} still on top.`;
+      case 'B': return `Another quarter to the left: the ${w('B')}-centred face, ${w('U')} on top.`;
+      case 'L': return `Another quarter: the ${w('L')}-centred face, ${w('U')} on top.`;
+      case 'U': return `Turn back to ${w('F')} facing you, then tip the top towards you: the ${w('U')}-centred face, ${w('B')} on top.`;
+      default: return `Now tip it the other way: the ${w('D')}-centred face, ${w('F')} on top.`;
+    }
+  }
+  /**
+   * The 2x2 or 3x3 described for the shared puzzle engine (PuzzleCore), with exactly this file's sticker order, turns and
+   * validation, so the generic window can treat them like every other puzzle.
+   */
+  function makePuzzleDef(n, PuzzleCore) {
+    const g = geometry(n);
+    const m = g.m;
+    const stickers = g.stickers.map((s) => {
+      const nrm = s.normal;
+      const centre = s.pos.map((v, k) => v + 0.5 * nrm[k]);
+      const t = [0, 1, 2].filter((k) => nrm[k] === 0);
+      const corner = (a, b) => { const p = centre.slice(); p[t[0]] += a * 0.5; p[t[1]] += b * 0.5; return p; };
+      return { face: s.face, centre, poly: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)] };
+    });
+    const turns = {};
+    for (const f of FACES) { const a = AXIS[f]; turns[f] = { axis: a, order: 4, select: (c) => dot(c, a) > m - 0.5 + 1e-6 }; }
+    const step = n + 0.25; const row = n + 0.7;
+    const BLOCK = { U: [1, 0], L: [0, 1], F: [1, 1], R: [2, 1], B: [3, 1], D: [1, 2] };
+    const puzzle = PuzzleCore.definePuzzle({
+      id: 'cube' + n, name: `${n}x${n} cube`,
+      colours: Object.fromEntries(COLOURS.map((c) => [c, { name: COLOUR_NAME[c], hex: COLOUR_HEX[c] }])),
+      faces: FACES.map((f) => ({ id: f, name: FACE_NAME[f], normal: AXIS[f], up: FACE_UP[f], colour: STANDARD_SCHEME[f] })),
+      stickers,
+      turns,
+      net: FACES.map((f) => ({ face: f, x: BLOCK[f][0] * step, y: BLOCK[f][1] * row })),
+      scrambleTurns: n === 2 ? ['U', 'R', 'F'] : FACES,
+    });
+    const fixed = n === 3 ? g.centres.slice() : [];
+    const def = {
+      id: 'cube' + n,
+      name: n === 3 ? "Rubik's Cube 3x3" : "Rubik's Cube 2x2",
+      short: `${n}x${n}`,
+      puzzle,
+      scrambleLength: n === 3 ? 25 : 11,
+      optimal: n === 2,
+      fixedStickers: fixed,
+      validate(colours) {
+        const v = validate(n, colours);
+        return { ok: v.ok, solved: v.solved, errors: v.errors, summary: v.summary, faces: v.faces };
+      },
+      randomMoves: (len, seed) => randomMoves(n, len, seed).map((t) => puzzle.parseToken(t)),
+      describeMove(mv) {
+        const face = FACE_NAME[mv.turn].toLowerCase();
+        return mv.amount === 2 ? `the ${face} face half a turn` : mv.amount === 3 ? `the ${face} face a quarter anticlockwise` : `the ${face} face a quarter clockwise`;
+      },
+      scan: { experimental: false, faces: ['F', 'R', 'B', 'L', 'U', 'D'].map((f) => ({ face: f, say: n === 3 ? say3(f, STANDARD_SCHEME) : SAY2[f] })) },
+      holdHelp: n === 3
+        ? 'Hold the cube with the white centre on top and the green centre facing you, and keep it that way. The centres never move on a 3x3, so they are already filled in.'
+        : 'A 2x2 has no centres, so hold it any way you like and keep it that way: the face looking at you is the front, the one on top is the top. Fill in the front, then turn the whole cube a quarter to the left for the right face, again for the back and the left face. For the top face, tip the cube towards you; for the bottom, tip it away from you. The solution never moves the bottom-back-left corner.',
+      notationHelp: "U, D, L, R, F and B turn the top, bottom, left, right, front or back face a quarter turn clockwise (as you look at that face). ' means anticlockwise, 2 means half a turn.",
+    };
+    if (n === 3) {
+      // the 3x3's centres never move, so how the cube is held (which colour on top / in front) decides the centres
+      def.orientation = {
+        colours: COLOURS.slice(),
+        default: { top: 'w', front: 'g' },
+        scheme: (top, front) => orientationScheme(top, front),
+      };
+      def.scanSay = (face, scheme) => say3(face, scheme || STANDARD_SCHEME);
+    }
+    return def;
+  }
+
   return {
+    makePuzzleDef,
     FACES, AXIS, OPPOSITE, FACE_WORD, COLOURS, COLOUR_NAME, COLOUR_HEX, STANDARD_SCHEME, CORNER_FACES, EDGE_FACES, CORNER_PLACE, EDGE_PLACE, MOVE_NAMES,
     geometry, parseMoves, normMove, inverseMove, invertMoves, formatMoves, simplify, applyMoves, solvedFaces, solvedColours, isSolved,
     toCubies, fromCubies, parity, rngFrom, randomState3, randomState2, randomMoves, validate, schemeFor2, orientationScheme,
