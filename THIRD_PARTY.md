@@ -38,6 +38,8 @@ components. Each downloadable package also carries the licence files its compone
 | [@img/sharp-wasm32](https://github.com/lovell/sharp) | Photo Batch Editor | Apache-2.0 AND LGPL-3.0-or-later AND MIT | sharp and libvips compiled to WebAssembly; used inside the app on Linux, where the native sharp clashes with Electron's own GLib when drawing; needs [@emnapi/runtime](https://github.com/toyobayashi/emnapi) (MIT) and tslib (0BSD) |
 | [exif-reader](https://github.com/devongovett/exif-reader) | Photo Batch Editor | MIT | Pure JavaScript; reads the copyright, artist and date of a photo to keep them, and for `{date}` |
 | [DejaVu Fonts](https://dejavu-fonts.github.io/) 2.37 via [dejavu-fonts-ttf](https://www.npmjs.com/package/dejavu-fonts-ttf) | Subtitle Maker | Bitstream Vera Fonts licence (DejaVu changes public domain; Arev glyphs under the Arev licence) | Only DejaVu Sans and DejaVu Sans Bold are packaged; they are handed to ffmpeg/libass so burnt-in subtitles look the same on every computer |
+| [three.js](https://github.com/mrdoob/three.js) (three) | Rubik's Cube Solver | MIT | 3D cube view; only build/three.module.min.js is packaged |
+| [cubejs](https://github.com/ldez/cubejs) | Rubik's Cube Solver | MIT | Kociemba two-phase 3x3 solver; lib/cube.js and lib/solve.js copied into src/vendor/cubejs (with its licence) with small marked changes (time limit, empty search phases, keep searching for shorter answers); its stray npm dependency is not bundled |
 
 Music Player's playback uses the audio decoders built into Electron / Chromium (MP3, FLAC, Ogg Vorbis, Opus, AAC, WAV); it bundles no extra codecs. Its LRC and TTML lyrics, M3U playlist and library code is code in this repository.
 

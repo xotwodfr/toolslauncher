@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:;">
+  <title>Rubik's Cube Solver</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Rubik's Cube Solver</h1>
+      <div class="seg" role="radiogroup" aria-label="Cube size">
+        <button class="mode" role="radio" data-size="3" aria-checked="true">3x3</button>
+        <button class="mode" role="radio" data-size="2" aria-checked="false">2x2</button>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="How to enter the cube">
+        <button role="tab" id="t-fill" data-tab="fill" aria-selected="true" aria-controls="tab-fill">Fill in</button>
+        <button role="tab" id="t-camera" data-tab="camera" aria-selected="false" aria-controls="tab-camera">Webcam</button>
+        <button role="tab" id="t-photos" data-tab="photos" aria-selected="false" aria-controls="tab-photos">Photos</button>
+      </nav>
+      <span class="grow"></span>
+      <span id="engine" class="engine muted small" aria-live="polite">Getting the solver ready…</span>
+      <div id="engineProg" class="progress" role="progressbar" aria-label="Solver start-up" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="engineFill"></div></div>
+    </header>
+
+    <main class="stage">
+      <section class="left">
+        <!-- ============ fill in ============ -->
+        <div id="tab-fill" class="tab" role="tabpanel" aria-labelledby="t-fill">
+          <div class="palette" role="radiogroup" aria-label="Paint colour (keys 1 to 6, 0 erases)" id="palette"></div>
+          <div id="net" class="net" role="grid" aria-label="The cube's stickers, unfolded. Arrow keys move, Enter or Space paints."></div>
+          <div class="row tools">
+            <button id="reset" class="btn small" title="Every face one colour again">Reset to solved</button>
+            <button id="clear" class="btn small" title="Empty every sticker except the centres">Clear</button>
+            <button id="random" class="btn small" title="A random scramble, to try the solver">Random scramble</button>
+            <span class="grow"></span>
+            <span id="netInfo" class="muted small"></span>
+          </div>
+          <div class="row turns">
+            <label for="turnsText">Turns</label>
+            <input id="turnsText" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. R U R' U' - applied to a solved cube">
+            <button id="applyTurns" class="btn small">Apply</button>
+          </div>
+          <details class="hold" id="hold" open>
+            <summary>How to hold the cube</summary>
+            <div id="hold3">
+              <p class="fine">Hold the cube with the <b id="hTop">white</b> centre on top and the <b id="hFront">green</b> centre facing you, and keep it that way. The centres never move on a 3x3, so they are already filled in. Fill in the front, then turn the whole cube a quarter to the left for the right face, again for the back and the left face, always with the same colour on top. For the top face, tip the cube towards you (the back goes up); for the bottom, tip it away from you (the front goes up).</p>
+              <div class="row orient">
+                <label for="oTop">Top</label><select id="oTop"></select>
+                <label for="oFront">Front</label><select id="oFront"></select>
+              </div>
+            </div>
+            <div id="hold2" hidden>
+              <p class="fine">A 2x2 has no centres, so hold it any way you like and keep it that way: the face looking at you is the front, the one on top is the top. Fill in the front, then turn the whole cube a quarter to the left for the right face, again for the back and the left face. For the top face, tip the cube towards you; for the bottom, tip it away from you. The solution never moves the bottom-back-left corner.</p>
+            </div>
+          </details>
+        </div>
+
+        <!-- ============ webcam ============ -->
+        <div id="tab-camera" class="tab" role="tabpanel" aria-labelledby="t-camera" hidden>
+          <div class="row">
+            <label for="camSel">Camera</label>
+            <select id="camSel"><option value="">Default camera</option></select>
+            <button id="camStart" class="btn small primary">Start camera</button>
+            <button id="camStop" class="btn small" hidden>Stop</button>
+            <span class="grow"></span>
+            <label class="check" title="Only the picture is flipped, not what is read"><input type="checkbox" id="camMirror"> Mirror</label>
+          </div>
+          <p id="camSay" class="say">Press Start camera. The picture stays on this computer: nothing is recorded or saved.</p>
+          <div class="camwrap" id="camWrap">
+            <div class="camview" id="camView"><video id="video" muted playsinline></video><canvas id="overlay"></canvas></div>
+            <div class="camside">
+              <h2>What I read</h2>
+              <div id="liveFace" class="miniface big" aria-live="off"></div>
+              <button id="capture" class="btn primary" disabled>Capture (Space)</button>
+              <label for="gridSize">Grid size</label>
+              <input id="gridSize" type="range" min="30" max="95" value="62" aria-label="Grid size">
+            </div>
+          </div>
+          <div class="faces" id="camFaces" aria-label="Faces captured so far (click one to scan it again)"></div>
+        </div>
+
+        <!-- ============ photos ============ -->
+        <div id="tab-photos" class="tab" role="tabpanel" aria-labelledby="t-photos" hidden>
+          <div class="row">
+            <button id="photosPick" class="btn small">Choose six photos…</button>
+            <span class="muted small grow">One photo per face, in this order. Drag the grid's corners onto the face's corners.</span>
+            <button id="photosRead" class="btn small primary" disabled>Read the colours</button>
+          </div>
+          <div class="photos" id="photos"></div>
+        </div>
+      </section>
+
+      <section class="right">
+        <div class="viewbar">
+          <h2 id="viewTitle">Your cube</h2>
+          <span class="grow"></span>
+          <div class="seg small" role="radiogroup" aria-label="Viewing angle">
+            <button class="mode" role="radio" data-view="front" aria-checked="true" title="Always seen from the front, the top and the right">From the front</button>
+            <button class="mode" role="radio" data-view="free" aria-checked="false" title="Drag the cube to look around">Free</button>
+          </div>
+        </div>
+        <div id="view3d" class="view3d" aria-label="3D view of the cube. Drag to turn it around."><canvas id="gl"></canvas><p id="noGl" class="muted small" hidden>The 3D view needs WebGL, which is not available here. Everything else still works.</p></div>
+
+        <div class="solvebar">
+          <button id="solve" class="btn primary">Solve</button>
+          <span id="verdict" class="verdict" role="status"></span>
+        </div>
+        <div id="problems" class="problems" role="alert" hidden><ul id="problemList"></ul></div>
+
+        <div id="solution" class="solution" hidden>
+          <div id="chips" class="chips" aria-label="The solution, one turn per chip. Click one to jump there."></div>
+          <div class="player">
+            <button id="pStart" class="btn small icon" aria-label="Go to the start" title="Go to the start"><svg viewBox="0 0 16 16"><path d="M3 3v10M13 3L6 8l7 5z"/></svg></button>
+            <button id="pBack" class="btn small icon" aria-label="One turn back" title="One turn back"><svg viewBox="0 0 16 16"><path d="M11 3L4 8l7 5z"/></svg></button>
+            <button id="pPlay" class="btn small icon primary" aria-label="Play" title="Play"><svg id="icPlay" viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg><svg id="icPause" viewBox="0 0 16 16" hidden><path d="M4 3h3v10H4zM9 3h3v10H9z"/></svg></button>
+            <button id="pFwd" class="btn small icon" aria-label="One turn forward" title="One turn forward"><svg viewBox="0 0 16 16"><path d="M5 3l7 5-7 5z"/></svg></button>
+            <button id="pEnd" class="btn small icon" aria-label="Go to the end" title="Go to the end"><svg viewBox="0 0 16 16"><path d="M13 3v10M3 3l7 5-7 5z"/></svg></button>
+            <span id="pCount" class="count">Turn 0 of 0</span>
+            <span class="grow"></span>
+            <label for="speed">Speed</label>
+            <input id="speed" type="range" min="0.25" max="3" step="0.25" value="1" aria-label="Playback speed">
+          </div>
+          <p id="pNext" class="next"></p>
+          <div class="row">
+            <span id="moveInfo" class="muted small grow"></span>
+            <button id="copy" class="btn small ghost">Copy</button>
+            <button id="save" class="btn small ghost">Save…</button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../cube.js"></script>
+  <script src="../colour.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

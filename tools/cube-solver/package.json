@@ -1,0 +1,67 @@
+{
+  "name": "cube-solver",
+  "productName": "Cube Solver",
+  "version": "0.1.0",
+  "description": "Solve a 3x3 or 2x2 Rubik's cube: fill it in or scan it with a webcam or photos, then follow the solution on an animated 3D cube. Offline.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": {
+    "name": "xotwodfr",
+    "email": "xotwodfr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/cube.test.js",
+    "e2e": "node test/run-e2e.js",
+    "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "build": {
+    "appId": "com.toolslauncher.cubesolver",
+    "productName": "Cube Solver",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!node_modules/three/examples/**",
+      "!node_modules/three/src/**",
+      "!node_modules/three/build/three.cjs",
+      "!node_modules/three/build/three.module.js",
+      "!node_modules/three/build/three.webgpu*.js"
+    ],
+    "artifactName": "CubeSolver-${version}-${os}-${arch}.${ext}",
+    "executableName": "cube-solver",
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signExecutable": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Game"
+    }
+  }
+}

@@ -34,6 +34,7 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **Photo Batch Editor** | Applies **one recipe of edits to many photos**: resize, crop to an aspect (with a smart subject-finding anchor), rotate / flip, auto-orient, auto levels, brightness / contrast / saturation / warmth, sharpen, black & white or sepia, border, **text and logo watermarks**, rounded corners. Steps run in the order you set. Live **before/after preview**, presets, rename patterns, photo info kept or stripped; originals are never touched. |
 | **Subtitle Maker** | Listens to a video or audio file and writes **subtitles**, offline (the Whisper model, 99 languages, optional **translate to English**), following the usual rules: two lines, 42 characters, 1–7 s each, a readable speed. Watch them over the video, fix any word or time, split, merge, shift, stamp at the playhead, then save `.srt` / `.vtt` or write a new MP4 with them **burnt in** or as a **subtitle track**. The original file is never changed. |
 | **Audio Inspector** | Shows what is **really** inside audio files, a batch or a whole folder at a time: catches **fake lossless** files (a FLAC/WAV made from an MP3: "Fake lossless file … the sound stops at 16 kHz"), **upsampled** hi-res and **padded 24-bit**, with a spectrogram and the cutoff marked. Also the true format, bitrate, peak and true peak, loudness (LUFS), dynamic range, clipping, DC offset, mono-in-stereo and silence, with a CSV or text report. Files are only read, never changed. |
+| **Rubik's Cube Solver** | Solves a **3x3 or 2x2** cube: fill it in on a net or **scan it** with a webcam or six photos, get told in plain words if the cube is impossible (twisted corner, flipped edge, swapped pieces), and follow the solution (3x3: at most 22 turns; 2x2: the fewest possible) on an **animated 3D cube** you can step through. |
 
 <p>
   <img src="docs/screenshots/audio-tagger.png" width="32%" alt="Audio Tagger">
@@ -63,6 +64,7 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
   <img src="docs/screenshots/photo-batch-editor.png" width="32%" alt="Photo Batch Editor: invented landscape photos with a recipe of resize, border and watermark steps, and a before/after preview">
   <img src="docs/screenshots/subtitle-maker.png" width="32%" alt="Subtitle Maker: an invented, spoken video with its subtitles drawn over it and the list of subtitles with their times and reading speed">
   <img src="docs/screenshots/audio-inspector.png" width="32%" alt="Audio Inspector: seven invented songs with their verdicts, one FLAC marked Fake lossless file with its spectrogram cut off at 16.6 kHz">
+  <img src="docs/screenshots/cube-solver.png" width="32%" alt="Rubik's Cube Solver: an invented scramble on the net, and its solution being played on the 3D cube with the turns as chips">
 </p>
 
 No tool overwrites your original files. (Music Player never changes a song; when you save lyrics it writes a `.lrc` file next to the song, and keeps any existing one as `.lrc.bak`. Lyrics Maker does the same with `.ttml` and `.lrc` files.)
@@ -239,6 +241,15 @@ No tool overwrites your original files. (Music Player never changes a song; when
 - **Click a file** for a spectrogram with a frequency axis and the cutoff line, the average spectrum, and every number: format, sample rate, bits stored and used, channels, duration, stated and actual bitrate, peak, true peak, loudness and loudness range (EBU R128), DR, clipping, DC offset, mono-in-stereo, silence at the start and end.
 - **Save** the results as CSV (opens in Excel) or as a readable text report.
 - **Good to know.** The verdict looks for the steep cutoff a lossy encoder leaves. A real recording that was filtered hard below 20 kHz will look fake, and a lossy encoder that keeps the full band (some AAC at 256 kbps) is not caught.
+
+### Rubik's Cube Solver
+
+- **Fill it in** on an unfolded net (click, drag-paint, or keys 1-6 and the arrows), or **scan it**: with a webcam (a grid over the picture, the app says which face to show and how to hold it, and reads the colours live; Capture with <kbd>Space</kbd>), or from six photos with a grid you drag onto each face. Scanned colours land on the net, where any sticker can be fixed; doubtful ones are outlined.
+- **Colours are read** from the middle of each sticker and compared with the centres (3x3) or grouped into six sets of four (2x2), with a light correction per face, so a warm lamp or a dim side still reads right.
+- **Impossible cubes are explained** in plain words (wrong colour counts, a corner with two whites, a twisted corner, a flipped edge, two swapped pieces) and the stickers are marked on the net.
+- **Solutions:** 3x3 in at most 22 turns (Kociemba's two-phase method, then about a second looking for shorter ones); 2x2 in the fewest possible turns. Every solution is checked before it is shown.
+- **Animated 3D cube:** play, pause, step, jump to any turn, change the speed, view it from the front or turn it around; copy or save the turns.
+- Nothing leaves your computer: the camera picture is read live and never recorded.
 
 ## Install
 

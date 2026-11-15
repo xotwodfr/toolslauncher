@@ -113,6 +113,7 @@ jobs:
           - { id: photo-batch-editor, name: 'Photo Batch Editor', setup: '' }
           - { id: subtitle-maker, name: 'Subtitle Maker', setup: 'ffmpeg and model setup' }
           - { id: audio-inspector, name: 'Audio Inspector', setup: 'ffmpeg setup' }
+          - { id: cube-solver, name: 'Rubik''s Cube Solver', setup: '' }
     name: ${{ matrix.tool.name }} (${{ matrix.platform.os }})
     runs-on: ${{ matrix.platform.os }}
     defaults:
