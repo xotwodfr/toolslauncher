@@ -1,0 +1,44 @@
+{
+  "name": "photo-cleanup",
+  "productName": "Photo Cleanup",
+  "version": "0.1.1",
+  "description": "Remove unwanted things from photos and extend their edges, offline on your computer (LaMa inpainting, MobileSAM tap-to-select).",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": { "name": "xotwodfr", "email": "xotwodfr@users.noreply.github.com" },
+  "homepage": "https://github.com/xotwodfr/toolslauncher",
+  "scripts": {
+    "setup": "node scripts/fetch-model.js",
+    "start": "node ../../node_modules/electron/cli.js .",
+    "test": "node test/cleanup.test.js && node test/seams.test.js",
+    "e2e": "node test/run-e2e.js",
+    "readme-shots": "node ../../node_modules/electron/cli.js . --e2e --readme-shots=../../docs/screenshots",
+    "dist:win": "node scripts/fetch-model.js && node ../../node_modules/electron-builder/cli.js --win zip --publish never",
+    "dist:linux": "node scripts/fetch-model.js && node ../../node_modules/electron-builder/cli.js --linux zip --publish never"
+  },
+  "dependencies": {
+    "onnxruntime-node": "1.31.1"
+  },
+  "build": {
+    "appId": "com.toolslauncher.photocleanup",
+    "productName": "Photo Cleanup",
+    "electronVersion": "33.4.11",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["src/**/*", "models/*.onnx", "package.json"],
+    "asarUnpack": ["node_modules/onnxruntime-node/**", "models/**"],
+    "artifactName": "PhotoCleanup-${version}-${os}-${arch}.${ext}",
+    "executableName": "photo-cleanup",
+    "win": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "signExecutable": false,
+      "files": ["!node_modules/onnxruntime-node/bin/napi-v6/darwin/**", "!node_modules/onnxruntime-node/bin/napi-v6/linux/**", "!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**"]
+    },
+    "linux": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "category": "Graphics",
+      "files": ["!node_modules/onnxruntime-node/bin/napi-v6/darwin/**", "!node_modules/onnxruntime-node/bin/napi-v6/win32/**", "!node_modules/onnxruntime-node/bin/napi-v6/linux/arm64/**", "!node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_cuda.so", "!node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_tensorrt.so"]
+    }
+  }
+}

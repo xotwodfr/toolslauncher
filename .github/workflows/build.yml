@@ -114,6 +114,7 @@ jobs:
           - { id: subtitle-maker, name: 'Subtitle Maker', setup: 'ffmpeg and model setup' }
           - { id: audio-inspector, name: 'Audio Inspector', setup: 'ffmpeg setup' }
           - { id: cube-solver, name: 'Rubik''s Cube Solver', setup: '' }
+          - { id: photo-cleanup, name: 'Photo Cleanup', setup: 'model setup' }
     name: ${{ matrix.tool.name }} (${{ matrix.platform.os }})
     runs-on: ${{ matrix.platform.os }}
     defaults:

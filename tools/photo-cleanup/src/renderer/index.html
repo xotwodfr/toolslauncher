@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data: blob:;">
+  <title>Photo Cleanup</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skin.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <h1>Photo Cleanup</h1>
+      <span class="muted small tagline">remove · extend · save</span>
+      <span class="grow"></span>
+      <span id="fileInfo" class="muted small trunc"></span>
+      <button id="undo" class="btn small" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button id="redo" class="btn small" disabled title="Redo (Ctrl+Y)">Redo</button>
+      <button id="open" class="btn">Open photo…</button>
+    </header>
+
+    <div id="engineWarn" class="banner" role="alert" hidden></div>
+
+    <main class="stage">
+      <section id="empty" class="drop" tabindex="0" role="button" aria-label="Open a photo">
+        <strong class="big">Drop a photo here</strong>
+        <span class="muted">JPEG, PNG or WebP (also AVIF, BMP, GIF), up to 60 megapixels</span>
+        <button id="open2" class="btn primary">Open photo…</button>
+        <p class="muted small fine">Tap something to select it, or paint over it, and it is removed and the gap filled in to match the surroundings. You can also make the photo wider or taller and let the new edges be filled in. Everything runs on this computer, offline; nothing is uploaded. Your original file is never changed.</p>
+      </section>
+
+      <section id="work" class="work" hidden>
+        <div id="viewwrap" class="viewwrap">
+          <canvas id="view" aria-label="The photo. Tap or paint to select what to remove. Scroll to zoom, drag with the middle button or Space to move."></canvas>
+          <div id="busy" class="busy" hidden role="status" aria-live="polite">
+            <p id="busyText" class="phase">Working…</p>
+            <div id="busyBar" class="progress indeterminate" aria-hidden="true"><div></div></div>
+            <p id="busySub" class="muted small"></p>
+            <div class="row"><button id="cancel" class="btn">Cancel</button></div>
+          </div>
+          <div class="viewbar">
+            <button id="fit" class="btn small" title="Fit the photo in the window (F)">Fit</button>
+            <button id="actual" class="btn small" title="Actual pixels (1)">100%</button>
+            <button id="hold" class="btn small" title="Hold to see the original (O)">Hold: original</button>
+            <button id="compare" class="btn small" aria-pressed="false" title="Before / after slider (C)">Compare</button>
+            <span id="zoomInfo" class="muted small"></span>
+            <span id="selInfo" class="muted small"></span>
+          </div>
+        </div>
+
+        <aside class="side" aria-label="Controls">
+          <fieldset id="removeSet" disabled>
+            <legend>Remove</legend>
+            <div class="seg" role="radiogroup" aria-label="Selection tool">
+              <label class="segbtn"><input type="radio" name="tool" id="tool-tap" value="tap" checked><span>Tap</span></label>
+              <label class="segbtn"><input type="radio" name="tool" id="tool-brush" value="brush"><span>Brush</span></label>
+              <label class="segbtn"><input type="radio" name="tool" id="tool-erase" value="erase"><span>Erase</span></label>
+              <label class="segbtn"><input type="radio" name="tool" id="tool-move" value="move"><span>Move</span></label>
+            </div>
+            <p id="toolHelp" class="muted small help">Tap an object to outline it. Tap more to add; Alt-click or right-click to take a part away.</p>
+            <div class="opt">
+              <label for="brush">Brush</label>
+              <input type="range" id="brush" min="4" max="300" value="48">
+              <output id="brushVal">48</output>
+            </div>
+            <div class="opt">
+              <label for="grow">Grow</label>
+              <input type="range" id="grow" min="0" max="40" value="6" aria-describedby="growHelp">
+              <output id="growVal">6</output>
+            </div>
+            <p id="growHelp" class="muted small">The selection is widened by this many pixels before removing, so shadows and soft edges go too.</p>
+            <div class="opt">
+              <button id="remove" class="btn primary" disabled title="Remove the selection (Enter)">Remove</button>
+              <button id="clearSel" class="btn ghost small" disabled title="Clear the selection (Esc)">Clear selection</button>
+            </div>
+          </fieldset>
+
+          <fieldset id="extendSet" disabled>
+            <legend>Extend edges</legend>
+            <div class="seg grid3" role="radiogroup" aria-label="New shape">
+              <label class="segbtn"><input type="radio" name="preset" id="preset-free" value="free"><span>Free</span></label>
+              <label class="segbtn"><input type="radio" name="preset" id="preset-1-1" value="1:1"><span>1:1</span></label>
+              <label class="segbtn"><input type="radio" name="preset" id="preset-4-5" value="4:5"><span>4:5</span></label>
+              <label class="segbtn"><input type="radio" name="preset" id="preset-3-2" value="3:2"><span>3:2</span></label>
+              <label class="segbtn"><input type="radio" name="preset" id="preset-16-9" value="16:9"><span>16:9</span></label>
+              <label class="segbtn"><input type="radio" name="preset" id="preset-9-16" value="9:16"><span>9:16</span></label>
+            </div>
+            <div class="opt">
+              <label for="amount">Amount</label>
+              <input type="range" id="amount" min="0" max="100" value="0">
+              <output id="amountVal">0</output>
+            </div>
+            <p id="extInfo" class="muted small">Pick a shape, or drag the edges of the frame in the picture.</p>
+            <div class="opt">
+              <button id="extend" class="btn primary" disabled>Extend</button>
+              <button id="extCancel" class="btn ghost small" disabled>Cancel</button>
+            </div>
+            <p class="note warn small">Works best on skies, walls, grass, water and plain backgrounds. People, buildings and busy detail at the edge may come out smeared or repeated.</p>
+          </fieldset>
+
+          <fieldset id="historySet" disabled>
+            <legend>History</legend>
+            <ol id="history" class="history" aria-label="Edits"></ol>
+          </fieldset>
+
+          <fieldset id="saveSet" disabled>
+            <legend>Save</legend>
+            <div class="opt">
+              <label for="format">As</label>
+              <select id="format" aria-label="File format">
+                <option value="jpeg">JPEG</option>
+                <option value="png">PNG (lossless)</option>
+                <option value="webp">WebP</option>
+              </select>
+            </div>
+            <div id="qualityRow" class="opt">
+              <label for="quality">Quality</label>
+              <input type="range" id="quality" min="50" max="100" value="92">
+              <output id="qualityVal">92</output>
+            </div>
+            <div class="opt">
+              <label class="check"><input type="checkbox" id="keepDetails" checked> Keep photo details</label>
+            </div>
+            <p id="detailsInfo" class="muted small">Camera, date and other details stored in the file.</p>
+            <div class="opt">
+              <button id="save" class="btn primary">Save as…</button>
+              <button id="copy" class="btn small" title="Copy the picture (Ctrl+C)">Copy</button>
+            </div>
+            <div id="result" class="result" hidden role="status"></div>
+          </fieldset>
+        </aside>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script src="../core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
