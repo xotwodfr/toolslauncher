@@ -309,17 +309,36 @@ test('3x3: the hardest known positions (superflip, superflip + four-spot) and ea
   assert.deepStrictEqual(S3.solve(solved3()), []);
 });
 
-test('the solver worker answers both sizes, checks its answers, and reports start-up progress', async () => {
+test('the solver workers answer both sizes, check their answers, and report start-up progress', async () => {
   const progress = [];
-  const e = new Engine({ onStatus: (s) => progress.push(s) });
+  const puzzles = require('../src/puzzles').loadAll().filter((p) => p.id === 'cube3' || p.id === 'cube2');
+  const e = new Engine({ puzzles, onStatus: (s) => progress.push(s) });
   try {
-    await e.whenReady(3);
-    assert(progress.some((s) => s.progress3 > 0 && s.progress3 < 1), 'intermediate progress');
-    const f3 = C.randomState3(99); const r3 = await e.solve(3, f3);
-    assert(C.isSolved(3, C.applyMoves(3, f3, r3.moves)));
-    const f2 = C.randomState2(99); const r2 = await e.solve(2, f2);
+    await e.whenReady('cube3');
+    assert(progress.some((s) => s.puzzles.cube3.progress > 0 && s.puzzles.cube3.progress < 1), 'intermediate progress');
+    const f3 = colourise(C.randomState3(99)); const r3 = await e.solve('cube3', f3);
+    assert(C.isSolved(3, C.applyMoves(3, f3, r3.text)));
+    assert.strictEqual(r3.stages.length, 1);
+    const f2 = C.randomState2(99); const r2 = await e.solve('cube2', colourise(f2));
     assert.strictEqual(r2.moves.length, S2.distance(f2));
   } finally { await e.close(); }
+});
+
+test('the 2x2 and 3x3 puzzle modules have exactly this model\'s stickers, turns and validation', () => {
+  for (const n of [2, 3]) {
+    const d = require('../src/puzzles/cube' + n); const P = d.puzzle;
+    assert.strictEqual(P.size, 6 * n * n);
+    for (let s = 0; s < 40; s++) {
+      const mv = C.randomMoves(n, 20, s);
+      assert.deepStrictEqual(P.applyMoves(P.solvedColours(), mv.join(' ')), C.applyMoves(n, C.solvedColours(n), mv));
+    }
+    assert.strictEqual(P.formatMoves(P.parseMoves("R U2 F'")), "R U2 F'");
+    const bad = C.solvedColours(n); bad[0] = bad[bad.length - 1];
+    assert(!d.validate(bad).ok && d.validate(bad).errors.length);
+  }
+  const d3 = require('../src/puzzles/cube3');
+  assert.deepStrictEqual(d3.fixedStickers, [4, 13, 22, 31, 40, 49]);
+  assert.strictEqual(d3.orientation.scheme('y', 'b').U, 'y');
 });
 
 // ---- colours ---------------------------------------------------------------------------------------------------------------------

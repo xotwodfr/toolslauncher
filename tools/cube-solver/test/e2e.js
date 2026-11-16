@@ -2,14 +2,19 @@
 // End-to-end test: runs inside Electron (`npm run e2e`). Drives the REAL window with real mouse and keyboard input: fills in a
 // scrambled cube by clicking, solves it, steps and plays through the solution and reads the colours back off the 3D scene;
 // checks the messages for impossible cubes; solves a 2x2; scans a cube with a FAKE WEBCAM playing an invented video of known
-// colours; reads a 2x2 from invented photos after dragging the grid onto each face; saves the solution.
+// colours; reads a 2x2 from invented photos after dragging the grid onto each face; saves the solution. Then, for EVERY puzzle
+// module present (and two small test puzzles of its own, a tetrahedron and a 2x2x1): picks it, scrambles it, solves it,
+// steps to the end reading the 3D state back, gets a validation error for a broken state and reads it from invented photos;
+// and scans a non-cube puzzle with the fake webcam.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { nativeImage } = require('electron');
 const C = require('../src/cube');
 const { renderFace } = require('../src/synth');
-const { SCAN_ORDER, scanCube, faceColours } = require('./fixtures');
+const K = require('../src/colour');
+const { renderTemplate, printFor } = require('../src/synth');
+const { SCAN_ORDER, scanCube, faceColours, allPuzzles, camPuzzle, scrambled } = require('./fixtures');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const KEYS = { w: '1', y: '2', g: '3', b: '4', r: '5', o: '6' };
@@ -60,6 +65,13 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
   const text = (id) => js(`document.getElementById(${JSON.stringify(id)}).textContent`);
   const problems = () => js('[...document.querySelectorAll("#problemList li")].map((l) => l.textContent)');
   const sticker = (i) => `#net .sticker[data-i="${i}"]`;
+  const clickSticker = async (i, wait = 15) => { const p = await js(`window.__app.cellPoint(${i})`); if (!p) throw new Error('no sticker ' + i); await clickAt(p.x, p.y, wait); };
+  const pick = async (id) => {
+    await click('#picker');
+    await waitFor('!document.getElementById("pickList").hidden', 2000, 'the puzzle list');
+    await click(`[data-puzzle="${id}"]`);
+    await waitFor(`window.__app.S.id === ${JSON.stringify(id)} && document.getElementById("pickList").hidden`, 3000, 'puzzle ' + id);
+  };
   const uniformFaces = (n, st) => C.isSolved(n, st);
   const waitIdle = () => waitFor('!window.__app.player().animating', 10000, 'the turn to finish');
   /** paints the whole net by real input: palette by number key, stickers by clicks */
@@ -68,7 +80,7 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
     const g = C.geometry(target.length === 54 ? 3 : 2);
     for (const c of C.COLOURS) {
       await key(KEYS[c], [], true);
-      for (let i = 0; i < target.length; i++) if (target[i] === c && !g.centres.includes(i)) await click(sticker(i), 15);
+      for (let i = 0; i < target.length; i++) if (target[i] === c && !g.centres.includes(i)) await clickSticker(i);
     }
   }
   async function solveAndWait() {
@@ -98,7 +110,7 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
     await step('drag-painting and the keyboard (number keys, arrows, Enter) paint stickers', async () => {
       await click('#net .sticker[data-i="0"]'); // focus the net with white painted on white (no change)
       await key('5', [], true); // red
-      const a = await center(sticker(0)); const b = await center(sticker(1)); const c = await center(sticker(2));
+      const a = await js('window.__app.cellPoint(0)'); const b = await js('window.__app.cellPoint(1)'); const c = await js('window.__app.cellPoint(2)');
       await dragPath([a, b, c]);
       const after = await colours();
       eq([after[0], after[1], after[2]], ['r', 'r', 'r'], 'top row dragged red');
@@ -198,7 +210,7 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
     const g3 = C.geometry(3);
     async function paintThese(changes) {
       await click('#reset');
-      for (const [i, c] of changes) { await key(KEYS[c], [], true); await click(sticker(i), 15); }
+      for (const [i, c] of changes) { await key(KEYS[c], [], true); await clickSticker(i); }
       await click('#solve');
       await waitFor('document.getElementById("problems").hidden === false || /solved/.test(document.getElementById("verdict").textContent)', 4000, 'a verdict');
       return problems();
@@ -225,13 +237,13 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
       const marked = await js('[...document.querySelectorAll("#net .sticker.bad")].map((b) => Number(b.dataset.i)).sort((x, y) => x - y)');
       assert(g3.cornerFacelets[0].every((i) => marked.includes(i)), 'the corner is marked: ' + JSON.stringify(marked));
       await shot('4-invalid');
-      await key('5', [], true); await click(sticker(a)); // editing (red again) clears the marks
+      await key('5', [], true); await clickSticker(a); // editing (red again) clears the marks
       await waitFor('document.querySelectorAll("#net .sticker.bad").length === 0', 2000, 'marks cleared');
     });
 
     // ---- 2x2 ----
     await step('2x2: a random scramble is solved optimally and plays to a solved cube', async () => {
-      await click('[data-size="2"]');
+      await pick('cube2');
       eq(await js('document.querySelectorAll("#net .sticker").length'), 24, '2x2 net');
       await click('#random');
       const start = await colours();
@@ -270,11 +282,11 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
         const f = SCAN_ORDER[k];
         await js(`document.querySelector('.pslot[data-face="${f}"]').scrollIntoView({block:'nearest'})`);
         for (let c = 0; c < 4; c++) {
-          const from = await js(`(() => { const q = window.__app.photos.${f}.quad[${c}]; return window.__app.photoPoint('${f}', q[0], q[1]); })()`);
+          const from = await js(`(() => { const q = window.__app.photos.${f}.corners[${c}]; return window.__app.photoPoint('${f}', q[0], q[1]); })()`);
           const to = await js(`window.__app.photoPoint('${f}', ${files[k].quad[c][0]}, ${files[k].quad[c][1]})`);
           await dragPath([from, { x: Math.round((from.x + to.x) / 2), y: Math.round((from.y + to.y) / 2) }, to]);
         }
-        const q = await js(`window.__app.photos.${f}.quad`);
+        const q = await js(`window.__app.photos.${f}.corners`);
         q.forEach((pt, c) => assert(Math.hypot(pt[0] - files[k].quad[c][0], pt[1] - files[k].quad[c][1]) < 6, `grid corner ${c} of photo ${k + 1} landed at ${pt}`));
       }
       await shot('5-photos');
@@ -289,7 +301,7 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
     await step('3x3 webcam scan: the fake camera shows the six faces; each face is read live, captured with Space, and lands in the net', async () => {
       assert(fakeVideo && fs.existsSync(fakeVideo), 'the fake video exists');
       const cube = scanCube(fakeSeed);
-      await click('[data-size="3"]');
+      await pick('cube3');
       await click('#t-camera');
       await click('#camStart');
       await waitFor('!!(window.__app.cam.stream && window.__app.cam.live)', 15000, 'live camera reading');
@@ -298,7 +310,7 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
         const f = SCAN_ORDER[k];
         const want = faceColours(cube, 3, f);
         assert(new RegExp(C.COLOUR_NAME[C.STANDARD_SCHEME[f]] + '-centred').test(await text('camSay')), 'instruction for ' + f + ': ' + await text('camSay'));
-        await waitFor(`JSON.stringify(window.__app.cam.live && window.__app.cam.live.guess) === ${JSON.stringify(JSON.stringify(want))}`, 20000, `the camera to show the ${f} face`);
+        await waitFor(`JSON.stringify(window.__app.cam.live && window.__app.cam.live.guess) === ${JSON.stringify(JSON.stringify(want))}`, 30000, `the camera to show the ${f} face`);
         if (k === 2) await shot('6-camera');
         await js('document.activeElement && document.activeElement.blur()');
         await key('Space');
@@ -314,6 +326,149 @@ exports.run = async ({ app, getWin, outFile, shotsDir, dialog, fakeVideo, fakeSe
       const p = await js('window.__app.player()');
       assert(p.total > 0 && C.isSolved(3, C.applyMoves(3, cube, p.moves)), 'scanned cube solved');
       return `camera: ${notes.camera}`;
+    });
+
+    // ---- every puzzle module present ----
+    const savePng = (file, img) => {
+      const bgra = Buffer.alloc(img.width * img.height * 4);
+      for (let i = 0; i < img.width * img.height; i++) { bgra[i * 4] = img.data[i * 4 + 2]; bgra[i * 4 + 1] = img.data[i * 4 + 1]; bgra[i * 4 + 2] = img.data[i * 4]; bgra[i * 4 + 3] = 255; }
+      fs.writeFileSync(file, nativeImage.createFromBitmap(bgra, { width: img.width, height: img.height }).toPNG());
+    };
+    const inWindow = await js('window.__app.ids');
+    const present = allPuzzles().filter((p) => inWindow.includes(p.id));
+    notes.puzzles = present.map((p) => p.id).join(' ');
+    await step(`every puzzle module present is offered in the picker, grouped (${present.map((p) => p.def.short).join(', ')})`, async () => {
+      eq(inWindow, present.map((p) => p.id), 'puzzles in the window');
+      const heads = await js('[...document.querySelectorAll("#pickList .pickhead")].map((h) => h.textContent)');
+      assert(heads[0] === 'Cubes', 'groups: ' + JSON.stringify(heads));
+      if (present.some((p) => p.group === 'Other puzzles')) assert(heads.includes('Other puzzles'), 'groups: ' + JSON.stringify(heads));
+      return heads.join(' / ');
+    });
+    for (const { id, def } of present) {
+      const P = def.puzzle;
+      const name = def.short;
+      let start = null;
+      await step(`${name}: picked, Random, Solve, step and jump to the end; the 3D view reads back solved`, async () => {
+        await pick(id);
+        await click('#reset');
+        eq(await js('document.querySelectorAll("#net .sticker").length'), P.size, 'stickers on the map');
+        eq(await js('window.__app.readBack()'), P.solvedColours(), '3D view of the solved puzzle');
+        await waitFor('/Solver ready/.test(document.getElementById("engine").textContent)', 120000, 'the ' + name + ' solver');
+        await click('#random');
+        start = await colours();
+        assert(!P.isSolved(start), 'scrambled');
+        eq(await js('window.__app.readBack()'), start, '3D view of the scramble');
+        await click('#solve');
+        await waitFor('window.__app.player().total > 0 || /can.t|could not|not shown|stopped|took too long/.test(document.getElementById("verdict").textContent)', 90000, 'a solution');
+        const p = await js('window.__app.player()');
+        assert(p.total > 0, 'no solution: ' + await text('verdict'));
+        const moves = P.parseMoves(p.moves.join(' '));
+        assert(P.isSolved(P.applyMoves(start, moves)), 'the moves solve it');
+        if (p.stages.length > 1) {
+          eq(await js('document.querySelectorAll("#chips .stagehead").length'), p.stages.length, 'stage titles in the move list');
+          assert(/^Stage 1 of/.test(await text('pStage')), 'current stage shown: ' + await text('pStage'));
+        }
+        await js('document.getElementById("speed").value = "3"; document.getElementById("speed").dispatchEvent(new Event("input"))');
+        for (let k = 1; k <= Math.min(2, p.total); k++) {
+          await click('#pFwd'); await sleep(30); await waitIdle();
+          eq(await js('window.__app.readBack()'), P.applyMoves(start, moves.slice(0, k)), `3D view after ${k} turns`);
+        }
+        await click('#pEnd'); await waitIdle();
+        const back = await js('window.__app.readBack()');
+        assert(P.isSolved(back), 'the 3D view ends solved');
+        await click('#pBack'); await sleep(30); await waitIdle();
+        eq(await js('window.__app.readBack()'), P.applyMoves(start, moves.slice(0, p.total - 1)), '3D view one turn back from the end');
+        await shot('p-' + id);
+        return `${p.total} turns in ${p.stages.length} ${p.stages.length === 1 ? 'stage' : 'stages'}: ${p.stages.map((s) => s.title).join(' / ')}`;
+      });
+      await step(`${name}: a broken state is refused with a plain-words problem`, async () => {
+        await click('#reset');
+        const solvedNow = await colours();
+        const fx = new Set(def.fixedStickers || []);
+        const i = P.stickers.find((s) => !fx.has(s.i)).i;
+        const other = P.colourKeys.find((c) => c !== solvedNow[i]);
+        const keyOf = await js(`(() => { const b = document.querySelector('.swatch[data-colour="${other}"] kbd'); return b && b.textContent.toLowerCase(); })()`);
+        await js('document.activeElement && document.activeElement.blur()');
+        await key(keyOf, [], true);
+        eq(await js('window.__app.S.paint'), other, 'colour picked with its key');
+        await clickSticker(i);
+        eq((await colours())[i], other, 'painted');
+        await click('#solve');
+        await waitFor('document.getElementById("problems").hidden === false', 4000, 'the problems');
+        const p = await problems();
+        assert(p.length >= 1 && p.every((t) => t.length > 10), JSON.stringify(p));
+        assert(/can't be solved/.test(await text('verdict')), 'verdict');
+        await click('#reset');
+        return p[0];
+      });
+      await step(`${name}: read from invented photos, one per face, after dragging each outline onto its face`, async () => {
+        const state = scrambled(def, 31);
+        const order = def.scan.faces.map((f) => f.face);
+        const files = [];
+        order.forEach((f, k) => {
+          const Wd = 400; const Hd = 300; const t = P.templates[f];
+          // where the face is in the photo: the outline placed off-centre, then tilted a little (a perspective / affine map)
+          const base = K.placeOutline(t, 190 + 6 * (k % 3), 150 - 4 * (k % 2), 200);
+          const n = base.length;
+          const warp = n === 3 ? K.fitMap([[0, 0], [1, 0], [0, 1]], [[0, 0], [1.04, 0.05], [-0.03, 0.97]]) : K.fitMap([[0, 0], [1, 0], [1, 1], [0, 1]], [[0, 0], [1, 0.03], [0.97, 1.02], [0.02, 0.96]]);
+          const corners = base.map(([x, y]) => { const q = K.mapPoint(warp, [(x - 100) / 200, (y - 50) / 200]); return [100 + q[0] * 200, 50 + q[1] * 200]; });
+          const light = def.scan.experimental ? [[1, 1, 1], [1.03, 1, 0.95], [0.92, 0.92, 0.94]][k % 3] : [[1, 1, 1], [1.12, 1, 0.76], [0.55, 0.55, 0.57], [0.95, 1, 1.08]][k % 4];
+          const img = renderTemplate(t, state, { width: Wd, height: Hd, corners, print: printFor(P.colours), light, noise: 4, glare: 0.3, seed: 300 + k });
+          const file = path.join(dir, `${id} face ${k + 1}.png`);
+          savePng(file, img);
+          files.push({ file, corners });
+        });
+        dialog.showOpenDialog = async () => ({ canceled: false, filePaths: files.map((x) => x.file) });
+        await click('#t-photos');
+        assert(/Experimental/.test(await text('photosExp')) && (await js('!document.getElementById("photosExp").hidden')) === !!def.scan.experimental, 'experimental badge');
+        await click('#photosPick');
+        await waitFor('!document.getElementById("photosRead").disabled', 10000, 'all photos loaded');
+        for (let k = 0; k < order.length; k++) {
+          const f = order[k];
+          await js(`document.querySelector('.pslot[data-face="${f}"]').scrollIntoView({block:'nearest'})`);
+          for (let c = 0; c < files[k].corners.length; c++) {
+            const from = await js(`(() => { const q = window.__app.photos[${JSON.stringify(f)}].corners[${c}]; return window.__app.photoPoint(${JSON.stringify(f)}, q[0], q[1]); })()`);
+            const to = await js(`window.__app.photoPoint(${JSON.stringify(f)}, ${files[k].corners[c][0]}, ${files[k].corners[c][1]})`);
+            await dragPath([from, { x: Math.round((from.x + to.x) / 2), y: Math.round((from.y + to.y) / 2) }, to]);
+          }
+          const q = await js(`window.__app.photos[${JSON.stringify(f)}].corners`);
+          q.forEach((pt, c) => assert(Math.hypot(pt[0] - files[k].corners[c][0], pt[1] - files[k].corners[c][1]) < 8, `outline corner ${c} of photo ${k + 1} landed at ${pt}`));
+        }
+        await shot('photos-' + id);
+        await click('#photosRead');
+        await waitFor('!document.getElementById("tab-fill").hidden', 4000, 'back on the map');
+        const got = await colours();
+        const wrong = got.map((c, i) => i).filter((i) => got[i] !== state[i]);
+        assert(!wrong.length, `${wrong.length} stickers read wrong: ${wrong.slice(0, 8).join(', ')}`);
+        return `${order.length} photos, ${P.size} stickers read right`;
+      });
+    }
+
+    const camDef = camPuzzle();
+    await step(`${camDef.short} webcam scan: the outline is a ${K.outlineCorners(camDef.puzzle.templates[camDef.scan.faces[0].face]).length}-cornered shape; each face is read live and captured`, async () => {
+      const P = camDef.puzzle;
+      const want = scrambled(camDef, fakeSeed);
+      await pick(camDef.id);
+      await click('#t-camera');
+      await click('#camStart');
+      await waitFor('!!(window.__app.cam.stream && window.__app.cam.live)', 15000, 'live camera reading');
+      const order = camDef.scan.faces;
+      for (let k = 0; k < order.length; k++) {
+        const f = order[k].face;
+        assert((await text('camSay')) === order[k].say, 'instruction for ' + f + ': ' + await text('camSay'));
+        const expect = P.templates[f].stickers.map((s) => want[s.i]);
+        await waitFor(`!!window.__app.cam.live && window.__app.cam.live.face === ${JSON.stringify(f)} && JSON.stringify(window.__app.cam.live.guess) === ${JSON.stringify(JSON.stringify(expect))}`, 30000, `the camera to show the ${f} face`);
+        if (k === 1) await shot('camera-' + camDef.id);
+        await js('document.activeElement && document.activeElement.blur()');
+        await key('Space');
+        if (k < order.length - 1) await waitFor(`!!window.__app.cam.captured[${JSON.stringify(f)}]`, 2000, 'captured ' + f);
+      }
+      await waitFor('!document.getElementById("tab-fill").hidden', 4000, 'back on the map after the last face');
+      eq(await colours(), want, 'the scanned puzzle');
+      await solveAndWait();
+      const p = await js('window.__app.player()');
+      assert(p.total > 0 && P.isSolved(P.applyMoves(want, p.moves.join(' '))), 'scanned puzzle solved');
+      return `${order.length} faces`;
     });
 
     await step('no errors in the window console', async () => { eq(errors, [], 'console errors'); });

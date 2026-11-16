@@ -257,5 +257,242 @@
     });
   }
 
-  return { COLOURS, TYPICAL, TYPICAL_LAB, rgbToLab, linToLab, toLinear, fromLinear, dist, quadPoint, gridCells, rotateQuad, squareQuad, sampleFace, hungarian, assignEqual, classify3, classify2, liveGuess, median };
+  // ---- any puzzle: face templates (outline + sticker polygons) instead of a square grid ------------------------------------
+  // A face template (puzzle.templates[face]) is flat, in its own units, y DOWN. The user places the outline's corners on the
+  // picture (3 for a triangle, 4 for a square or rectangle, 5 for a pentagon); the template is mapped onto the picture with an
+  // affine map (3 corners) or a perspective map (4 corners exactly, 5 by least squares), and every sticker is sampled in the
+  // middle part of its polygon.
+  const area2 = (pts) => { let a = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i]; const q = pts[(i + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; } return a; };
+  /** The outline's corners, clockwise on screen, starting at the top-left-most one. */
+  function outlineCorners(template) {
+    let pts = template.outline.map((p) => [p[0], p[1]]);
+    if (area2(pts) < 0) pts = pts.reverse();
+    let k = 0;
+    pts.forEach((p, i) => { if (p[0] + p[1] < pts[k][0] + pts[k][1] - 1e-9) k = i; });
+    return pts.slice(k).concat(pts.slice(0, k));
+  }
+  /** Where the outline's corners go for a template centred at (cx, cy), its larger side `size` long. */
+  function placeOutline(template, cx, cy, size) {
+    const b = template.box; const s = size / Math.max(b.w, b.h);
+    const mx = (b.minX + b.maxX) / 2; const my = (b.minY + b.maxY) / 2;
+    return outlineCorners(template).map(([x, y]) => [cx + (x - mx) * s, cy + (y - my) * s]);
+  }
+  /** Turns the corner assignment one corner on (a quarter for squares, a third for triangles, a fifth for pentagons). */
+  const rotateCorners = (corners) => [corners[corners.length - 1], ...corners.slice(0, -1)];
+  function solveLinear(A, b) { // Gaussian elimination with partial pivoting
+    const n = b.length; const M = A.map((row, i) => [...row, b[i]]);
+    for (let c = 0; c < n; c++) {
+      let piv = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+      [M[c], M[piv]] = [M[piv], M[c]];
+      if (Math.abs(M[c][c]) < 1e-12) return null;
+      for (let r = 0; r < n; r++) { if (r === c) continue; const f = M[r][c] / M[c][c]; if (f) for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+    }
+    return M.map((row, i) => row[n] / row[i]);
+  }
+  /** A 3x3 matrix (row-major) mapping the points src onto dst: affine for 3 points, perspective for 4 or more. */
+  function fitMap(src, dst) {
+    if (src.length === 3) {
+      const A = []; const b = [];
+      src.forEach(([x, y], i) => { A.push([x, y, 1, 0, 0, 0]); b.push(dst[i][0]); A.push([0, 0, 0, x, y, 1]); b.push(dst[i][1]); });
+      const h = solveLinear(A, b);
+      return h ? [h[0], h[1], h[2], h[3], h[4], h[5], 0, 0, 1] : null;
+    }
+    const rows = []; const rhs = [];
+    src.forEach(([x, y], i) => {
+      const [u, v] = dst[i];
+      rows.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); rhs.push(u);
+      rows.push([0, 0, 0, x, y, 1, -v * x, -v * y]); rhs.push(v);
+    });
+    let h;
+    if (rows.length === 8) h = solveLinear(rows, rhs);
+    else { // least squares: (A^T A) h = A^T b
+      const AtA = Array.from({ length: 8 }, (_, i) => Array.from({ length: 8 }, (_, j) => rows.reduce((s, r) => s + r[i] * r[j], 0)));
+      const Atb = Array.from({ length: 8 }, (_, i) => rows.reduce((s, r, k) => s + r[i] * rhs[k], 0));
+      h = solveLinear(AtA, Atb);
+    }
+    return h ? [...h, 1] : null;
+  }
+  const mapPoint = (H, [x, y]) => { const w = H[6] * x + H[7] * y + H[8]; return [(H[0] * x + H[1] * y + H[2]) / w, (H[3] * x + H[4] * y + H[5]) / w]; };
+  function invertMap(m) {
+    const [a, b, c, d, e, f, g, h, i] = m;
+    const A = e * i - f * h; const B = -(d * i - f * g); const Cc = d * h - e * g;
+    const det = a * A + b * B + c * Cc;
+    return [A / det, -(b * i - c * h) / det, (b * f - c * e) / det, B / det, (a * i - c * g) / det, -(a * f - c * d) / det, Cc / det, -(a * h - b * g) / det, (a * e - b * d) / det];
+  }
+  const polyCentre = (poly) => { const n = poly.length; return [poly.reduce((s, p) => s + p[0], 0) / n, poly.reduce((s, p) => s + p[1], 0) / n]; };
+  const shrink = (poly, k) => { const c = polyCentre(poly); return poly.map(([x, y]) => [c[0] + (x - c[0]) * k, c[1] + (y - c[1]) * k]); };
+  function insidePoly(q, x, y) {
+    let ins = false;
+    for (let i = 0, j = q.length - 1; i < q.length; j = i++) {
+      const [xi, yi] = q[i]; const [xj, yj] = q[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) ins = !ins;
+    }
+    return ins;
+  }
+  /** The map from the template onto the picture, for these outline corners (in the order outlineCorners gives). */
+  const templateMap = (template, corners) => fitMap(outlineCorners(template), corners);
+  /** Every sticker of the template on the picture: { i, centre, poly, inner } (inner = the sampled middle part). */
+  function templateCells(template, corners, inner = 0.5) {
+    const H = templateMap(template, corners);
+    if (!H) return [];
+    return template.stickers.map((s) => {
+      const c = polyCentre(s.poly);
+      return { i: s.i, centre: mapPoint(H, c), poly: s.poly.map((p) => mapPoint(H, p)), inner: shrink(s.poly, inner).map((p) => mapPoint(H, p)) };
+    });
+  }
+  /** Samples every sticker of one face (template order). Same reading as sampleFace: a median in Lab of the middle part. */
+  function sampleTemplate(img, template, corners, { inner = 0.5, steps = 9 } = {}) {
+    const H = templateMap(template, corners);
+    return template.stickers.map((s) => {
+      const poly = shrink(s.poly, inner);
+      let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+      for (const [x, y] of poly) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); }
+      const L = []; const A = []; const B = []; const R = []; const G = []; const Bl = [];
+      const n = poly.length === 4 ? steps : steps + 3; // a triangle or pentagon fills less of its box
+      for (let i = 0; i < n && H; i++) {
+        for (let j = 0; j < n; j++) {
+          const tx = minX + ((maxX - minX) * (j + 0.5)) / n; const ty = minY + ((maxY - minY) * (i + 0.5)) / n;
+          if (poly.length !== 4 && !insidePoly(poly, tx, ty)) continue;
+          const [x, y] = mapPoint(H, [tx, ty]);
+          const px = Math.round(x); const py = Math.round(y);
+          if (!(px >= 0 && py >= 0 && px < img.width && py < img.height)) continue;
+          const o = (py * img.width + px) * 4;
+          const r = img.data[o]; const g = img.data[o + 1]; const b = img.data[o + 2];
+          const lab = linToLab(LIN[r], LIN[g], LIN[b]);
+          L.push(lab[0]); A.push(lab[1]); B.push(lab[2]); R.push(r); G.push(g); Bl.push(b);
+        }
+      }
+      if (!L.length) return { i: s.i, lab: [0, 0, 0], rgb: [0, 0, 0], spread: 999, outside: true };
+      const lab = [median(L), median(A), median(B)];
+      const spread = median(L.map((l, k) => dist([l, A[k], B[k]], lab)));
+      return { i: s.i, lab, rgb: [median(R), median(G), median(Bl)], spread };
+    });
+  }
+
+  // ---- any number of colours, known counts ---------------------------------------------------------------------------------------
+  const hexRgb = (hex) => { const h = String(hex).replace('#', ''); return [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16)); };
+  const TYPICAL_BY_NAME = { white: TYPICAL.w, yellow: TYPICAL.y, green: TYPICAL.g, blue: TYPICAL.b, red: TYPICAL.r, orange: TYPICAL.o };
+  /** What a camera typically sees for each colour of a puzzle (the six cube colours as measured, others from their hex). */
+  function typicalFor(colours) {
+    return Object.fromEntries(Object.entries(colours).map(([k, c]) => [k, (TYPICAL_BY_NAME[String(c.name).toLowerCase()] || hexRgb(c.hex)).slice()]));
+  }
+  /** Gives each item a group, counts[g] items per group, minimising the summed cost. */
+  function assignCounts(cost, counts, fixed = {}) {
+    const n = cost.length; const BIG = 1e9;
+    if (counts.reduce((s, x) => s + x, 0) !== n) throw new Error('assignCounts: counts do not add up');
+    const colGroup = []; counts.forEach((k, g) => { for (let j = 0; j < k; j++) colGroup.push(g); });
+    const m = cost.map((row, i) => colGroup.map((g) => (fixed[i] != null ? (fixed[i] === g ? 0 : BIG) : row[g])));
+    return hungarian(m).map((col) => colGroup[col]);
+  }
+  /** solveLighting for faces of any sizes and any number of groups with known counts. */
+  function lightingCounts(faces, counts, initRefsLin, fixed, rounds = 6) {
+    const all = faces.flat(); const faceOf = []; faces.forEach((f, k) => f.forEach(() => faceOf.push(k)));
+    const lin = all.map(linOf);
+    const gains = faces.map(() => [1, 1, 1]);
+    let refsLin = initRefsLin.map((r) => r.slice());
+    let groups = null;
+    for (let round = 0; round < rounds; round++) {
+      const corrected = lin.map((x, i) => { const g = gains[faceOf[i]]; return labOfLin([x[0] / g[0], x[1] / g[1], x[2] / g[2]]); });
+      const refLab = refsLin.map(labOfLin);
+      const next = assignCounts(corrected.map((lab) => refLab.map((ref) => dist(lab, ref))), counts, fixed);
+      const same = groups && next.every((g, i) => g === groups[i]);
+      groups = next;
+      if (same && round > 1) break;
+      for (let f = 0; f < faces.length; f++) {
+        for (let ch = 0; ch < 3; ch++) {
+          let num = 0; let den = 0;
+          for (let i = 0; i < all.length; i++) { if (faceOf[i] !== f) continue; const ref = refsLin[groups[i]][ch]; num += lin[i][ch] * ref; den += ref * ref; }
+          gains[f][ch] = den > 1e-9 ? Math.max(0.05, num / den) : 1;
+        }
+      }
+      for (let ch = 0; ch < 3; ch++) {
+        const mean = Math.exp(gains.reduce((s, g) => s + Math.log(g[ch]), 0) / gains.length);
+        for (const g of gains) g[ch] /= mean;
+      }
+      refsLin = refsLin.map((old, grp) => {
+        const sum = [0, 0, 0]; let k = 0;
+        groups.forEach((gg, i) => { if (gg !== grp) return; const g = gains[faceOf[i]]; for (let ch = 0; ch < 3; ch++) sum[ch] += lin[i][ch] / g[ch]; k++; });
+        return k ? sum.map((s) => s / k) : old;
+      });
+    }
+    return { groups, refsLin, gains, faceOf };
+  }
+  /**
+   * Any puzzle. faces: arrays of samples (one array per scanned face, any sizes). keys: the colour keys; counts: how many
+   * stickers of each colour the puzzle has (same order); typical: key -> typical sRGB; fixed: flat sample index -> colour key
+   * for stickers whose colour is known (centres that never move); white: the key of white, if the puzzle has it. When every colour has a known sticker those are the
+   * references (as for the 3x3); otherwise the samples are clustered into groups of exactly the right sizes and the groups are
+   * named by the nearest typical colours (as for the 2x2). Returns { colours (flat, input order), unsure (flat indices), gains }.
+   */
+  function classifyCounts(faces, { keys, counts, typical, fixed = {}, white = keys.includes('w') ? 'w' : null }) {
+    const all = faces.flat();
+    if (all.length !== counts.reduce((s, x) => s + x, 0)) throw new Error('The pictures do not have the right number of stickers');
+    const typLab = keys.map((k) => rgbToLab(typical[k]));
+    const fixedIdx = {}; for (const [i, k] of Object.entries(fixed)) fixedIdx[i] = keys.indexOf(k);
+    const known = new Set(Object.values(fixedIdx));
+    let lit; let names;
+    if (keys.every((_, g) => known.has(g))) {
+      const lin = all.map(linOf);
+      const init = keys.map((_, g) => {
+        const mine = Object.keys(fixedIdx).filter((i) => fixedIdx[i] === g).map((i) => lin[i]);
+        return [0, 1, 2].map((ch) => mine.reduce((s, x) => s + x[ch], 0) / mine.length);
+      });
+      lit = lightingCounts(faces, counts, init, fixedIdx);
+      names = keys.slice();
+    } else {
+      const K = keys.length;
+      let centres = typLab.map((c) => c.slice());
+      let groups = null;
+      for (let it = 0; it < 12; it++) {
+        const cost = all.map((s) => centres.map((c) => dist(s.lab, c)));
+        groups = it < 3 ? cost.map((row) => row.indexOf(Math.min(...row))) : assignCounts(cost, counts);
+        centres = centres.map((old, g) => {
+          const mine = all.filter((_, i) => groups[i] === g);
+          return mine.length ? [0, 1, 2].map((k) => mine.reduce((s, x) => s + x.lab[k], 0) / mine.length) : old;
+        });
+      }
+      groups = assignCounts(all.map((s) => centres.map((c) => dist(s.lab, c))), counts);
+      const lin = all.map(linOf);
+      const initLin = keys.map((_, g) => {
+        const mine = lin.filter((_, i) => groups[i] === g);
+        return mine.length ? [0, 1, 2].map((k) => mine.reduce((s, x) => s + x[k], 0) / mine.length) : typical[keys[g]].map(toLinear);
+      });
+      lit = lightingCounts(faces, counts, initLin, {});
+      // name the groups: white balance on the brightest, least colourful group if the puzzle has white, then the nearest
+      // typical colours, one name per group, only among colours with as many stickers as the group
+      const labs = lit.refsLin.map(labOfLin);
+      const wKey = white == null ? -1 : keys.indexOf(white);
+      let wb = [1, 1, 1];
+      if (wKey >= 0) {
+        const whiteIdx = labs.map((l, i) => [l[0] - 1.5 * Math.hypot(l[1], l[2]), i]).sort((a, b) => b[0] - a[0])[0][1];
+        const wl = lit.refsLin[whiteIdx]; const tw = typical[keys[wKey]].map(toLinear);
+        wb = wl.map((v, k) => (v > 1e-6 ? tw[k] / v : 1));
+      }
+      const balanced = lit.refsLin.map((r) => labOfLin(r.map((v, k) => v * wb[k])));
+      const nameCost = balanced.map((lab, g) => typLab.map((t, k) => dist(lab, t) + (counts[k] === counts[g] ? 0 : 1e6)));
+      names = hungarian(nameCost).map((k) => keys[k]);
+      for (let g = 0; g < K; g++) if (!names[g]) names[g] = keys[g];
+    }
+    const colours = lit.groups.map((g) => names[g]);
+    const refLab = lit.refsLin.map(labOfLin);
+    const unsure = [];
+    all.forEach((s, i) => {
+      const g = lit.gains[lit.faceOf[i]];
+      const lab = labOfLin(linOf(s).map((v, k) => v / g[k]));
+      const d = refLab.map((r) => dist(lab, r));
+      const mine = d[lit.groups[i]];
+      const other = Math.min(...d.filter((_, k) => k !== lit.groups[i]));
+      if (other - mine < 8 || s.spread > 25) unsure.push(i);
+    });
+    return { colours, unsure, gains: lit.gains };
+  }
+  /** Quick guess for the live camera preview, any colour set: nearest of refs[key] (Lab) or the typical colour. */
+  function liveGuessKeys(samples, keys, typical, refs = {}) {
+    const refLab = keys.map((k) => (refs[k] ? refs[k] : rgbToLab(typical[k])));
+    return samples.map((s) => { const d = refLab.map((r) => dist(s.lab, r)); return keys[d.indexOf(Math.min(...d))]; });
+  }
+
+  return { COLOURS, TYPICAL, TYPICAL_LAB, rgbToLab, linToLab, toLinear, fromLinear, dist, quadPoint, gridCells, rotateQuad, squareQuad, sampleFace, hungarian, assignEqual, classify3, classify2, liveGuess, median,
+    outlineCorners, placeOutline, rotateCorners, fitMap, mapPoint, invertMap, templateMap, templateCells, sampleTemplate, insidePoly, polyCentre, shrink,
+    hexRgb, typicalFor, assignCounts, classifyCounts, liveGuessKeys };
 }));

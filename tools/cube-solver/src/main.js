@@ -2,8 +2,8 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, session, clipboard } = require('electron');
 const fs = require('original-fs');
 const path = require('path');
-const C = require('./cube');
 const { Engine } = require('./engine');
+const Registry = require('./puzzles');
 
 const E2E = process.argv.includes('--e2e');
 const SELFTEST = process.argv.find((a) => a.startsWith('--self-test='));
@@ -19,6 +19,13 @@ if (E2E || SELFTEST) {
   }
 }
 
+// The puzzles that are present (each one a module + a solver). The end-to-end test adds its own small test puzzles.
+const TEST_PUZZLES = (E2E || SELFTEST) && process.argv.includes('--test-puzzles')
+  ? ['tetra', 'box221'].map((id) => ({ id, puzzlePath: path.join(__dirname, '..', 'test', 'puzzles', id + '.js'), solverPath: path.join(__dirname, '..', 'test', 'puzzles', 'solvers', id + '.js'), group: 'Test puzzles' }))
+  : [];
+const PUZZLES = Registry.loadAll({ extra: TEST_PUZZLES, warn: (w) => console.warn('puzzle left out: ' + w) });
+const BY_ID = new Map(PUZZLES.map((p) => [p.id, p]));
+
 const PHOTO_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif', 'avif'];
 const PHOTO_LIMIT = 60 * 1024 * 1024;
 const TEXT_LIMIT = 1024 * 1024;
@@ -32,14 +39,14 @@ const cleanError = (e) => String((e && e.message) || e);
 
 function startEngine() {
   if (engine) return engine;
-  engine = new Engine({ onStatus: (s) => { lastStatus = s; send('solver:status', s); } });
+  engine = new Engine({ puzzles: PUZZLES, onStatus: (s) => { lastStatus = s; send('solver:status', s); } });
   return engine;
 }
 
 function createWindow() {
   win = new BrowserWindow({
     width: 1240, height: 840, minWidth: 1040, minHeight: 680,
-    backgroundColor: '#0b0b0d', title: "Rubik's Cube Solver", autoHideMenuBar: true, show: !SELFTEST,
+    backgroundColor: '#0b0b0d', title: 'Cube Solver', autoHideMenuBar: true, show: !SELFTEST,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
   });
   Menu.setApplicationMenu(null);
@@ -65,18 +72,39 @@ function setUpPermissions() {
 
 // ---- solving ------------------------------------------------------------------------------------------------------------
 ipcMain.handle('solver:status', () => lastStatus || (engine && engine.status) || null);
-ipcMain.handle('solver:solve', async (_e, size, faces) => {
-  if (size !== 2 && size !== 3) throw new Error('Only 2x2 and 3x3 cubes can be solved');
-  const want = size === 3 ? 54 : 24;
-  if (typeof faces !== 'string' || faces.length !== want || !/^[URFDLB]+$/.test(faces)) throw new Error('That cube description is not valid');
-  // check it again here: the worker must only ever see a real, solvable cube
-  const v = C.validate(size, faces.split('').map((f) => C.STANDARD_SCHEME[f]));
-  if (!v.ok) throw new Error(v.summary);
-  if (size === 3 && v.faces.join('') !== faces) throw new Error('That cube description is not valid');
-  if (v.solved) return { moves: [], ms: 0 };
+// which puzzles the window can offer, and where it loads each module from (relative to the window's own folder)
+const forWindow = (file) => path.relative(path.join(__dirname, 'renderer'), file).split(path.sep).join('/');
+// helpers a module needs first (its require('./x') of files next to it, e.g. cuboid-kit.js), deepest first
+function helpersOf(file, seen = new Set()) {
+  const out = [];
+  let src = '';
+  try { src = fs.readFileSync(file, 'utf8'); } catch { return out; }
+  for (const m of src.matchAll(/require\(\s*['"]\.\/([\w.-]+?)(?:\.js)?['"]\s*\)/g)) {
+    const dep = path.join(path.dirname(file), m[1] + '.js');
+    if (seen.has(dep) || !fs.existsSync(dep)) continue;
+    seen.add(dep);
+    out.push(...helpersOf(dep, seen), dep);
+  }
+  return out;
+}
+ipcMain.handle('puzzles:list', () => PUZZLES.map((p) => ({
+  id: p.id, group: p.group,
+  src: forWindow(p.puzzlePath),
+  helpers: helpersOf(p.puzzlePath).map(forWindow),
+})));
+ipcMain.handle('solver:want', (_e, id) => { if (typeof id === 'string' && BY_ID.has(id)) startEngine().want(id); return true; });
+ipcMain.handle('solver:solve', async (_e, id, colours) => {
+  const p = typeof id === 'string' && BY_ID.get(id);
+  if (!p) throw new Error('That puzzle is not available');
+  const P = p.def.puzzle;
+  if (!Array.isArray(colours) || colours.length !== P.size || !colours.every((c) => c === null || Object.prototype.hasOwnProperty.call(P.colours, c))) throw new Error('That puzzle description is not valid');
+  // check it again here: the worker must only ever see a real, solvable puzzle
+  const v = p.def.validate(colours);
+  if (!v.ok) throw new Error(v.summary || (v.errors && v.errors[0] && v.errors[0].text) || 'This puzzle cannot be solved as filled in');
+  if (P.isSolved(colours)) return { moves: '', stages: [], ms: 0 };
   const eng = startEngine();
-  await eng.whenReady(size);
-  return eng.solve(size, faces.split(''));
+  const r = await eng.solve(p.id, colours);
+  return { moves: r.text, stages: r.stages, ms: r.ms, solverMs: r.solverMs };
 });
 
 // ---- small conveniences ----------------------------------------------------------------------------------------------------
@@ -88,7 +116,7 @@ ipcMain.handle('clipboard:write', (_e, text) => {
 
 ipcMain.handle('solution:save', async (_e, text) => {
   if (typeof text !== 'string' || !text || text.length > TEXT_LIMIT) throw new Error('Nothing to save');
-  const pick = await dialog.showSaveDialog(win, { title: 'Save the solution', defaultPath: 'cube-solution.txt', filters: [{ name: 'Text', extensions: ['txt'] }] });
+  const pick = await dialog.showSaveDialog(win, { title: 'Save the solution', defaultPath: 'puzzle-solution.txt', filters: [{ name: 'Text', extensions: ['txt'] }] });
   if (pick.canceled || !pick.filePath) return { ok: false, cancelled: true };
   let out = pick.filePath;
   if (!/\.txt$/i.test(out)) out = freeName(out + '.txt'); // the dialog only asked about the name without .txt
@@ -106,13 +134,13 @@ function freeName(p) {
 // Photos are read here (the window is sandboxed) and handed over as bytes; they are only read, never changed.
 ipcMain.handle('photos:pick', async (_e, multi) => {
   const r = await dialog.showOpenDialog(win, {
-    title: multi ? 'Choose photos of the six faces' : 'Choose a photo of this face',
+    title: multi ? 'Choose photos of the faces, in order' : 'Choose a photo of this face',
     properties: multi ? ['openFile', 'multiSelections'] : ['openFile'],
     filters: [{ name: 'Pictures', extensions: PHOTO_EXTS }],
   });
   if (r.canceled) return [];
   const out = [];
-  for (const file of r.filePaths.slice(0, 6)) {
+  for (const file of r.filePaths.slice(0, 12)) {
     const ext = path.extname(file).slice(1).toLowerCase();
     if (!PHOTO_EXTS.includes(ext)) { out.push({ name: path.basename(file), error: 'Not a picture this tool can read' }); continue; }
     try {
@@ -136,7 +164,7 @@ if (SELFTEST) {
     const outFile = SELFTEST.slice('--self-test='.length);
     let code = 1;
     try {
-      const results = await require('./selftest').run({ getWin: () => win, engine });
+      const results = await require('./selftest').run({ getWin: () => win, engine, puzzles: PUZZLES });
       fs.writeFileSync(outFile, JSON.stringify({ ok: results.every((r) => r.ok), results }, null, 2));
       code = results.every((r) => r.ok) ? 0 : 1;
     } catch (e) {
@@ -155,7 +183,8 @@ else {
     if (E2E) {
       win.webContents.once('did-finish-load', () => {
         const ctx = { app, getWin: () => win, outFile: argValue('--e2e-out'), shotsDir: argValue('--shots'), outDir: argValue('--readme-shots'), fakeVideo: argValue('--fake-video'), fakeSeed: Number(argValue('--fake-seed')) || 0, dialog };
-        if (ctx.outDir) require('../test/readme-shots').run(ctx); else require('../test/e2e').run(ctx);
+        const probe = argValue('--probe'); // tests only: run another driver script (for looking at the window while developing)
+        if (probe) require(path.resolve(probe)).run(ctx); else if (ctx.outDir) require('../test/readme-shots').run(ctx); else require('../test/e2e').run(ctx);
       });
     }
   });

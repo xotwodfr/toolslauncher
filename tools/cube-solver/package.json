@@ -1,8 +1,8 @@
 {
   "name": "cube-solver",
   "productName": "Cube Solver",
-  "version": "0.1.0",
-  "description": "Solve a 3x3 or 2x2 Rubik's cube: fill it in or scan it with a webcam or photos, then follow the solution on an animated 3D cube. Offline.",
+  "version": "0.2.0",
+  "description": "Solve a Rubik's cube (3x3, 2x2, 4x4, 5x5), a 3x3x2 or 3x2x2 cuboid, a Pyraminx or a Megaminx: fill it in or scan it with a webcam or photos, then follow the solution step by step on an animated 3D puzzle. Offline.",
   "main": "src/main.js",
   "license": "MIT",
   "author": {
@@ -12,7 +12,8 @@
   "homepage": "https://github.com/xotwodfr/toolslauncher",
   "scripts": {
     "start": "node ../../node_modules/electron/cli.js .",
-    "test": "node test/cube.test.js",
+    "test": "node test/cube.test.js && node test/cuboids.test.js && node test/pyraminx.test.js && node test/megaminx.test.js",
+    "test:all": "npm test && node test/bigcubes.test.js",
     "e2e": "node test/run-e2e.js",
     "dist:win": "node ../../node_modules/electron-builder/cli.js --win zip --publish never",
     "dist:linux": "node ../../node_modules/electron-builder/cli.js --linux zip --publish never"

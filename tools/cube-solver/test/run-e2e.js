@@ -1,8 +1,9 @@
 'use strict';
 // `npm run e2e`: starts the app in end-to-end mode (a real window, driven with real input) and prints the report.
 //   node test/run-e2e.js [--shots=<folder for screenshots>]
-// It first writes an invented webcam video (.y4m) of the six faces of a known scrambled cube; only in this mode the app is
-// told to use it as a fake camera, so the scan is tested for real on known colours.
+// It first writes an invented webcam video (.y4m) of the six faces of a known scrambled cube and the faces of a non-cube
+// puzzle; only in this mode the app is told to use it as a fake camera (and to offer two small test puzzles too), so the
+// scan is tested for real on known colours.
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -15,10 +16,10 @@ const shots = (process.argv.find((a) => a.startsWith('--shots=')) || '').slice(8
 const SEED = 4242;
 scanVideo(video, SEED);
 const electron = require(path.join(__dirname, '..', '..', '..', 'node_modules', 'electron'));
-const args = [path.join(__dirname, '..'), '--e2e', `--e2e-out=${out}`, `--fake-video=${video}`, `--fake-seed=${SEED}`];
+const args = [path.join(__dirname, '..'), '--e2e', '--test-puzzles', `--e2e-out=${out}`, `--fake-video=${video}`, `--fake-seed=${SEED}`];
 if (shots) args.push(`--shots=${path.resolve(shots)}`);
 const child = spawn(electron, args, { stdio: 'inherit' });
-const timer = setTimeout(() => { console.error('e2e timed out'); child.kill(); }, 420000);
+const timer = setTimeout(() => { console.error('e2e timed out'); child.kill(); }, 1200000);
 child.on('exit', (code) => {
   clearTimeout(timer);
   try { fs.rmSync(video, { force: true }); } catch { /* ignore */ }

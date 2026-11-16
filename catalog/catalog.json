@@ -264,11 +264,11 @@
     {
       "id": "cube-solver",
       "name": "Rubik's Cube Solver",
-      "description": "Solve a 3x3 or 2x2 Rubik's cube: fill it in or scan it with a webcam or photos, then follow the turns on an animated 3D cube.",
+      "description": "Solve a 3x3, 2x2, 4x4, 5x5, 3x3x2, 3x2x2, Pyraminx or Megaminx: fill it in or scan it with a webcam or photos, then follow the turns, stage by stage, on an animated 3D puzzle.",
       "category": "Puzzles",
       "glyph": "▦",
       "accent": "#ff5d8f",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "platforms": {}
     },
     {

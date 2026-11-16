@@ -34,7 +34,7 @@ A small desktop launcher (Windows and Linux) that installs, updates and starts a
 | **Photo Batch Editor** | Applies **one recipe of edits to many photos**: resize, crop to an aspect (with a smart subject-finding anchor), rotate / flip, auto-orient, auto levels, brightness / contrast / saturation / warmth, sharpen, black & white or sepia, border, **text and logo watermarks**, rounded corners. Steps run in the order you set. Live **before/after preview**, presets, rename patterns, photo info kept or stripped; originals are never touched. |
 | **Subtitle Maker** | Listens to a video or audio file and writes **subtitles**, offline (the Whisper model, 99 languages, optional **translate to English**), following the usual rules: two lines, 42 characters, 1–7 s each, a readable speed. Watch them over the video, fix any word or time, split, merge, shift, stamp at the playhead, then save `.srt` / `.vtt` or write a new MP4 with them **burnt in** or as a **subtitle track**. The original file is never changed. |
 | **Audio Inspector** | Shows what is **really** inside audio files, a batch or a whole folder at a time: catches **fake lossless** files (a FLAC/WAV made from an MP3: "Fake lossless file … the sound stops at 16 kHz"), **upsampled** hi-res and **padded 24-bit**, with a spectrogram and the cutoff marked. Also the true format, bitrate, peak and true peak, loudness (LUFS), dynamic range, clipping, DC offset, mono-in-stereo and silence, with a CSV or text report. Files are only read, never changed. |
-| **Rubik's Cube Solver** | Solves a **3x3 or 2x2** cube: fill it in on a net or **scan it** with a webcam or six photos, get told in plain words if the cube is impossible (twisted corner, flipped edge, swapped pieces), and follow the solution (3x3: at most 22 turns; 2x2: the fewest possible) on an **animated 3D cube** you can step through. |
+| **Rubik's Cube Solver** | Solves a **3x3, 2x2, 4x4, 5x5, 3x3x2, 3x2x2, Pyraminx or Megaminx**: fill it in or **scan it** with a webcam or photos, get told in plain words if the puzzle is impossible, and follow the solution on an **animated 3D puzzle**: the fewest turns for the 2x2, 3x2x2, 3x3x2 and Pyraminx (3x3: at most 22), and a human method in named stages for the 4x4, 5x5 and Megaminx. |
 | **Photo Cleanup** | **Removes unwanted things** from photos (tap an object and it is outlined automatically, or paint over it) and **extends photos** wider or taller with matching edges (square, 4:5, 3:2, 16:9, 9:16 or free). Before/after compare, undo history; untouched pixels stay exactly as they were. |
 
 <p>
@@ -246,21 +246,13 @@ No tool overwrites your original files. (Music Player never changes a song; when
 
 ### Rubik's Cube Solver
 
-- **Fill it in** on an unfolded net (click, drag-paint, or keys 1-6 and the arrows), or **scan it**: with a webcam (a grid over the picture, the app says which face to show and how to hold it, and reads the colours live; Capture with <kbd>Space</kbd>), or from six photos with a grid you drag onto each face. Scanned colours land on the net, where any sticker can be fixed; doubtful ones are outlined.
-- **Colours are read** from the middle of each sticker and compared with the centres (3x3) or grouped into six sets of four (2x2), with a light correction per face, so a warm lamp or a dim side still reads right.
-- **Impossible cubes are explained** in plain words (wrong colour counts, a corner with two whites, a twisted corner, a flipped edge, two swapped pieces) and the stickers are marked on the net.
-- **Solutions:** 3x3 in at most 22 turns (Kociemba's two-phase method, then about a second looking for shorter ones); 2x2 in the fewest possible turns. Every solution is checked before it is shown.
-- **Animated 3D cube:** play, pause, step, jump to any turn, change the speed, view it from the front or turn it around; copy or save the turns.
+- **Eight puzzles:** 3x3, 2x2, 4x4, 5x5, 3x3x2 (Domino), 3x2x2, Pyraminx and Megaminx, picked from a list at the top.
+- **Fill it in** on an unfolded map of the puzzle (click, drag-paint, or the number keys and arrows), or **scan it**: with a webcam (an outline of the face over the picture, the app says which face to show and how to hold it) or from photos, dragging the outline's corners onto each face. Pyraminx and Megaminx scanning is marked Experimental; any sticker can be fixed on the map.
+- **Colours are read** from the middle of each sticker and assigned knowing how many of each colour the puzzle has, with a light correction per face.
+- **Impossible puzzles are explained** in plain words (wrong colour counts, impossible pieces, a twisted corner, a flipped edge, swapped pieces, parity that cannot happen on that puzzle) and the stickers are marked on the map.
+- **Solutions:** the fewest possible turns for the 2x2, 3x2x2, 3x3x2 and Pyraminx; 3x3 in at most 22 turns (Kociemba's two-phase method). The 4x4 and 5x5 use the reduction method (centres, pair the edges, parity fixes, solve it like a 3x3) and the Megaminx the beginner layer-by-layer method, each in named stages. Every solution is checked before it is shown.
+- **Animated 3D puzzle:** play, pause, step, jump to any turn, change the speed, see the current stage; view it from the front or turn it around; copy or save the turns with the stage titles.
 - Nothing leaves your computer: the camera picture is read live and never recorded.
-
-### Photo Cleanup
-
-- **Tap to select:** tap an object and it is outlined automatically (MobileSAM); tap more to add, Alt-click or right-click to take a part away, and fix the outline with the brush or eraser. "Grow" widens the selection so soft edges go too.
-- **Remove:** the selection is filled in with LaMa, an inpainting model, around the object at its own resolution and blended back into the full-size photo, so everything outside the edited area stays exactly as it was. A 12 MP photo takes a few seconds per removal on a normal PC.
-- **Extend the edges:** make the photo square, 4:5, 3:2, 16:9, 9:16 or drag the edges freely, and the new area is filled to match, step by step outward. Works best on skies, walls, grass, water and plain backgrounds; offline it cannot invent new objects.
-- **Compare and undo:** hold to see the original or drag a before/after slider; every removal and extension can be undone and redone.
-- **Save** as JPEG, PNG or WebP (keeps the orientation; keep or strip the photo details), or copy to the clipboard. HEIC files are not supported yet: export them to JPEG first.
-- Nothing is uploaded: both models are inside the app.
 
 ## Install
 

@@ -80,6 +80,85 @@ function renderFace(colours, opts = {}) {
   return { width, height, data, quad };
 }
 
+const K = require('./colour');
+const hexRgb = (hex) => { const h = String(hex).replace('#', ''); return [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16)); };
+/** Printed colours for a puzzle's colour set: the cube colours as above, the rest from their hex. */
+function printFor(colours) {
+  const byName = { white: PRINT.w, yellow: PRINT.y, green: PRINT.g, blue: PRINT.b, red: PRINT.r, orange: PRINT.o };
+  return Object.fromEntries(Object.entries(colours).map(([k, c]) => [k, byName[String(c.name).toLowerCase()] || hexRgb(c.hex)]));
+}
+// signed distances of p to the edges of a convex polygon (positive inside, whichever way it winds)
+function edgeDistances(poly, p) {
+  let a = 0; for (let i = 0; i < poly.length; i++) { const q = poly[i]; const r = poly[(i + 1) % poly.length]; a += q[0] * r[1] - r[0] * q[1]; }
+  const sgn = a >= 0 ? 1 : -1;
+  return poly.map((q, i) => {
+    const r = poly[(i + 1) % poly.length];
+    const ex = r[0] - q[0]; const ey = r[1] - q[1]; const len = Math.hypot(ex, ey) || 1;
+    return sgn * ((p[1] - q[1]) * -ex + (p[0] - q[0]) * ey) / len * -1;
+  });
+}
+
+/**
+ * Any puzzle face: an invented picture of one face template (puzzle.templates[face]) with known colours. colours: sticker
+ * index -> colour key (an array over all the puzzle's stickers, or an object). Options as renderFace, plus corners (where the
+ * outline's corners are in the picture, in K.outlineCorners order; default: centred, 70% of the picture) and print (colour
+ * key -> sRGB as printed). Returns { width, height, data, corners }.
+ */
+function renderTemplate(template, colours, opts = {}) {
+  const width = opts.width || 320; const height = opts.height || 240;
+  const corners = opts.corners || K.placeOutline(template, width / 2, height / 2, Math.min(width, height) * 0.7);
+  const print = opts.print || PRINT;
+  const light = opts.light || [1, 1, 1];
+  const noise = opts.noise == null ? 4 : opts.noise;
+  const glare = opts.glare || 0;
+  const bg = opts.background || [120, 116, 108];
+  const rnd = rng(opts.seed || 1);
+  const H = K.templateMap(template, corners);
+  const inv = K.invertMap(H);
+  const box = template.box; const span = Math.max(box.w, box.h);
+  const outline = K.outlineCorners(template);
+  const cells = template.stickers.map((s) => {
+    let a = 0; for (let i = 0; i < s.poly.length; i++) { const q = s.poly[i]; const r = s.poly[(i + 1) % s.poly.length]; a += q[0] * r[1] - r[0] * q[1]; }
+    const size = Math.sqrt(Math.abs(a) / 2);
+    const xs = s.poly.map((p) => p[0]); const ys = s.poly.map((p) => p[1]);
+    return { poly: s.poly, colour: colours[s.i], gap: 0.06 * size, radius: 0.12 * size * (s.poly.length === 3 ? 0.6 : 1), minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+  });
+  const data = new Uint8ClampedArray(width * height * 4);
+  const glareAt = [0.3 + 0.4 * rnd(), 0.3 + 0.4 * rnd()];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const t = K.mapPoint(inv, [x + 0.5, y + 0.5]);
+      const od = Math.min(...edgeDistances(outline, t));
+      let lin;
+      if (od < -0.02 * span) {
+        lin = bg.map((c) => toLin(c) * (0.85 + 0.15 * (y / height)));
+      } else {
+        let base = [18, 18, 20]; let onSticker = false;
+        for (const c of cells) {
+          if (t[0] < c.minX || t[0] > c.maxX || t[1] < c.minY || t[1] > c.maxY) continue;
+          const e = edgeDistances(c.poly, t);
+          if (Math.min(...e) < 0) continue;
+          const inset = c.gap + c.radius;
+          const q = Math.hypot(...e.map((v) => Math.max(0, inset - v)));
+          if (q <= c.radius) { onSticker = true; base = print[c.colour] || [60, 60, 60]; }
+          break;
+        }
+        lin = base.map((c) => toLin(c));
+        if (glare && onSticker) {
+          const u = (t[0] - box.minX) / span; const v = (t[1] - box.minY) / span;
+          const gdist = Math.hypot(u - glareAt[0], v - glareAt[1]);
+          const gl = glare * Math.exp(-(gdist * gdist) / 0.004);
+          lin = lin.map((c) => c + gl);
+        }
+      }
+      const o = (y * width + x) * 4;
+      for (let k = 0; k < 3; k++) data[o + k] = toSrgb(lin[k] * light[k]) + noise * gauss(rnd);
+      data[o + 3] = 255;
+    }
+  }
+  return { width, height, data, corners };
+}
+
 /** RGBA image -> one I420 (YUV 4:2:0, BT.601 studio range) frame. */
 function toI420(img) {
   const { width: w, height: h, data } = img;
@@ -116,4 +195,4 @@ function writeY4m(file, frames, fps = 10) {
   return file;
 }
 
-module.exports = { PRINT, renderFace, writeY4m, toI420, squareToQuad, invert3 };
+module.exports = { PRINT, printFor, renderTemplate, renderFace, writeY4m, toI420, squareToQuad, invert3 };
